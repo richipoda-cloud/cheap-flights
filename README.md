@@ -23,3 +23,5 @@ Bloccata al passo "Crea progetto" (serve una URL). Da fare: creare/pubblicare il
 ## Limite noto: "verifica prezzo"
 
 Data API Travelpayouts è basata su cache, non realtime per singolo volo (quello è Real-Time Search API, scartata per requisiti commerciali). `verify-price` ri-interroga la cache più fresca disponibile + genera deep link Aviasales dove si vede il prezzo vero finale.
+
+_(trigger primo deploy Vercel)_
