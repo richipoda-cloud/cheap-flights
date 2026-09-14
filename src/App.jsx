@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { COLORS } from "./theme/colors";
+import { isSupabaseConfigured } from "./lib/supabaseClient";
 import { useAuth } from "./hooks/useAuth";
 import { Login } from "./pages/Login";
+import { SetupNeeded } from "./pages/SetupNeeded";
 import { Home } from "./pages/Home";
 import { Search } from "./pages/Search";
 import { Results } from "./pages/Results";
@@ -12,6 +14,8 @@ import { Suggestions } from "./pages/Suggestions";
 
 export default function App() {
   const { user, loading } = useAuth();
+
+  if (!isSupabaseConfigured) return <SetupNeeded />;
 
   if (loading) {
     return (

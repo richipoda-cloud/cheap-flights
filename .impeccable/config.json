@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-14T22:26:47.395Z",
+        "reason": "design_system_reference.md guardaroba: font unico Inter esplicito, riuso intenzionale"
+      }
+    ]
+  }
+}

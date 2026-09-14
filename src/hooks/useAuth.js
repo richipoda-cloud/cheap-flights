@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 export function useAuth() {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return; // App.jsx mostra SetupNeeded, niente chiamate a un URL placeholder
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
