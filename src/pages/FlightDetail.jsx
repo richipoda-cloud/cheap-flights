@@ -49,51 +49,43 @@ function LegBox({ title, leg, route, date }) {
   );
 }
 
-// Un "percorso creativo" è DUE biglietti A/R separati e indipendenti (non un unico volo
-// con scalo): ognuno va verificato e prenotato per conto proprio, con il proprio deep link.
-function StopoverTicket({ index, leg }) {
-  const [verifiedPrice, setVerifiedPrice] = useState(null);
-  const [deepLink, setDeepLink] = useState(null);
-  const [verifying, setVerifying] = useState(true);
+function formatTime(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+}
 
-  useEffect(() => {
-    setVerifying(true);
-    verifyPrice(leg)
-      .then((data) => {
-        setVerifiedPrice(data?.price ?? leg.price);
-        if (data?.deepLink) setDeepLink(data.deepLink);
-      })
-      .finally(() => setVerifying(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+// Un "percorso creativo" è N biglietti one-way separati e indipendenti (non un unico
+// volo con scalo): ognuno va prenotato per conto proprio, col proprio deep link.
+// Orario/compagnia/deep link arrivano già pronti da search-stopover (v3/prices_for_dates,
+// one-way) — niente fetch di verifica extra, il prezzo è già quello trovato in ricerca.
+function MultiLegTicket({ index, total, leg }) {
   const handleBooking = () => {
-    if (deepLink) window.open(deepLink, "_blank", "noopener,noreferrer");
+    if (leg.deepLink) window.open(leg.deepLink, "_blank", "noopener,noreferrer");
   };
 
   return (
     <Card style={{ padding: 16, marginBottom: 16, border: `1px solid ${COLORS.plum}` }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.plum, marginBottom: 8 }}>
-        BIGLIETTO {index} DI 2
+        BIGLIETTO {index} DI {total}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
-          {leg.origin} ⇄ {leg.destination}
+          {leg.originAirport} → {leg.destinationAirport}
         </div>
+        {leg.duration != null && (
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration} min</div>
+        )}
       </div>
       <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
-        {leg.departDate} → {leg.returnDate}
+        {leg.date} · {formatTime(leg.departureAt)} · {leg.airline}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink }}>
-            {verifying ? "…" : `${verifiedPrice ?? leg.price} €`}
-          </div>
-          <div style={{ fontSize: 11, color: COLORS.inkSoft }}>
-            {verifying ? "Verifica in corso…" : "Prezzo verificato ora"}
-          </div>
+          <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink }}>{leg.price} €</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Prezzo dalla ricerca</div>
         </div>
-        <PrimaryButton variant="solid" onClick={handleBooking} disabled={verifying || !deepLink}>
+        <PrimaryButton variant="solid" onClick={handleBooking} disabled={!leg.deepLink}>
           Prenota biglietto {index}
         </PrimaryButton>
       </div>
@@ -173,12 +165,13 @@ export function FlightDetail() {
               lineHeight: 1.4,
             }}
           >
-            ✂️ Viaggio in 2 biglietti separati (via {flight.viaHub}) — completa entrambi gli
-            acquisti, non solo l'ultimo. Prezzo totale indicativo: {flight.price} €.
+            ✂️ Viaggio in {flight.legs.length} biglietti separati (via {flight.viaHub}) — completa
+            tutti gli acquisti, non solo l'ultimo. Prezzo totale indicativo: {flight.price} €.
           </div>
 
-          <StopoverTicket index={1} leg={flight.leg1} />
-          <StopoverTicket index={2} leg={flight.leg2} />
+          {flight.legs.map((leg, i) => (
+            <MultiLegTicket key={leg.id} index={i + 1} total={flight.legs.length} leg={leg} />
+          ))}
         </>
       ) : (
         <>

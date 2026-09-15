@@ -1,36 +1,81 @@
 // Edge Function: "scalo libero" — usata quando flexDeparture e/o flexArrival sono attive.
-// Logica (come da spec):
-//   1) origine → ovunque (1 chiamata)
-//   2) per i 3 candidati più economici: candidato → zona di destino (altre chiamate)
-//   3) se nessuno dà risparmio significativo vs il diretto, allarga a 3-5 candidati extra
-// Risultati restituiti separatamente ("Percorsi creativi"), mai mescolati con i diretti.
 //
-// NOTE: prima implementazione funzionale — da affinare con dati reali una volta attivo il
-// token Travelpayouts. TODO: gestire meglio il caso destinazione "Ovunque" combinata con
-// scalo libero (oggi il secondo leg usa la destinazione se fissa, altrimenti salta il narrowing).
-import {
-  TRAVELPAYOUTS_TOKEN,
-  fetchLatestPrices,
-  filterByNights,
-  filterByExcludedCountries,
-} from "../_shared/travelpayouts.ts";
+// Modello a 4 tratte ONE-WAY indipendenti (non più 2 round-trip nidificati):
+//   1) origine → hub        2) hub → destinazione
+//   3) destinazione → hub   4) hub → origine
+// Ogni tratta è un biglietto separato con orario/compagnia reali e deep link diretto
+// (aviasales/v3/prices_for_dates, one_way=true — stessa Data API gratuita, non Real-Time).
+// Vincolo di sequenza obbligatorio: ogni tratta deve avere data >= alla precedente
+// (+ eventuale soggiorno minimo richiesto), altrimenti l'itinerario è impossibile.
+//
+// Chiamate: 1 (candidati hub, origine→ovunque) + 3 per hub candidato (hub→dest,
+// dest→hub, hub→origine) = 1+3N. Vedi README per il confronto col modello precedente.
+import { fetchLatestPrices, filterByNights, filterByExcludedCountries } from "../_shared/travelpayouts.ts";
+import { TRAVELPAYOUTS_TOKEN, fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const INITIAL_CANDIDATES = 5;
-const EXPANDED_CANDIDATES = 10; // molti candidati economici non hanno affatto voli verso la destinazione
-const SIGNIFICANT_SAVING_RATIO = 0.85; // stopover deve costare <85% del diretto per valere la pena
+const EXPANDED_CANDIDATES = 10;
+const SIGNIFICANT_SAVING_RATIO = 0.85;
+const TOP_K_FIRST_LEG = 8; // ventaglio di partenze provate per la prima tratta, gratis (solo CPU)
 
-const MIN_HUB_NIGHTS = 1; // sotto 1 notte all'hub non c'è finestra per il secondo biglietto
+function addDays(dateStr: string, days: number) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
-async function findCandidates(origins: string[], count: number, excludedCountries?: string[] | null) {
-  const perOrigin = await Promise.all(
-    origins.map((origin) => fetchLatestPrices({ origin, limit: 200 }))
-  );
-  const withoutExcluded = filterByExcludedCountries(perOrigin.flat(), excludedCountries);
-  return withoutExcluded
-    .filter((r) => (r.nights ?? 0) >= MIN_HUB_NIGHTS)
-    .sort((a, b) => a.price - b.price)
+function cheapestAfter(options: any[], afterDate: string, minGapDays: number) {
+  const minDate = addDays(afterDate, minGapDays);
+  return options.filter((o) => o.date >= minDate).sort((a, b) => a.price - b.price)[0] ?? null;
+}
+
+// Prova le TOP_K partenze più economiche per la prima tratta, poi incastra a cascata
+// (greedy: tratta più economica compatibile) le successive — esplorare tutte le
+// combinazioni esploderebbe, questo ventaglio è un compromesso a costo zero di API.
+function pickCheapestChain(legOptionsList: any[][], minGapDaysList: number[]) {
+  const [first, ...rest] = legOptionsList;
+  if (!first?.length) return null;
+
+  let best: { legs: any[]; total: number } | null = null;
+  const candidates = [...first].sort((a, b) => a.price - b.price).slice(0, TOP_K_FIRST_LEG);
+
+  for (const start of candidates) {
+    const legs = [start];
+    let ok = true;
+    for (let i = 0; i < rest.length; i++) {
+      const next = cheapestAfter(rest[i], legs[legs.length - 1].date, minGapDaysList[i] ?? 0);
+      if (!next) {
+        ok = false;
+        break;
+      }
+      legs.push(next);
+    }
+    if (!ok) continue;
+    const total = legs.reduce((sum, l) => sum + l.price, 0);
+    if (!best || total < best.total) best = { legs, total };
+  }
+  return best;
+}
+
+function groupByDestination(options: any[]) {
+  const groups = new Map<string, any[]>();
+  for (const o of options) {
+    if (!groups.has(o.destination)) groups.set(o.destination, []);
+    groups.get(o.destination)!.push(o);
+  }
+  return groups;
+}
+
+async function findHubCandidates(origins: string[], count: number, excludedCountries?: string[] | null) {
+  const perOrigin = await Promise.all(origins.map((origin) => fetchOneWayPrices({ origin, limit: 200 })));
+  const all = filterByExcludedCountries(perOrigin.flat(), excludedCountries);
+  const groups = groupByDestination(all);
+  const ranked = [...groups.entries()]
+    .map(([hub, options]) => ({ hub, options, minPrice: Math.min(...options.map((o) => o.price)) }))
+    .sort((a, b) => a.minPrice - b.minPrice)
     .slice(0, count);
+  return ranked;
 }
 
 Deno.serve(async (req) => {
@@ -47,32 +92,26 @@ Deno.serve(async (req) => {
     const filters = await req.json();
     const origins: string[] = filters.origins ?? [];
     const destination: string | null = filters.destination ?? null;
+    const minNightsAtDest = filters.nightsMin ?? 0;
 
-    // Prezzo diretto di riferimento per valutare se lo scalo conviene davvero
-    const directResults = await Promise.all(
-      origins.map((origin) => fetchLatestPrices({ origin, destination }))
-    );
-    const cheapestDirect = directResults.flat().sort((a, b) => a.price - b.price)[0];
-    const directPrice = cheapestDirect?.price ?? Infinity;
+    // Prezzo diretto di riferimento (round-trip aggregato v2, coerente con search-direct)
+    const directResults = await Promise.all(origins.map((o) => fetchLatestPrices({ origin: o, destination })));
+    const directPrice = directResults.flat().sort((a, b) => a.price - b.price)[0]?.price ?? Infinity;
 
-    let candidates = await findCandidates(origins, INITIAL_CANDIDATES, filters.excludedCountries);
-    let creativeResults = await buildCreativeResults(candidates, destination, directPrice);
+    let hubCandidates = await findHubCandidates(origins, INITIAL_CANDIDATES, filters.excludedCountries);
+    let results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
 
-    if (creativeResults.length === 0) {
-      // Nessun risparmio significativo: allarga ad altri candidati
-      const moreCandidates = await findCandidates(
+    if (results.length === 0) {
+      const more = await findHubCandidates(
         origins,
         INITIAL_CANDIDATES + EXPANDED_CANDIDATES,
         filters.excludedCountries
       );
-      candidates = moreCandidates.slice(INITIAL_CANDIDATES);
-      creativeResults = await buildCreativeResults(candidates, destination, directPrice);
+      hubCandidates = more.slice(INITIAL_CANDIDATES);
+      results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
     }
 
-    // Il paese della destinazione finale va comunque ricontrollato: nel ramo "Ovunque" i
-    // candidati sono già la destinazione mostrata, ma qui filtriamo anche il ramo a
-    // destinazione fissa per coerenza (mai un risultato nel paese escluso, in nessun campo).
-    const withoutExcluded = filterByExcludedCountries(creativeResults, filters.excludedCountries);
+    const withoutExcluded = filterByExcludedCountries(results, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
 
     return new Response(JSON.stringify({ results: filtered.sort((a, b) => a.price - b.price) }), {
@@ -86,55 +125,65 @@ Deno.serve(async (req) => {
   }
 });
 
-async function buildCreativeResults(candidates: any[], destination: string | null, directPrice: number) {
-  if (!destination) {
-    // Destinazione "Ovunque" + scalo libero: i candidati stessi sono già proposte valide,
-    // marcati come percorso creativo se sotto soglia di risparmio rispetto al minimo diretto.
-    return candidates.filter((c) => c.price < directPrice * SIGNIFICANT_SAVING_RATIO);
-  }
+async function buildResults(
+  hubCandidates: { hub: string; options: any[] }[],
+  origins: string[],
+  destination: string | null,
+  minNightsAtDest: number,
+  directPrice: number
+) {
+  const results = await Promise.all(
+    hubCandidates.map(async ({ hub, options: leg1Options }) => {
+      if (!destination) {
+        // "Ovunque": 2 tratte one-way, hub è anche la destinazione finale.
+        const leg4Options = (
+          await Promise.all(origins.map((o) => fetchOneWayPrices({ origin: hub, destination: o, limit: 100 })))
+        ).flat();
+        const chain = pickCheapestChain([leg1Options, leg4Options], [minNightsAtDest]);
+        if (!chain || chain.total >= directPrice * SIGNIFICANT_SAVING_RATIO) return null;
+        return buildResultFromChain(chain, hub, chain.legs[0].destination);
+      }
 
-  // Limit alto qui: serve un campione ampio di date hub→destinazione per trovare almeno
-  // una combinazione che cada dentro la finestra di leg1 (vedi vincolo date sotto).
-  const secondLegs = await Promise.all(
-    candidates.map((c) => fetchLatestPrices({ origin: c.destination, destination, limit: 500 }))
+      // Destinazione fissa: 4 tratte — origine→hub, hub→dest, dest→hub, hub→origine
+      const [leg2Options, leg3Options, leg4Options] = await Promise.all([
+        fetchOneWayPrices({ origin: hub, destination, limit: 100 }),
+        fetchOneWayPrices({ origin: destination, destination: hub, limit: 100 }),
+        (async () =>
+          (
+            await Promise.all(origins.map((o) => fetchOneWayPrices({ origin: hub, destination: o, limit: 100 })))
+          ).flat())(),
+      ]);
+      const chain = pickCheapestChain(
+        [leg1Options, leg2Options, leg3Options, leg4Options],
+        [0, minNightsAtDest, 0]
+      );
+      if (!chain || chain.total >= directPrice * SIGNIFICANT_SAVING_RATIO) return null;
+      return buildResultFromChain(chain, hub, destination);
+    })
   );
+  return results.filter(Boolean);
+}
 
-  // Percorso creativo = DUE biglietti A/R separati e indipendenti (non un unico volo con
-  // scalo): leg1 origine→hub, leg2 hub→destinazione, ciascuno con le proprie date/prezzo/
-  // deep link. Vanno mostrati ed acquistati come due prenotazioni distinte.
-  //
-  // Vincolo fisico obbligatorio: il viaggiatore è all'hub solo tra l'andata di leg1 e il
-  // ritorno di leg1, quindi leg2 (hub→destinazione) deve stare INTERAMENTE dentro quella
-  // finestra (leg2.departDate >= leg1.departDate e leg2.returnDate <= leg1.returnDate) —
-  // altrimenti si propone un itinerario con le date fuori ordine, impossibile da seguire.
-  const combined = candidates.flatMap((c, i) => {
-    const legs = secondLegs[i] ?? [];
-    const compatibleLegs = legs.filter(
-      (leg: any) => leg.departDate >= c.departDate && leg.returnDate <= c.returnDate
-    );
-    const cheapestLeg = compatibleLegs.sort((a: any, b: any) => a.price - b.price)[0];
-    if (!cheapestLeg) return [];
-    const totalPrice = c.price + cheapestLeg.price;
-    if (totalPrice >= directPrice * SIGNIFICANT_SAVING_RATIO) return [];
-    return [
-      {
-        id: `stopover-${c.id}-${cheapestLeg.id}`,
-        isStopover: true,
-        viaHub: c.destination,
-        origin: c.origin,
-        destination: cheapestLeg.destination,
-        destinationName: cheapestLeg.destinationName,
-        countryCode: cheapestLeg.countryCode,
-        departDate: c.departDate,
-        returnDate: c.returnDate,
-        nights: cheapestLeg.nights,
-        price: totalPrice,
-        currency: c.currency,
-        leg1: c,
-        leg2: cheapestLeg,
-      },
-    ];
-  });
-
-  return combined;
+function buildResultFromChain(chain: { legs: any[]; total: number }, hub: string, finalDestination: string) {
+  const legs = chain.legs;
+  const last = legs[legs.length - 1];
+  const arrivalLeg = legs.length === 4 ? legs[1] : legs[0]; // tratta che arriva alla destinazione finale
+  const departureLeg = legs.length === 4 ? legs[2] : last; // tratta che riparte dalla destinazione finale
+  return {
+    id: `multileg-${legs.map((l) => l.id).join("-")}`,
+    isStopover: true,
+    viaHub: hub,
+    origin: legs[0].originAirport,
+    destination: finalDestination,
+    destinationName: arrivalLeg.destinationName,
+    countryCode: arrivalLeg.countryCode,
+    departDate: legs[0].date,
+    returnDate: last.date,
+    nights: Math.round(
+      (new Date(departureLeg.date).getTime() - new Date(arrivalLeg.date).getTime()) / 86400000
+    ),
+    price: chain.total,
+    currency: "EUR",
+    legs,
+  };
 }
