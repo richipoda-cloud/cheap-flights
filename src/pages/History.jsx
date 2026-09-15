@@ -64,13 +64,13 @@ export function History() {
                   {details && (
                     <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{details}</div>
                   )}
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 4 }}>
+                    {formatRelativeTime(s.created_at)}
+                  </div>
                 </div>
                 <PrimaryButton variant="solid" onClick={() => resume(s.filters)}>
                   ↻ Riprendi
                 </PrimaryButton>
-              </div>
-              <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8 }}>
-                {formatRelativeTime(s.created_at)}
               </div>
             </Card>
           </SwipeToDelete>
