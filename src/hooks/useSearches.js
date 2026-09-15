@@ -31,5 +31,13 @@ export function useSearches(userId) {
     [userId, reload]
   );
 
-  return { searches, loading, recordSearch, reload };
+  const removeSearch = useCallback(
+    async (id) => {
+      await supabase.from("searches").delete().eq("id", id);
+      reload();
+    },
+    [reload]
+  );
+
+  return { searches, loading, recordSearch, removeSearch, reload };
 }

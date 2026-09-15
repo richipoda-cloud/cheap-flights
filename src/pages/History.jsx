@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { COLORS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { SwipeToDelete } from "../components/SwipeToDelete";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 import { cityName } from "../lib/cityNames";
@@ -34,7 +35,7 @@ function describeDetails(f) {
 export function History() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { searches, loading } = useSearches(user?.id);
+  const { searches, loading, removeSearch } = useSearches(user?.id);
 
   const resume = (filters) => navigate("/results", { state: { filters } });
 
@@ -55,22 +56,24 @@ export function History() {
       {searches.map((s) => {
         const details = describeDetails(s.filters);
         return (
-          <Card key={s.id} style={{ padding: 14, marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{describeFilters(s.filters)}</div>
-                {details && (
-                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{details}</div>
-                )}
+          <SwipeToDelete key={s.id} onDelete={() => removeSearch(s.id)}>
+            <Card style={{ padding: 14, marginBottom: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{describeFilters(s.filters)}</div>
+                  {details && (
+                    <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{details}</div>
+                  )}
+                </div>
+                <PrimaryButton variant="solid" onClick={() => resume(s.filters)}>
+                  ↻ Riprendi
+                </PrimaryButton>
               </div>
-              <PrimaryButton variant="solid" onClick={() => resume(s.filters)}>
-                ↻ Riprendi
-              </PrimaryButton>
-            </div>
-            <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8 }}>
-              {formatRelativeTime(s.created_at)}
-            </div>
-          </Card>
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8 }}>
+                {formatRelativeTime(s.created_at)}
+              </div>
+            </Card>
+          </SwipeToDelete>
         );
       })}
     </div>
