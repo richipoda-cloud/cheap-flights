@@ -12,6 +12,11 @@ import { useUserPreferences } from "../hooks/useUserPreferences";
 import { countryName } from "../lib/countryNames";
 import { cityName, resolveCityCode } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
+import cities from "../data/cities.json";
+
+// Suggerimenti di completamento per il campo Partenza — nomi città + gli override
+// manuali (Bergamo, aggregata da Travelpayouts sotto Milano ma cercata col suo nome).
+const ORIGIN_SUGGESTIONS = [...new Set([...cities.map((c) => c.name), "Bergamo"])];
 
 function Section({ label, action, children }) {
   return (
@@ -228,9 +233,24 @@ export function Search() {
     <div style={{ padding: 20, paddingBottom: 100 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontWeight: 600, fontSize: 22, color: COLORS.ink }}>Cerca voli</div>
-        <Pill tone="plum" onClick={resetFilters}>
+        <button
+          onClick={resetFilters}
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 600,
+            fontSize: 11.5,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: COLORS.plum,
+            background: COLORS.surface,
+            border: `1px solid ${COLORS.hairline}`,
+            borderRadius: RADIUS.pill,
+            padding: "3px 10px",
+            cursor: "pointer",
+          }}
+        >
           Azzera
-        </Pill>
+        </button>
       </div>
 
       <Section
@@ -270,6 +290,7 @@ export function Search() {
           <>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <input
+                list="origin-options"
                 value={originInput}
                 onChange={(e) => {
                   setOriginInput(e.target.value);
@@ -280,6 +301,11 @@ export function Search() {
                 style={inputStyle}
                 autoFocus={addingOrigin}
               />
+              <datalist id="origin-options">
+                {ORIGIN_SUGGESTIONS.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
               <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
             </div>
             {originError && (
