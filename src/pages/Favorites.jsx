@@ -11,6 +11,8 @@ import { formatDateRangeShort, formatRelativeTime } from "../lib/formatters";
 
 function FavoriteCard({ fav, onOpen, onVerify }) {
   const [verifying, setVerifying] = useState(false);
+  const [justVerified, setJustVerified] = useState(false); // il prezzo può non cambiare:
+  // senza questo, un esito "nessuna variazione" sembra un bottone che non ha fatto nulla
   const flight = fav.flight_snapshot ?? {};
   const canVerify = !flight.isStopover; // percorsi creativi: niente singolo endpoint sensato
 
@@ -19,6 +21,8 @@ function FavoriteCard({ fav, onOpen, onVerify }) {
     setVerifying(true);
     await onVerify(fav);
     setVerifying(false);
+    setJustVerified(true);
+    setTimeout(() => setJustVerified(false), 2000);
   };
 
   return (
@@ -42,21 +46,21 @@ function FavoriteCard({ fav, onOpen, onVerify }) {
           {canVerify && (
             <button
               onClick={handleVerify}
-              disabled={verifying}
+              disabled={verifying || justVerified}
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontSize: 11,
                 fontWeight: 600,
-                color: COLORS.plum,
-                background: "transparent",
-                border: `1px solid ${COLORS.hairline}`,
+                color: justVerified ? COLORS.accent : COLORS.plum,
+                background: justVerified ? COLORS.accentSoft : "transparent",
+                border: `1px solid ${justVerified ? COLORS.accent : COLORS.hairline}`,
                 borderRadius: RADIUS.pill,
                 padding: "4px 10px",
                 marginTop: 6,
-                cursor: verifying ? "default" : "pointer",
+                cursor: verifying || justVerified ? "default" : "pointer",
               }}
             >
-              {verifying ? "…" : "🔄 Verifica prezzo"}
+              {verifying ? "…" : justVerified ? "✓ Verificato" : "🔄 Verifica prezzo"}
             </button>
           )}
         </div>

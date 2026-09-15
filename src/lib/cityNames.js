@@ -21,3 +21,23 @@ export function cityName(code) {
   const cityCode = airportCityMap[upper];
   return (cityCode && CITY_BY_CODE[cityCode]) ?? code;
 }
+
+// Direzione inversa: l'utente scrive un NOME ("Bologna", "Bergamo") in un campo che poi
+// va all'API come codice — senza questa risoluzione, un nome scritto invece di un codice
+// dà silenziosamente zero risultati (l'API non riconosce "BOLOGNA" come codice valido).
+const CODE_BY_NAME = Object.fromEntries(cities.map((c) => [c.name.toLowerCase(), c.code]));
+const CODE_BY_OVERRIDE_NAME = Object.fromEntries(
+  Object.entries(ORIGIN_NAME_OVERRIDES).map(([code, name]) => [name.toLowerCase(), code])
+);
+
+export function resolveCityCode(input) {
+  if (!input) return null;
+  const trimmed = input.trim();
+  const lower = trimmed.toLowerCase();
+  // Override espliciti prima (Bergamo -> BGY, non l'aggregato città MIL)
+  if (CODE_BY_OVERRIDE_NAME[lower]) return CODE_BY_OVERRIDE_NAME[lower];
+  if (CODE_BY_NAME[lower]) return CODE_BY_NAME[lower];
+  // Già un codice valido (3 lettere, es. un aeroporto minore non coperto dal nome)
+  if (/^[a-zA-Z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
+  return null;
+}

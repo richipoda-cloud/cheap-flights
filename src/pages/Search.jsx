@@ -10,7 +10,7 @@ import { FlagIcon } from "../components/FlagIcon";
 import { useAuth } from "../hooks/useAuth";
 import { useUserPreferences } from "../hooks/useUserPreferences";
 import { countryName } from "../lib/countryNames";
-import { cityName } from "../lib/cityNames";
+import { cityName, resolveCityCode } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
 
 function Section({ label, action, children }) {
@@ -154,10 +154,17 @@ export function Search() {
     }
   }, [origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival]);
 
+  const [originError, setOriginError] = useState(null);
+
   const addOrigin = () => {
-    const code = originInput.trim().toUpperCase();
-    if (code && !origins.includes(code)) setOrigins([...origins, code]);
+    const code = resolveCityCode(originInput);
+    if (!code) {
+      setOriginError(`"${originInput}" non riconosciuto — scrivi il nome della città o il codice IATA`);
+      return;
+    }
+    if (!origins.includes(code)) setOrigins([...origins, code]);
     setOriginInput("");
+    setOriginError(null);
     setAddingOrigin(false);
   };
 
@@ -221,12 +228,9 @@ export function Search() {
     <div style={{ padding: 20, paddingBottom: 100 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontWeight: 600, fontSize: 22, color: COLORS.ink }}>Cerca voli</div>
-        <span
-          onClick={resetFilters}
-          style={{ fontSize: 13, fontWeight: 600, color: COLORS.plum, cursor: "pointer" }}
-        >
+        <Pill tone="plum" onClick={resetFilters}>
           Azzera
-        </span>
+        </Pill>
       </div>
 
       <Section
@@ -263,16 +267,25 @@ export function Search() {
           </Card>
         ))}
         {(origins.length === 0 || addingOrigin) && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <input
-              value={originInput}
-              onChange={(e) => setOriginInput(e.target.value)}
-              placeholder="Codice IATA (es. MXP)"
-              style={inputStyle}
-              autoFocus={addingOrigin}
-            />
-            <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
-          </div>
+          <>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input
+                value={originInput}
+                onChange={(e) => {
+                  setOriginInput(e.target.value);
+                  setOriginError(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && addOrigin()}
+                placeholder="Città o codice IATA (es. Bergamo, MXP)"
+                style={inputStyle}
+                autoFocus={addingOrigin}
+              />
+              <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
+            </div>
+            {originError && (
+              <div style={{ fontSize: 11.5, color: COLORS.warn, marginTop: 6 }}>{originError}</div>
+            )}
+          </>
         )}
         <ToggleRow
           label="Arrivo finale flessibile"
