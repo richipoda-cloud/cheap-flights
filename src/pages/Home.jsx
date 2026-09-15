@@ -11,14 +11,14 @@ function SearchCard({ onClick }) {
     <Card
       onClick={onClick}
       style={{
-        padding: 24,
+        padding: 16,
         background: COLORS.accent,
         border: "none",
         boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
       }}
     >
-      <div style={{ fontSize: 28, marginBottom: 6 }}>🔍</div>
-      <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF", marginBottom: 4 }}>
+      <div style={{ fontSize: 26, lineHeight: 1, marginBottom: 4 }}>🔍</div>
+      <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF", marginBottom: 2 }}>
         Cerca voli
       </div>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
@@ -28,8 +28,8 @@ function SearchCard({ onClick }) {
 
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
-    <Card onClick={onClick} style={{ padding: 16 }}>
-      <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+    <Card onClick={onClick} style={{ padding: 14 }}>
+      <div style={{ fontSize: 20, lineHeight: 1, marginBottom: 4 }}>{icon}</div>
       <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink, marginBottom: 2 }}>{title}</div>
       {subtitle && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{subtitle}</div>}
     </Card>
@@ -52,16 +52,8 @@ export function Home() {
       : "In base alle tue ricerche passate";
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: 20 }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
         <SearchCard onClick={() => navigate("/search")} />
 
         <div style={{ display: "flex", gap: 12 }}>
@@ -83,9 +75,9 @@ export function Home() {
           </div>
         </div>
 
-        <Card onClick={() => navigate("/suggestions")} style={{ padding: 24 }}>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>✨</div>
-          <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink, marginBottom: 4 }}>
+        <Card onClick={() => navigate("/suggestions")} style={{ padding: 16 }}>
+          <div style={{ fontSize: 22, lineHeight: 1, marginBottom: 4 }}>✨</div>
+          <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink, marginBottom: 2 }}>
             Suggeriti per te
           </div>
           <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{suggestSubtitle}</div>
