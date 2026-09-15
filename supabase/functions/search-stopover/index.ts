@@ -83,6 +83,9 @@ async function buildCreativeResults(candidates: any[], destination: string | nul
     candidates.map((c) => fetchLatestPrices({ origin: c.destination, destination }))
   );
 
+  // Percorso creativo = DUE biglietti A/R separati e indipendenti (non un unico volo con
+  // scalo): leg1 origine→hub, leg2 hub→destinazione, ciascuno con le proprie date/prezzo/
+  // deep link. Vanno mostrati ed acquistati come due prenotazioni distinte.
   const combined = candidates.flatMap((c, i) => {
     const legs = secondLegs[i] ?? [];
     const cheapestLeg = legs.sort((a: any, b: any) => a.price - b.price)[0];
@@ -91,10 +94,20 @@ async function buildCreativeResults(candidates: any[], destination: string | nul
     if (totalPrice >= directPrice * SIGNIFICANT_SAVING_RATIO) return [];
     return [
       {
-        ...cheapestLeg,
-        id: `stopover-${c.destination}-${cheapestLeg.id}`,
-        price: totalPrice,
+        id: `stopover-${c.id}-${cheapestLeg.id}`,
+        isStopover: true,
         viaHub: c.destination,
+        origin: c.origin,
+        destination: cheapestLeg.destination,
+        destinationName: cheapestLeg.destinationName,
+        countryCode: cheapestLeg.countryCode,
+        departDate: c.departDate,
+        returnDate: c.returnDate,
+        nights: cheapestLeg.nights,
+        price: totalPrice,
+        currency: c.currency,
+        leg1: c,
+        leg2: cheapestLeg,
       },
     ];
   });

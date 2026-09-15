@@ -19,6 +19,7 @@ function ResultRow({ result, filters, onClick }) {
             </div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
               {result.departDate} → {result.returnDate}
+              {result.isStopover && ` · via ${result.viaHub}`}
             </div>
           </div>
         </div>
