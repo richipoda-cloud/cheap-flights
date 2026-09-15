@@ -4,12 +4,13 @@ import { COLORS, RADIUS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { FlagIcon } from "../components/FlagIcon";
 import { FreshnessBadge } from "../components/FreshnessBadge";
+import { SwipeToDelete } from "../components/SwipeToDelete";
 import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
 import { cityName } from "../lib/cityNames";
 import { formatDateRangeShort, formatRelativeTime } from "../lib/formatters";
 
-function FavoriteCard({ fav, onOpen, onVerify }) {
+function FavoriteCard({ fav, onOpen, onVerify, onDelete }) {
   const [verifying, setVerifying] = useState(false);
   const [justVerified, setJustVerified] = useState(false); // il prezzo può non cambiare:
   // senza questo, un esito "nessuna variazione" sembra un bottone che non ha fatto nulla
@@ -26,7 +27,8 @@ function FavoriteCard({ fav, onOpen, onVerify }) {
   };
 
   return (
-    <Card onClick={onOpen} style={{ padding: 14, marginBottom: 10 }}>
+    <SwipeToDelete onDelete={onDelete}>
+      <Card onClick={onOpen} style={{ padding: 14, marginBottom: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <FlagIcon countryCode={flight.countryCode} />
@@ -78,14 +80,15 @@ function FavoriteCard({ fav, onOpen, onVerify }) {
         <span style={{ fontSize: 12, color: COLORS.inkSoft }}>Salvato {formatRelativeTime(fav.saved_at)}</span>
         <FreshnessBadge isFresh={fav.is_fresh} price={fav.price} originalPrice={fav.original_price} />
       </div>
-    </Card>
+      </Card>
+    </SwipeToDelete>
   );
 }
 
 export function Favorites() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { favorites, loading, verifyFavorite } = useFavorites(user?.id);
+  const { favorites, loading, verifyFavorite, removeFavorite } = useFavorites(user?.id);
 
   return (
     <div style={{ padding: 20 }}>
@@ -109,6 +112,7 @@ export function Favorites() {
             fav={fav}
             onOpen={() => navigate("/flight", { state: { flight, filters: flight.searchFilters } })}
             onVerify={verifyFavorite}
+            onDelete={() => removeFavorite(fav.id)}
           />
         );
       })}
