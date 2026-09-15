@@ -112,8 +112,10 @@ export function FlightDetail() {
       navigate("/results");
       return;
     }
-    if (flight.isStopover) {
-      setVerifying(false); // verifica gestita dai due StopoverTicket, indipendenti
+    if (flight.isStopover || (flight.viaHub && !Array.isArray(flight.legs))) {
+      // stopover valido: verifica gestita dai MultiLegTicket, indipendenti
+      // schema legacy: dato inaffidabile, non ha senso verificarlo — vedi isLegacySchema sotto
+      setVerifying(false);
       return;
     }
     setVerifying(true);
@@ -128,6 +130,11 @@ export function FlightDetail() {
   }, []);
 
   if (!flight) return null;
+
+  // Un preferito salvato da una versione precedente dell'app (percorso creativo con lo
+  // schema vecchio leg1/leg2, o ancora prima) non ha legs[] — mostrarlo come se fosse
+  // valido darebbe un itinerario incompleto o fuorviante (tratte mancanti, date perse).
+  const isLegacySchema = Boolean(flight.viaHub) && !Array.isArray(flight.legs);
 
   const nights = flight.nights ?? "?";
 
@@ -151,7 +158,24 @@ export function FlightDetail() {
         <Pill tone="accent">{nights} notti</Pill>
       </div>
 
-      {flight.isStopover ? (
+      {isLegacySchema ? (
+        <div
+          style={{
+            background: COLORS.cream,
+            border: `1px solid ${COLORS.warn}`,
+            color: COLORS.warn,
+            borderRadius: RADIUS.button,
+            padding: "14px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            lineHeight: 1.5,
+            marginBottom: 16,
+          }}
+        >
+          ⚠️ Questo preferito è stato salvato con una versione precedente dell'app e potrebbe
+          non essere più accurato — rifai la ricerca per un dato aggiornato.
+        </div>
+      ) : flight.isStopover ? (
         <>
           <div
             style={{
@@ -218,24 +242,26 @@ export function FlightDetail() {
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
 
-      <button
-        onClick={handleSaveFavorite}
-        style={{
-          background: "transparent",
-          border: `1px solid ${COLORS.hairline}`,
-          borderRadius: RADIUS.button,
-          padding: "10px 16px",
-          fontFamily: "'Inter', sans-serif",
-          fontWeight: 600,
-          fontSize: 13,
-          color: COLORS.plum,
-          cursor: "pointer",
-        }}
-      >
-        ★ Salva nei preferiti
-      </button>
+      {!isLegacySchema && (
+        <button
+          onClick={handleSaveFavorite}
+          style={{
+            background: "transparent",
+            border: `1px solid ${COLORS.hairline}`,
+            borderRadius: RADIUS.button,
+            padding: "10px 16px",
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 600,
+            fontSize: 13,
+            color: COLORS.plum,
+            cursor: "pointer",
+          }}
+        >
+          ★ Salva nei preferiti
+        </button>
+      )}
 
-      {!flight.isStopover && (
+      {!flight.isStopover && !isLegacySchema && (
         <div
           style={{
             position: "fixed",
