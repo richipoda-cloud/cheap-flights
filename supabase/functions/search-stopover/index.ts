@@ -15,14 +15,19 @@ import {
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const INITIAL_CANDIDATES = 3;
-const EXPANDED_CANDIDATES = 5;
+const INITIAL_CANDIDATES = 5;
+const EXPANDED_CANDIDATES = 10; // molti candidati economici non hanno affatto voli verso la destinazione
 const SIGNIFICANT_SAVING_RATIO = 0.85; // stopover deve costare <85% del diretto per valere la pena
 
+const MIN_HUB_NIGHTS = 1; // sotto 1 notte all'hub non c'è finestra per il secondo biglietto
+
 async function findCandidates(origins: string[], count: number) {
-  const perOrigin = await Promise.all(origins.map((origin) => fetchLatestPrices({ origin })));
+  const perOrigin = await Promise.all(
+    origins.map((origin) => fetchLatestPrices({ origin, limit: 200 }))
+  );
   return perOrigin
     .flat()
+    .filter((r) => (r.nights ?? 0) >= MIN_HUB_NIGHTS)
     .sort((a, b) => a.price - b.price)
     .slice(0, count);
 }
@@ -79,16 +84,26 @@ async function buildCreativeResults(candidates: any[], destination: string | nul
     return candidates.filter((c) => c.price < directPrice * SIGNIFICANT_SAVING_RATIO);
   }
 
+  // Limit alto qui: serve un campione ampio di date hub→destinazione per trovare almeno
+  // una combinazione che cada dentro la finestra di leg1 (vedi vincolo date sotto).
   const secondLegs = await Promise.all(
-    candidates.map((c) => fetchLatestPrices({ origin: c.destination, destination }))
+    candidates.map((c) => fetchLatestPrices({ origin: c.destination, destination, limit: 500 }))
   );
 
   // Percorso creativo = DUE biglietti A/R separati e indipendenti (non un unico volo con
   // scalo): leg1 origine→hub, leg2 hub→destinazione, ciascuno con le proprie date/prezzo/
   // deep link. Vanno mostrati ed acquistati come due prenotazioni distinte.
+  //
+  // Vincolo fisico obbligatorio: il viaggiatore è all'hub solo tra l'andata di leg1 e il
+  // ritorno di leg1, quindi leg2 (hub→destinazione) deve stare INTERAMENTE dentro quella
+  // finestra (leg2.departDate >= leg1.departDate e leg2.returnDate <= leg1.returnDate) —
+  // altrimenti si propone un itinerario con le date fuori ordine, impossibile da seguire.
   const combined = candidates.flatMap((c, i) => {
     const legs = secondLegs[i] ?? [];
-    const cheapestLeg = legs.sort((a: any, b: any) => a.price - b.price)[0];
+    const compatibleLegs = legs.filter(
+      (leg: any) => leg.departDate >= c.departDate && leg.returnDate <= c.returnDate
+    );
+    const cheapestLeg = compatibleLegs.sort((a: any, b: any) => a.price - b.price)[0];
     if (!cheapestLeg) return [];
     const totalPrice = c.price + cheapestLeg.price;
     if (totalPrice >= directPrice * SIGNIFICANT_SAVING_RATIO) return [];

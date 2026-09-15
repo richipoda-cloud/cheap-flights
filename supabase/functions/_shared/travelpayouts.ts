@@ -39,10 +39,12 @@ export async function fetchLatestPrices({
   origin,
   destination,
   dateFrom,
+  limit = 30,
 }: {
   origin: string;
   destination?: string | null;
   dateFrom?: string | null;
+  limit?: number;
 }) {
   if (!TRAVELPAYOUTS_TOKEN) throw new Error("TRAVELPAYOUTS_TOKEN non configurato");
 
@@ -50,7 +52,7 @@ export async function fetchLatestPrices({
     origin,
     currency: "EUR",
     token: TRAVELPAYOUTS_TOKEN,
-    limit: "30",
+    limit: String(limit),
     sorting: "price",
     one_way: "false",
     period_type: "month",
