@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <filter id="dollarShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="6" dy="8" stdDeviation="8" flood-color="#5a4212" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- sfondo squircle iOS-style -->
+  <rect x="4" y="4" width="504" height="504" rx="118" ry="118" fill="#FFFFFF" stroke="#DCE3D3" stroke-width="8"/>
+
+  <!-- $ dorato, dietro l'aereo -->
+  <text x="440" y="438" text-anchor="end" font-family="Georgia, serif" font-weight="700"
+        font-size="252" fill="#C9982F" filter="url(#dollarShadow)">$</text>
+
+  <!-- aereo verde stile Lucide "send", con alone bianco per staccarsi dal $ sottostante -->
+  <g transform="translate(88,118) scale(11.5)">
+    <g stroke="#FFFFFF" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z"/>
+      <path d="M22 2 11 13"/>
+    </g>
+    <g stroke="#6E7F5C" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z"/>
+      <path d="M22 2 11 13"/>
+    </g>
+  </g>
+</svg>
