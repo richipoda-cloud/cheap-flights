@@ -1,33 +1,60 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { COLORS } from "../theme/colors";
-import { Card } from "../components/Card";
+import { COLORS, RADIUS } from "../theme/colors";
 import { FlagIcon } from "../components/FlagIcon";
 import { searchDirect, searchStopover } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 
-function ResultRow({ result, filters, onClick }) {
+// Lista piatta con separatori sottili tra le righe (non una card per riga) — un unico
+// box bianco arrotondato che contiene tutte le righe di un gruppo (diretti o creativi).
+function FlatList({ children }) {
   return (
-    <Card onClick={onClick} style={{ padding: 14, marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <FlagIcon countryCode={result.countryCode} />
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
-              {result.destinationName ?? result.destination}
-            </div>
-            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
-              {result.departDate} → {result.returnDate}
-              {result.isStopover && ` · via ${result.viaHub}`}
-            </div>
+    <div
+      style={{
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.hairline}`,
+        borderRadius: RADIUS.card,
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ResultRow({ result, isLast, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: "14px 16px",
+        borderBottom: isLast ? "none" : `1px solid ${COLORS.hairline}`,
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <FlagIcon countryCode={result.countryCode} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
+            {result.destinationName ?? result.destination}
           </div>
-        </div>
-        <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-          {result.price} {result.currency ?? "€"}
+          <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+            {result.departDate} → {result.returnDate}
+            {result.isStopover && ` · via ${result.viaHub}`}
+          </div>
+          {result.nights != null && (
+            <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{result.nights} notti</div>
+          )}
         </div>
       </div>
-    </Card>
+      <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
+        {result.price} {result.currency ?? "€"}
+      </div>
+    </div>
   );
 }
 
@@ -93,9 +120,18 @@ export function Results() {
       {!loadingDirect && directResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>Nessun risultato diretto trovato.</div>
       )}
-      {directResults.map((r) => (
-        <ResultRow key={r.id} result={r} filters={filters} onClick={() => openDetail(r)} />
-      ))}
+      {directResults.length > 0 && (
+        <FlatList>
+          {directResults.map((r, i) => (
+            <ResultRow
+              key={r.id}
+              result={r}
+              isLast={i === directResults.length - 1}
+              onClick={() => openDetail(r)}
+            />
+          ))}
+        </FlatList>
+      )}
 
       {(filters.flexDeparture || filters.flexArrival) && (
         <>
@@ -114,9 +150,18 @@ export function Results() {
           {!loadingStopover && stopoverResults.length === 0 && (
             <div style={{ color: COLORS.inkSoft }}>Nessun percorso alternativo conveniente trovato.</div>
           )}
-          {stopoverResults.map((r) => (
-            <ResultRow key={r.id} result={r} filters={filters} onClick={() => openDetail(r)} />
-          ))}
+          {stopoverResults.length > 0 && (
+            <FlatList>
+              {stopoverResults.map((r, i) => (
+                <ResultRow
+                  key={r.id}
+                  result={r}
+                  isLast={i === stopoverResults.length - 1}
+                  onClick={() => openDetail(r)}
+                />
+              ))}
+            </FlatList>
+          )}
         </>
       )}
     </div>
