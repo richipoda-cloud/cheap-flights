@@ -9,21 +9,41 @@ import { verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
 
-function LegBox({ title, leg }) {
-  if (!leg) return null;
+// v2/prices/latest (Data API gratuita) non fornisce orari/compagnia/durata per singolo
+// volo, solo un prezzo aggregato per coppia di date — quel dettaglio si vede solo al
+// passo di prenotazione (deep link). Se in futuro un leg dettagliato è disponibile,
+// questo componente lo mostra per intero; altrimenti mostra rotta+data note onestamente.
+function LegBox({ title, leg, route, date }) {
+  if (leg) {
+    return (
+      <Card style={{ padding: 16, marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
+          {title}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
+            {leg.originAirport} → {leg.destinationAirport}
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration}</div>
+        </div>
+        <div style={{ fontSize: 13, color: COLORS.inkSoft }}>
+          {leg.departTime} — {leg.arriveTime} · {leg.airline}
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card style={{ padding: 16, marginBottom: 12 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
         {title}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
-          {leg.originAirport} → {leg.destinationAirport}
-        </div>
-        <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration}</div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>{route}</div>
+        <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{date}</div>
       </div>
-      <div style={{ fontSize: 13, color: COLORS.inkSoft }}>
-        {leg.departTime} — {leg.arriveTime} · {leg.airline}
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, fontStyle: "italic" }}>
+        Orari e compagnia disponibili al passo di prenotazione
       </div>
     </Card>
   );
@@ -83,8 +103,18 @@ export function FlightDetail() {
         <Pill tone="accent">{nights} notti</Pill>
       </div>
 
-      <LegBox title="Andata" leg={flight.outbound} />
-      <LegBox title="Ritorno" leg={flight.inbound} />
+      <LegBox
+        title="Andata"
+        leg={flight.outbound}
+        route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
+        date={flight.departDate}
+      />
+      <LegBox
+        title="Ritorno"
+        leg={flight.inbound}
+        route={`${flight.destination ?? "?"} → ${flight.origin ?? "?"}`}
+        date={flight.returnDate}
+      />
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
 
