@@ -4,7 +4,7 @@ import { COLORS, RADIUS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { Pill } from "../components/Pill";
 import { Toggle } from "../components/Toggle";
-import { DualRangeSlider, MAX_NIGHTS } from "../components/DualRangeSlider";
+import { DualRangeSlider, MIN_DAYS, MAX_DAYS } from "../components/DualRangeSlider";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { FlagIcon } from "../components/FlagIcon";
 import { useAuth } from "../hooks/useAuth";
@@ -13,38 +13,50 @@ import { countryName } from "../lib/countryNames";
 import { cityName } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
 
-function Section({ label, children }) {
+function Section({ label, action, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: COLORS.inkSoft,
-          marginBottom: 8,
-        }}
-      >
-        {label}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: COLORS.inkSoft,
+          }}
+        >
+          {label}
+        </div>
+        {action}
       </div>
       {children}
     </div>
   );
 }
 
-// Riga icona+label+sublabel a sinistra, Toggle iOS a destra — usata per Destinazione,
-// Date e le due Flessibilità, al posto delle coppie di pill "attivo/non attivo".
-function ToggleRow({ icon, label, hint, checked, onChange }) {
+// Due pill invece di un toggle: nessuna delle due è pre-selezionata finché l'utente
+// non sceglie esplicitamente (usata per Destinazione e Date — niente default nascosto).
+function ChoicePills({ options, value, onChange }) {
   return (
-    <Card style={{ padding: 14, marginBottom: 8 }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {options.map((opt) => (
+        <Pill key={opt.value} tone={value === opt.value ? "accent" : "neutral"} onClick={() => onChange(opt.value)}>
+          {opt.icon} {opt.label}
+        </Pill>
+      ))}
+    </div>
+  );
+}
+
+// Riga icona+label+sublabel a sinistra, Toggle iOS a destra — per le due Flessibilità.
+function ToggleRow({ label, hint, checked, onChange }) {
+  return (
+    <Card style={{ padding: 14, marginTop: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{label}</div>
-            {hint && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{hint}</div>}
-          </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{label}</div>
+          {hint && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{hint}</div>}
         </div>
         <Toggle checked={checked} onChange={onChange} />
       </div>
@@ -66,15 +78,17 @@ function resolveCountryCode(input) {
 // Filtri "sticky" nel browser: restano quelli dell'ultima ricerca finché non si preme
 // "Azzera filtri", anche navigando via e tornando su Cerca voli (a differenza di
 // Escludi paesi, che è legato all'account su Supabase, questo è solo locale).
+// destination/dateMode partono undefined (non "Ovunque"/"Sempre" preimpostati) — vanno
+// scelti esplicitamente, come la partenza.
 const STORAGE_KEY = "cheapflights_search_filters";
 const DEFAULT_FILTERS = {
   origins: [],
-  destination: null,
-  dateMode: "anytime",
+  destination: undefined,
+  dateMode: undefined,
   dateFrom: "",
   dateTo: "",
-  nightsMin: 0,
-  nightsMax: MAX_NIGHTS,
+  daysMin: MIN_DAYS,
+  daysMax: MAX_DAYS,
   flexDeparture: false,
   flexArrival: false,
 };
@@ -97,29 +111,31 @@ export function Search() {
 
   const [origins, setOrigins] = useState(() => loadPersistedFilters().origins);
   const [originInput, setOriginInput] = useState("");
+  const [addingOrigin, setAddingOrigin] = useState(false); // mostra il campo per aggiungerne altre dopo la prima
   const [destination, setDestination] = useState(() => loadPersistedFilters().destination);
   const [dateMode, setDateMode] = useState(() => loadPersistedFilters().dateMode);
   const [dateFrom, setDateFrom] = useState(() => loadPersistedFilters().dateFrom);
   const [dateTo, setDateTo] = useState(() => loadPersistedFilters().dateTo);
-  const [nightsMin, setNightsMinState] = useState(() => loadPersistedFilters().nightsMin);
-  const [nightsMax, setNightsMaxState] = useState(() => loadPersistedFilters().nightsMax);
+  const [daysMin, setDaysMinState] = useState(() => loadPersistedFilters().daysMin);
+  const [daysMax, setDaysMaxState] = useState(() => loadPersistedFilters().daysMax);
   const [flexDeparture, setFlexDeparture] = useState(() => loadPersistedFilters().flexDeparture);
   const [flexArrival, setFlexArrival] = useState(() => loadPersistedFilters().flexArrival);
   const [countryInput, setCountryInput] = useState("");
 
   useEffect(() => {
-    const state = { origins, destination, dateMode, dateFrom, dateTo, nightsMin, nightsMax, flexDeparture, flexArrival };
+    const state = { origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // storage non disponibile (privata/bloccato): i filtri restano solo per la sessione corrente
     }
-  }, [origins, destination, dateMode, dateFrom, dateTo, nightsMin, nightsMax, flexDeparture, flexArrival]);
+  }, [origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival]);
 
   const addOrigin = () => {
     const code = originInput.trim().toUpperCase();
     if (code && !origins.includes(code)) setOrigins([...origins, code]);
     setOriginInput("");
+    setAddingOrigin(false);
   };
 
   const removeOrigin = (code) => setOrigins(origins.filter((o) => o !== code));
@@ -138,29 +154,39 @@ export function Search() {
   const resetFilters = () => {
     setOrigins([]);
     setOriginInput("");
-    setDestination(null);
-    setDateMode("anytime");
+    setAddingOrigin(false);
+    setDestination(undefined);
+    setDateMode(undefined);
     setDateFrom("");
     setDateTo("");
-    setNightsMinState(0);
-    setNightsMaxState(MAX_NIGHTS);
+    setDaysMinState(MIN_DAYS);
+    setDaysMaxState(MAX_DAYS);
     setFlexDeparture(false);
     setFlexArrival(false);
     setCountryInput("");
     setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
   };
 
+  const canSearch =
+    origins.length > 0 &&
+    destination !== undefined &&
+    (destination === null || destination.length > 0) &&
+    dateMode !== undefined &&
+    (dateMode !== "fixed" || (dateFrom && dateTo));
+
   const runSearch = () => {
-    // Slider al range pieno (default) = nessun limite, coerente col comportamento originale
-    const noNightsLimit = nightsMin === 0 && nightsMax === MAX_NIGHTS;
+    if (!canSearch) return;
+    // Slider = giorni (1 = A/R in giornata, 0 notti); il filtro reale è in notti = giorni-1.
+    // Range pieno (default) = nessun limite.
+    const noLimit = daysMin === MIN_DAYS && daysMax === MAX_DAYS;
     const filters = {
       origins,
       destination, // null = ovunque
       dateMode,
       dateFrom: dateMode === "fixed" ? dateFrom : null,
       dateTo: dateMode === "fixed" ? dateTo : null,
-      nightsMin: noNightsLimit ? null : nightsMin,
-      nightsMax: noNightsLimit ? null : nightsMax,
+      nightsMin: noLimit ? null : daysMin - 1,
+      nightsMax: noLimit ? null : daysMax - 1,
       flexDeparture,
       flexArrival,
       excludedCountries,
@@ -180,7 +206,19 @@ export function Search() {
         </span>
       </div>
 
-      <Section label="Partenza">
+      <Section
+        label="Partenza"
+        action={
+          origins.length > 0 && !addingOrigin ? (
+            <span
+              onClick={() => setAddingOrigin(true)}
+              style={{ fontSize: 12, fontWeight: 600, color: COLORS.accent, cursor: "pointer" }}
+            >
+              + Aggiungi
+            </span>
+          ) : null
+        }
+      >
         {origins.length === 0 && (
           <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>
             Aggiungi almeno un aeroporto di partenza (es. BGY per Bergamo)
@@ -201,45 +239,62 @@ export function Search() {
             </div>
           </Card>
         ))}
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <input
-            value={originInput}
-            onChange={(e) => setOriginInput(e.target.value)}
-            placeholder="Codice IATA (es. MXP)"
-            style={inputStyle}
-          />
-          <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
-        </div>
+        {(origins.length === 0 || addingOrigin) && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <input
+              value={originInput}
+              onChange={(e) => setOriginInput(e.target.value)}
+              placeholder="Codice IATA (es. MXP)"
+              style={inputStyle}
+              autoFocus={addingOrigin}
+            />
+            <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
+          </div>
+        )}
+        <ToggleRow
+          label="Arrivo finale flessibile"
+          hint="Se conviene, atterra in un aeroporto diverso vicino a casa"
+          checked={flexArrival}
+          onChange={setFlexArrival}
+        />
       </Section>
 
       <Section label="Destinazione">
-        <ToggleRow
-          icon={destination === null ? "🌍" : "📍"}
-          label={destination === null ? "Ovunque" : "Fissa"}
-          hint={destination === null ? "Nessuna meta fissa" : "Scegli una destinazione precisa"}
-          checked={destination === null}
-          onChange={(isAnywhere) => setDestination(isAnywhere ? null : "")}
+        <ChoicePills
+          options={[
+            { value: null, icon: "🌍", label: "Ovunque" },
+            { value: "", icon: "📍", label: "Destinazione fissa" },
+          ]}
+          value={destination}
+          onChange={setDestination}
         />
-        {destination !== null && (
+        {destination !== undefined && destination !== null && (
           <input
             value={destination}
             onChange={(e) => setDestination(e.target.value.toUpperCase())}
             placeholder="Codice IATA città o paese"
-            style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
+            style={{ ...inputStyle, width: "100%", marginTop: 8 }}
           />
         )}
+        <ToggleRow
+          label="Ripartenza flessibile"
+          hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
+          checked={flexDeparture}
+          onChange={setFlexDeparture}
+        />
       </Section>
 
       <Section label="Date">
-        <ToggleRow
-          icon={dateMode === "anytime" ? "🎫" : "📅"}
-          label={dateMode === "anytime" ? "Sempre" : "Fisse"}
-          hint={dateMode === "anytime" ? "Prossimi 3 mesi" : "Scegli le date esatte"}
-          checked={dateMode === "anytime"}
-          onChange={(isAnytime) => setDateMode(isAnytime ? "anytime" : "fixed")}
+        <ChoicePills
+          options={[
+            { value: "anytime", icon: "🎫", label: "Sempre" },
+            { value: "fixed", icon: "📅", label: "Date fisse" },
+          ]}
+          value={dateMode}
+          onChange={setDateMode}
         />
         {dateMode === "fixed" && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
           </div>
@@ -249,32 +304,14 @@ export function Search() {
       <Section label="Durata soggiorno">
         <Card style={{ padding: 16 }}>
           <DualRangeSlider
-            min={nightsMin}
-            max={nightsMax}
+            min={daysMin}
+            max={daysMax}
             onChange={(lo, hi) => {
-              setNightsMinState(lo);
-              setNightsMaxState(hi);
+              setDaysMinState(lo);
+              setDaysMaxState(hi);
             }}
           />
         </Card>
-      </Section>
-
-      <Section label="Flessibilità ripartenza">
-        <ToggleRow
-          label="Aeroporto diverso a destino"
-          hint="Se conviene, riparti da lì vicino"
-          checked={flexDeparture}
-          onChange={setFlexDeparture}
-        />
-      </Section>
-
-      <Section label="Flessibilità arrivo finale">
-        <ToggleRow
-          label="Aeroporto diverso a casa"
-          hint="Se conviene, atterra lì vicino"
-          checked={flexArrival}
-          onChange={setFlexArrival}
-        />
       </Section>
 
       <Section label="Escludi paesi">
@@ -322,7 +359,7 @@ export function Search() {
         <PrimaryButton
           variant="solid"
           onClick={runSearch}
-          disabled={origins.length === 0}
+          disabled={!canSearch}
           style={{ width: "100%", justifyContent: "center", gap: 8 }}
         >
           🔍 Trova il più economico
