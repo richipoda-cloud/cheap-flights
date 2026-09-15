@@ -9,10 +9,11 @@ import { verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
 
-// v2/prices/latest (Data API gratuita) non fornisce orari/compagnia/durata per singolo
-// volo, solo un prezzo aggregato per coppia di date — quel dettaglio si vede solo al
-// passo di prenotazione (deep link). Se in futuro un leg dettagliato è disponibile,
-// questo componente lo mostra per intero; altrimenti mostra rotta+data note onestamente.
+// v2/prices/latest (round-trip aggregato, usato per lista+prezzo) non fornisce
+// orari/compagnia/durata — per quello, verify-price interroga in più anche
+// aviasales/v3/prices_for_dates (one-way, stesso endpoint dei Percorsi creativi) sulla
+// data esatta. Se in cache c'è un match, questo box mostra il dato reale; altrimenti
+// resta onesto sul limite invece di inventare o lasciare vuoto.
 function LegBox({ title, leg, route, date }) {
   if (leg) {
     return (
@@ -24,10 +25,12 @@ function LegBox({ title, leg, route, date }) {
           <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
             {leg.originAirport} → {leg.destinationAirport}
           </div>
-          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration}</div>
+          {leg.duration != null && (
+            <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration} min</div>
+          )}
         </div>
         <div style={{ fontSize: 13, color: COLORS.inkSoft }}>
-          {leg.departTime} — {leg.arriveTime} · {leg.airline}
+          {leg.date} · {formatTime(leg.departureAt)} · {leg.airline}
         </div>
       </Card>
     );
@@ -104,6 +107,8 @@ export function FlightDetail() {
 
   const [verifiedPrice, setVerifiedPrice] = useState(null);
   const [deepLink, setDeepLink] = useState(flight?.deepLink ?? null);
+  const [outboundLeg, setOutboundLeg] = useState(null);
+  const [inboundLeg, setInboundLeg] = useState(null);
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState(null);
 
@@ -123,6 +128,8 @@ export function FlightDetail() {
       .then((data) => {
         setVerifiedPrice(data?.price ?? flight.price);
         if (data?.deepLink) setDeepLink(data.deepLink);
+        if (data?.outboundLeg) setOutboundLeg(data.outboundLeg);
+        if (data?.inboundLeg) setInboundLeg(data.inboundLeg);
       })
       .catch((e) => setError(e.message))
       .finally(() => setVerifying(false));
@@ -227,13 +234,13 @@ export function FlightDetail() {
         <>
           <LegBox
             title="Andata"
-            leg={flight.outbound}
+            leg={outboundLeg}
             route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
             date={flight.departDate}
           />
           <LegBox
             title="Ritorno"
-            leg={flight.inbound}
+            leg={inboundLeg}
             route={`${flight.destination ?? "?"} → ${flight.origin ?? "?"}`}
             date={flight.returnDate}
           />

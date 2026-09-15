@@ -4,11 +4,22 @@
 // NON offre un vero check realtime per singolo volo — quello sarebbe la Real-Time Search
 // API, scartata per requisiti commerciali incompatibili. Qui si ri-interroga v2/prices/latest
 // ristretto esattamente a origine/destinazione/date per prendere il dato di cache più fresco
-// disponibile, e si costruisce il deep link alla ricerca reale su Aviasales (partner
-// Travelpayouts) dove il prezzo vero e finale si vede al passo di prenotazione.
-// La UI tratta comunque questo come "confermato" per semplicità (richiesta di prodotto).
+// disponibile (prezzo, comportamento invariato), e si costruisce il deep link round-trip
+// aggregato per la prenotazione (un volo diretto A/R è un biglietto unico, non due separati
+// come nei Percorsi creativi — qui il deep link resta quello classico origin+date+dest+date).
+//
+// In più (stesso refactor one-way già fatto per i Percorsi creativi): 2 chiamate extra a
+// aviasales/v3/prices_for_dates (andata + ritorno) SOLO per arricchire i box Andata/Ritorno
+// con orario/compagnia/durata reali quando disponibili in cache per quella data esatta —
+// se non c'è un match, resta il placeholder onesto invece di dato mancante o inventato.
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices } from "../_shared/travelpayouts.ts";
+import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+
+function pickCheapestOnDate(options: any[], date: string) {
+  const matches = options.filter((o) => o.date === date);
+  return matches.sort((a, b) => a.price - b.price)[0] ?? null;
+}
 
 const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
 
@@ -36,20 +47,25 @@ Deno.serve(async (req) => {
 
   try {
     const flight = await req.json();
-    const fresh = await fetchLatestPrices({
-      origin: flight.origin,
-      destination: flight.destination,
-      dateFrom: flight.departDate,
-    });
+
+    const [fresh, outboundOptions, inboundOptions] = await Promise.all([
+      fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
+      fetchOneWayPrices({ origin: flight.origin, destination: flight.destination, limit: 100 }),
+      fetchOneWayPrices({ origin: flight.destination, destination: flight.origin, limit: 100 }),
+    ]);
 
     const match = fresh.find(
       (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
     );
+    const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
+    const inboundLeg = pickCheapestOnDate(inboundOptions, flight.returnDate);
 
     return new Response(
       JSON.stringify({
         price: match?.price ?? flight.price,
         deepLink: buildDeepLink(flight),
+        outboundLeg,
+        inboundLeg,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
