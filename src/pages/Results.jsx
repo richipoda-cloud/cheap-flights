@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { COLORS } from "../theme/colors";
 import { Card } from "../components/Card";
@@ -42,13 +42,23 @@ export function Results() {
   const [loadingDirect, setLoadingDirect] = useState(true);
   const [loadingStopover, setLoadingStopover] = useState(false);
   const [error, setError] = useState(null);
+  const recordedRef = useRef(false);
+
+  // Separato dall'effect di ricerca: user?.id arriva async (sessione risolta dopo il
+  // mount), quindi va aspettato con la sua dependency, non catturato nella closure
+  // stale di un effect a dependency [] — altrimenti recordSearch(userId=undefined)
+  // ritorna subito senza salvare nulla, silenziosamente.
+  useEffect(() => {
+    if (!filters || !user?.id || recordedRef.current) return;
+    recordedRef.current = true;
+    recordSearch(filters);
+  }, [filters, user?.id, recordSearch]);
 
   useEffect(() => {
     if (!filters) {
       navigate("/search");
       return;
     }
-    recordSearch(filters);
 
     setLoadingDirect(true);
     searchDirect(filters)
