@@ -60,9 +60,16 @@ Deno.serve(async (req) => {
     const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
     const inboundLeg = pickCheapestOnDate(inboundOptions, flight.returnDate);
 
+    // Se abbiamo entrambe le tratte one-way (quelle di cui mostriamo orario/compagnia nei
+    // box Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che
+    // può riferirsi a una combinazione voli diversa da quella effettivamente mostrata in
+    // pagina (fonti scorrelate: prima si vedevano orari di un volo e il prezzo di un altro).
+    // Il v2 aggregato resta solo un fallback quando manca il match one-way esatto.
+    const price = outboundLeg && inboundLeg ? outboundLeg.price + inboundLeg.price : match?.price ?? flight.price;
+
     return new Response(
       JSON.stringify({
-        price: match?.price ?? flight.price,
+        price,
         deepLink: buildDeepLink(flight),
         outboundLeg,
         inboundLeg,
