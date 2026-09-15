@@ -2,6 +2,7 @@
 // stessa Data API gratuita già in uso (non la Real-Time Search API), ma one_way=true
 // dà orario esatto, compagnia, durata e deep link diretto per singola tratta.
 import citiesData from "./cities.json" with { type: "json" };
+import airlinesData from "./airlines.json" with { type: "json" };
 
 export const TRAVELPAYOUTS_TOKEN = Deno.env.get("TRAVELPAYOUTS_TOKEN");
 const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
@@ -10,6 +11,7 @@ const BASE_URL = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates";
 const CITY_BY_CODE: Record<string, { name: string; country_code: string }> = Object.fromEntries(
   (citiesData as Array<{ code: string; name: string; country_code: string }>).map((c) => [c.code, c])
 );
+const AIRLINE_NAME_BY_CODE: Record<string, string> = airlinesData as Record<string, string>;
 
 export function mapOneWayResult(r: any) {
   const city = CITY_BY_CODE[r.destination];
@@ -24,6 +26,7 @@ export function mapOneWayResult(r: any) {
     departureAt: r.departure_at, // ISO con ora esatta
     date: r.departure_at?.slice(0, 10),
     airline: r.airline,
+    airlineName: AIRLINE_NAME_BY_CODE[r.airline] ?? r.airline,
     flightNumber: r.flight_number,
     duration: r.duration,
     price: r.price,

@@ -1,25 +1,57 @@
 import { useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
-import { COLORS } from "../theme/colors";
+import { COLORS, RADIUS } from "../theme/colors";
+import { useAuth } from "../hooks/useAuth";
+import { useFavorites } from "../hooks/useFavorites";
+import { useSearches } from "../hooks/useSearches";
+import { useSuggestions } from "../hooks/useSuggestions";
 
-function BigCard({ title, subtitle, onClick, style }) {
+function SearchCard({ onClick }) {
   return (
-    <Card onClick={onClick} style={{ padding: 24, ...style }}>
-      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink, marginBottom: 4 }}>
-        {title}
+    <Card
+      onClick={onClick}
+      style={{
+        padding: 24,
+        background: COLORS.accent,
+        border: "none",
+        boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
+      }}
+    >
+      <div style={{ fontSize: 28, marginBottom: 6 }}>🔍</div>
+      <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF", marginBottom: 4 }}>
+        Cerca voli
       </div>
-      {subtitle && <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{subtitle}</div>}
+      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
+    </Card>
+  );
+}
+
+function SmallCard({ icon, title, subtitle, onClick }) {
+  return (
+    <Card onClick={onClick} style={{ padding: 16 }}>
+      <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+      <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink, marginBottom: 2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{subtitle}</div>}
     </Card>
   );
 }
 
 export function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { favorites } = useFavorites(user?.id);
+  const { searches } = useSearches(user?.id);
+  const { suggestions } = useSuggestions(user?.id);
+
+  const favCount = favorites.length;
+  const searchCount = searches.length;
+
+  const suggestSubtitle =
+    suggestions.topOrigins.length > 0
+      ? `${suggestions.topOrigins[0]} · ${suggestions.topNights ? `viaggi di ${suggestions.topNights} notti` : "weekend brevi"} · in base alle tue ricerche`
+      : "In base alle tue ricerche passate";
 
   return (
-    // Su viewport larghi/alti (desktop) le 4 card da sole lasciavano un vuoto enorme
-    // sotto, ancorate in cima. Centrando verticalmente e limitando la larghezza si
-    // ottiene una composizione bilanciata invece di uno stretch edge-to-edge vuoto.
     <div
       style={{
         minHeight: "100vh",
@@ -30,26 +62,34 @@ export function Home() {
       }}
     >
       <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
-        <BigCard
-          title="Cerca voli"
-          subtitle="Destinazione e date libere"
-          onClick={() => navigate("/search")}
-        />
+        <SearchCard onClick={() => navigate("/search")} />
 
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <BigCard title="Preferiti" onClick={() => navigate("/favorites")} style={{ padding: 16 }} />
+            <SmallCard
+              icon="⭐"
+              title="Preferiti"
+              subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
+              onClick={() => navigate("/favorites")}
+            />
           </div>
           <div style={{ flex: 1 }}>
-            <BigCard title="Storico" onClick={() => navigate("/history")} style={{ padding: 16 }} />
+            <SmallCard
+              icon="🕐"
+              title="Storico"
+              subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
+              onClick={() => navigate("/history")}
+            />
           </div>
         </div>
 
-        <BigCard
-          title="Suggeriti per te"
-          subtitle="In base alle tue ricerche passate"
-          onClick={() => navigate("/suggestions")}
-        />
+        <Card onClick={() => navigate("/suggestions")} style={{ padding: 24 }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>✨</div>
+          <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink, marginBottom: 4 }}>
+            Suggeriti per te
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{suggestSubtitle}</div>
+        </Card>
       </div>
     </div>
   );
