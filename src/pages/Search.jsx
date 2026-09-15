@@ -37,14 +37,37 @@ function Section({ label, action, children }) {
 
 // Due pill invece di un toggle: nessuna delle due è pre-selezionata finché l'utente
 // non sceglie esplicitamente (usata per Destinazione e Date — niente default nascosto).
+// Non riusa il Pill generico: il suo tono "accent" (sfondo accentSoft) è quasi identico
+// allo sfondo pagina (#DCE3D3 vs #DBE4CC) e il selezionato spariva alla vista. Qui serve
+// contrasto forte e inequivocabile: verde pieno + testo bianco quando selezionato.
 function ChoicePills({ options, value, onChange }) {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      {options.map((opt) => (
-        <Pill key={opt.value} tone={value === opt.value ? "accent" : "neutral"} onClick={() => onChange(opt.value)}>
-          {opt.icon} {opt.label}
-        </Pill>
-      ))}
+      {options.map((opt) => {
+        const selected = value === opt.value;
+        return (
+          <button
+            key={String(opt.value)}
+            onClick={() => onChange(opt.value)}
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 600,
+              fontSize: 12,
+              letterSpacing: "0.02em",
+              textTransform: "uppercase",
+              padding: "9px 14px",
+              borderRadius: RADIUS.pill,
+              border: selected ? "none" : `1px solid ${COLORS.hairline}`,
+              background: selected ? COLORS.accent : COLORS.surface,
+              color: selected ? "#FFFFFF" : COLORS.inkSoft,
+              boxShadow: selected ? "0 2px 6px rgba(33,30,43,0.2)" : "none",
+              cursor: "pointer",
+            }}
+          >
+            {opt.icon} {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
