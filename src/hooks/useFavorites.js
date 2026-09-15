@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { verifyPrice } from "../lib/api";
 
 // Risultati specifici salvati — tabella `favorites`.
 export function useFavorites(userId) {
@@ -29,6 +30,7 @@ export function useFavorites(userId) {
         user_id: userId,
         flight_snapshot: flightSnapshot,
         price: flightSnapshot.price,
+        original_price: flightSnapshot.price, // immutabile, per calcolare la variazione dopo
         currency: flightSnapshot.currency ?? "EUR",
         saved_at: new Date().toISOString(),
         is_fresh: true, // appena verificato al momento del salvataggio (nel dettaglio)
@@ -57,5 +59,20 @@ export function useFavorites(userId) {
     [reload]
   );
 
-  return { favorites, loading, addFavorite, removeFavorite, markVerified };
+  // Riverifica manuale di un preferito già salvato — solo voli diretti: per i percorsi
+  // creativi (più biglietti one-way) non esiste un singolo endpoint di verifica sensato,
+  // andrebbero riverificati biglietto per biglietto (non fatto qui, fuori scope).
+  const verifyFavorite = useCallback(
+    async (fav) => {
+      const snapshot = fav.flight_snapshot;
+      if (!snapshot || snapshot.isStopover) return null;
+      const data = await verifyPrice(snapshot);
+      const newPrice = data?.price ?? fav.price;
+      await markVerified(fav.id, newPrice);
+      return newPrice;
+    },
+    [markVerified]
+  );
+
+  return { favorites, loading, addFavorite, removeFavorite, markVerified, verifyFavorite };
 }
