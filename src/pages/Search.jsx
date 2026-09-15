@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { Card } from "../components/Card";
@@ -12,8 +12,6 @@ import { useUserPreferences } from "../hooks/useUserPreferences";
 import { countryName } from "../lib/countryNames";
 import { cityName } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
-
-const DEFAULT_ORIGIN = "BGY"; // Bergamo Orio al Serio
 
 function Section({ label, children }) {
   return (
@@ -65,6 +63,31 @@ function resolveCountryCode(input) {
   return NAME_TO_CODE[q] ?? null;
 }
 
+// Filtri "sticky" nel browser: restano quelli dell'ultima ricerca finché non si preme
+// "Azzera filtri", anche navigando via e tornando su Cerca voli (a differenza di
+// Escludi paesi, che è legato all'account su Supabase, questo è solo locale).
+const STORAGE_KEY = "cheapflights_search_filters";
+const DEFAULT_FILTERS = {
+  origins: [],
+  destination: null,
+  dateMode: "anytime",
+  dateFrom: "",
+  dateTo: "",
+  nightsMin: 0,
+  nightsMax: MAX_NIGHTS,
+  flexDeparture: false,
+  flexArrival: false,
+};
+
+function loadPersistedFilters() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...DEFAULT_FILTERS, ...JSON.parse(raw) } : DEFAULT_FILTERS;
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
 export function Search() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -72,17 +95,26 @@ export function Search() {
   // all'utente: caricati automaticamente qui e salvati ad ogni modifica.
   const { excludedCountries, setExcludedCountries } = useUserPreferences(user?.id);
 
-  const [origins, setOrigins] = useState([DEFAULT_ORIGIN]);
+  const [origins, setOrigins] = useState(() => loadPersistedFilters().origins);
   const [originInput, setOriginInput] = useState("");
-  const [destination, setDestination] = useState(null); // null = "Ovunque"
-  const [dateMode, setDateMode] = useState("anytime"); // "anytime" | "fixed"
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [nightsMin, setNightsMinState] = useState(0);
-  const [nightsMax, setNightsMaxState] = useState(MAX_NIGHTS);
-  const [flexDeparture, setFlexDeparture] = useState(false);
-  const [flexArrival, setFlexArrival] = useState(false);
+  const [destination, setDestination] = useState(() => loadPersistedFilters().destination);
+  const [dateMode, setDateMode] = useState(() => loadPersistedFilters().dateMode);
+  const [dateFrom, setDateFrom] = useState(() => loadPersistedFilters().dateFrom);
+  const [dateTo, setDateTo] = useState(() => loadPersistedFilters().dateTo);
+  const [nightsMin, setNightsMinState] = useState(() => loadPersistedFilters().nightsMin);
+  const [nightsMax, setNightsMaxState] = useState(() => loadPersistedFilters().nightsMax);
+  const [flexDeparture, setFlexDeparture] = useState(() => loadPersistedFilters().flexDeparture);
+  const [flexArrival, setFlexArrival] = useState(() => loadPersistedFilters().flexArrival);
   const [countryInput, setCountryInput] = useState("");
+
+  useEffect(() => {
+    const state = { origins, destination, dateMode, dateFrom, dateTo, nightsMin, nightsMax, flexDeparture, flexArrival };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // storage non disponibile (privata/bloccato): i filtri restano solo per la sessione corrente
+    }
+  }, [origins, destination, dateMode, dateFrom, dateTo, nightsMin, nightsMax, flexDeparture, flexArrival]);
 
   const addOrigin = () => {
     const code = originInput.trim().toUpperCase();
@@ -104,7 +136,7 @@ export function Search() {
     setExcludedCountries(excludedCountries.filter((c) => c !== code));
 
   const resetFilters = () => {
-    setOrigins([DEFAULT_ORIGIN]);
+    setOrigins([]);
     setOriginInput("");
     setDestination(null);
     setDateMode("anytime");
@@ -149,6 +181,11 @@ export function Search() {
       </div>
 
       <Section label="Partenza">
+        {origins.length === 0 && (
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>
+            Aggiungi almeno un aeroporto di partenza (es. BGY per Bergamo)
+          </div>
+        )}
         {origins.map((o) => (
           <Card key={o} style={{ padding: 14, marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -158,11 +195,9 @@ export function Search() {
                   {cityName(o)} ({o})
                 </div>
               </div>
-              {origins.length > 1 && (
-                <span onClick={() => removeOrigin(o)} style={{ color: COLORS.inkSoft, cursor: "pointer" }}>
-                  ✕
-                </span>
-              )}
+              <span onClick={() => removeOrigin(o)} style={{ color: COLORS.inkSoft, cursor: "pointer" }}>
+                ✕
+              </span>
             </div>
           </Card>
         ))}
@@ -287,6 +322,7 @@ export function Search() {
         <PrimaryButton
           variant="solid"
           onClick={runSearch}
+          disabled={origins.length === 0}
           style={{ width: "100%", justifyContent: "center", gap: 8 }}
         >
           🔍 Trova il più economico
