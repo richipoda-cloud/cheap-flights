@@ -17,27 +17,40 @@ export function Home() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-      <BigCard
-        title="Cerca voli"
-        subtitle="Destinazione e date libere"
-        onClick={() => navigate("/search")}
-      />
+    // Su viewport larghi/alti (desktop) le 4 card da sole lasciavano un vuoto enorme
+    // sotto, ancorate in cima. Centrando verticalmente e limitando la larghezza si
+    // ottiene una composizione bilanciata invece di uno stretch edge-to-edge vuoto.
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
+        <BigCard
+          title="Cerca voli"
+          subtitle="Destinazione e date libere"
+          onClick={() => navigate("/search")}
+        />
 
-      <div style={{ display: "flex", gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <BigCard title="Preferiti" onClick={() => navigate("/favorites")} style={{ padding: 16 }} />
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <BigCard title="Preferiti" onClick={() => navigate("/favorites")} style={{ padding: 16 }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <BigCard title="Storico" onClick={() => navigate("/history")} style={{ padding: 16 }} />
+          </div>
         </div>
-        <div style={{ flex: 1 }}>
-          <BigCard title="Storico" onClick={() => navigate("/history")} style={{ padding: 16 }} />
-        </div>
+
+        <BigCard
+          title="Suggeriti per te"
+          subtitle="In base alle tue ricerche passate"
+          onClick={() => navigate("/suggestions")}
+        />
       </div>
-
-      <BigCard
-        title="Suggeriti per te"
-        subtitle="In base alle tue ricerche passate"
-        onClick={() => navigate("/suggestions")}
-      />
     </div>
   );
 }
