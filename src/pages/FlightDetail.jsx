@@ -8,6 +8,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
+import { cityName } from "../lib/cityNames";
 
 // v2/prices/latest (round-trip aggregato, usato per lista+prezzo) non fornisce
 // orari/compagnia/durata — per quello, verify-price interroga in più anche
@@ -19,18 +20,32 @@ function LegBox({ title, leg, route, date }) {
     return (
       <Card style={{ padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
-          {title}
+          {title} · {leg.date}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
-            {leg.originAirport} → {leg.destinationAirport}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink }}>{leg.originAirport}</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{formatTime(leg.departureAt)}</div>
           </div>
-          {leg.duration != null && (
-            <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{leg.duration} min</div>
-          )}
+          <span style={{ fontSize: 18 }}>✈️</span>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink }}>{leg.destinationAirport}</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{formatTime(leg.arrivalAt)}</div>
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: COLORS.inkSoft }}>
-          {leg.date} · {formatTime(leg.departureAt)} · {leg.airline}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: `1px dashed ${COLORS.hairline}`,
+            fontSize: 12,
+            color: COLORS.inkSoft,
+          }}
+        >
+          <div>{leg.airlineName ?? leg.airline} · Diretto</div>
+          {leg.duration != null && <div>{formatDuration(leg.duration)}</div>}
         </div>
       </Card>
     );
@@ -58,6 +73,13 @@ function formatTime(iso) {
   return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatDuration(minutes) {
+  if (minutes == null) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 // Un "percorso creativo" è N biglietti one-way separati e indipendenti (non un unico
 // volo con scalo): ognuno va prenotato per conto proprio, col proprio deep link.
 // Orario/compagnia/deep link arrivano già pronti da search-stopover (v3/prices_for_dates,
@@ -81,7 +103,7 @@ function MultiLegTicket({ index, total, leg }) {
         )}
       </div>
       <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
-        {leg.date} · {formatTime(leg.departureAt)} · {leg.airline}
+        {leg.date} · {formatTime(leg.departureAt)} · {leg.airlineName ?? leg.airline}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -89,7 +111,7 @@ function MultiLegTicket({ index, total, leg }) {
           <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Prezzo dalla ricerca</div>
         </div>
         <PrimaryButton variant="solid" onClick={handleBooking} disabled={!leg.deepLink}>
-          Prenota biglietto {index}
+          Prenota biglietto {index} →
         </PrimaryButton>
       </div>
     </Card>
@@ -158,14 +180,19 @@ export function FlightDetail() {
 
   return (
     <div style={{ padding: 20, paddingBottom: flight.isStopover ? 40 : 100 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <FlagIcon countryCode={flight.countryCode} size={28} />
-          <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink }}>
-            {flight.destinationName ?? flight.destination}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <span onClick={() => navigate(-1)} style={{ fontSize: 20, color: COLORS.ink, cursor: "pointer" }}>
+          ←
+        </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <FlagIcon countryCode={flight.countryCode} size={24} />
+            <div style={{ fontWeight: 600, fontSize: 18, color: COLORS.ink }}>
+              {cityName(flight.origin)} → {flight.destinationName ?? flight.destination}
+            </div>
           </div>
+          <Pill tone="accent">{nights} notti</Pill>
         </div>
-        <Pill tone="accent">{nights} notti</Pill>
       </div>
 
       {isLegacySchema ? (
@@ -296,7 +323,7 @@ export function FlightDetail() {
             </div>
           </div>
           <PrimaryButton variant="solid" onClick={handleBooking} disabled={verifying || !deepLink}>
-            Vai alla prenotazione
+            Vai alla prenotazione →
           </PrimaryButton>
         </div>
       )}

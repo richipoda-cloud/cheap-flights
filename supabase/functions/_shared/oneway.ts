@@ -16,6 +16,10 @@ const AIRLINE_NAME_BY_CODE: Record<string, string> = airlinesData as Record<stri
 export function mapOneWayResult(r: any) {
   const city = CITY_BY_CODE[r.destination];
   const sep = r.link?.includes("?") ? "&" : "?";
+  const arrivalAt =
+    r.departure_at && r.duration != null
+      ? new Date(new Date(r.departure_at).getTime() + r.duration * 60000).toISOString()
+      : null;
   return {
     id: `${r.origin_airport}-${r.destination_airport}-${r.departure_at}-${r.flight_number}`,
     originAirport: r.origin_airport,
@@ -24,6 +28,7 @@ export function mapOneWayResult(r: any) {
     destinationName: city?.name ?? r.destination,
     countryCode: city?.country_code ?? null,
     departureAt: r.departure_at, // ISO con ora esatta
+    arrivalAt,
     date: r.departure_at?.slice(0, 10),
     airline: r.airline,
     airlineName: AIRLINE_NAME_BY_CODE[r.airline] ?? r.airline,
