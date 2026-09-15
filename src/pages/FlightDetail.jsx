@@ -169,9 +169,35 @@ export function FlightDetail() {
             tutti gli acquisti, non solo l'ultimo. Prezzo totale indicativo: {flight.price} €.
           </div>
 
-          {flight.legs.map((leg, i) => (
-            <MultiLegTicket key={leg.id} index={i + 1} total={flight.legs.length} leg={leg} />
-          ))}
+          {flight.legs.map((leg, i) => {
+            const nextLeg = flight.legs[i + 1];
+            // Stesso codice città (es. TCI) ma aeroporti fisicamente diversi (es. TFS/TFN
+            // a Tenerife): l'itinerario resta valido ma serve un trasferimento in loco.
+            const airportChange = nextLeg && nextLeg.originAirport !== leg.destinationAirport;
+            return (
+              <div key={leg.id}>
+                <MultiLegTicket index={i + 1} total={flight.legs.length} leg={leg} />
+                {airportChange && (
+                  <div
+                    style={{
+                      background: COLORS.cream,
+                      border: `1px solid ${COLORS.warn}`,
+                      color: COLORS.warn,
+                      borderRadius: RADIUS.button,
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      marginBottom: 16,
+                      marginTop: -8,
+                    }}
+                  >
+                    ⚠️ Attenzione: cambio aeroporto ({leg.destinationAirport} → {nextLeg.originAirport}),
+                    verifica il trasferimento
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </>
       ) : (
         <>
