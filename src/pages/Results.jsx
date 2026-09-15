@@ -52,7 +52,7 @@ function ResultRow({ result, isLast, onClick }) {
         </div>
       </div>
       <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-        {result.price} {result.currency ?? "€"}
+        ~{result.price} {result.currency ?? "€"}
       </div>
     </div>
   );
@@ -110,8 +110,11 @@ export function Results() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 16 }}>
+      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 4 }}>
         Risultati
+      </div>
+      <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 16 }}>
+        Prezzi indicativi (~) — si confermano aprendo il dettaglio del volo
       </div>
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
