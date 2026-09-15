@@ -1,6 +1,15 @@
 // Helper condiviso tra le Edge Function per chiamare Travelpayouts v2/prices/latest.
+import citiesData from "./cities.json" with { type: "json" };
+
 export const TRAVELPAYOUTS_TOKEN = Deno.env.get("TRAVELPAYOUTS_TOKEN");
 const BASE_URL = "https://api.travelpayouts.com/v2/prices/latest";
+
+// v2/prices/latest restituisce solo il codice IATA città/aeroporto, non nome esteso né
+// paese. Dataset statico Travelpayouts (data/en/cities.json), trimmed a code/name/country_code,
+// per bandiera + nome destinazione senza chiamata extra a runtime.
+const CITY_BY_CODE: Record<string, { name: string; country_code: string }> = Object.fromEntries(
+  (citiesData as Array<{ code: string; name: string; country_code: string }>).map((c) => [c.code, c])
+);
 
 export function nightsBetween(departDate: string | null, returnDate: string | null) {
   if (!departDate || !returnDate) return null;
@@ -8,15 +17,14 @@ export function nightsBetween(departDate: string | null, returnDate: string | nu
 }
 
 export function mapRawResult(r: any, origin: string) {
-  // v2/prices/latest usa "value" per il prezzo (non "price") e non restituisce nome
-  // esteso/paese della destinazione — solo codice IATA. Bandiera/nome pieno: TODO,
-  // servirebbe incrociare con un dataset statico IATA->paese o l'endpoint /data/{locale}/cities.json.
+  // v2/prices/latest usa "value" per il prezzo (non "price").
+  const city = CITY_BY_CODE[r.destination];
   return {
     id: `${origin}-${r.destination}-${r.depart_date}-${r.return_date}`,
     origin,
     destination: r.destination,
-    destinationName: r.destination_name ?? r.destination,
-    countryCode: r.destination_country_code ?? null,
+    destinationName: city?.name ?? r.destination,
+    countryCode: city?.country_code ?? null,
     departDate: r.depart_date,
     returnDate: r.return_date,
     price: r.value,
