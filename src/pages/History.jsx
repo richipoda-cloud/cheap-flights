@@ -4,10 +4,12 @@ import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
+import { cityName } from "../lib/cityNames";
+import { formatRelativeTime } from "../lib/formatters";
 
 function describeFilters(f) {
-  const origin = f.origins?.join(", ") ?? "?";
-  const dest = f.destination ?? "Ovunque";
+  const origin = f.origins?.map(cityName).join(", ") ?? "?";
+  const dest = f.destination ? cityName(f.destination) : "Ovunque";
   const dates = f.dateMode === "fixed" ? `${f.dateFrom} → ${f.dateTo}` : "Sempre";
   return `${origin} → ${dest} · ${dates}`;
 }
@@ -38,8 +40,11 @@ export function History() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 16 }}>
-        Storico
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <span onClick={() => navigate(-1)} style={{ fontSize: 20, color: COLORS.ink, cursor: "pointer" }}>
+          ←
+        </span>
+        <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent }}>Storico</div>
       </div>
 
       {loading && <div style={{ color: COLORS.inkSoft }}>Caricamento…</div>}
@@ -53,12 +58,17 @@ export function History() {
           <Card key={s.id} style={{ padding: 14, marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 13, color: COLORS.ink }}>{describeFilters(s.filters)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{describeFilters(s.filters)}</div>
                 {details && (
                   <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{details}</div>
                 )}
               </div>
-              <PrimaryButton onClick={() => resume(s.filters)}>↻ Riprendi</PrimaryButton>
+              <PrimaryButton variant="solid" onClick={() => resume(s.filters)}>
+                ↻ Riprendi
+              </PrimaryButton>
+            </div>
+            <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8 }}>
+              {formatRelativeTime(s.created_at)}
             </div>
           </Card>
         );
