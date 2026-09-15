@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
+import { Card } from "../components/Card";
 import { Pill } from "../components/Pill";
+import { Toggle } from "../components/Toggle";
+import { DualRangeSlider, MAX_NIGHTS } from "../components/DualRangeSlider";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { FlagIcon } from "../components/FlagIcon";
 import { useAuth } from "../hooks/useAuth";
 import { useUserPreferences } from "../hooks/useUserPreferences";
 import { countryName } from "../lib/countryNames";
+import { cityName } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
 
 const DEFAULT_ORIGIN = "BGY"; // Bergamo Orio al Serio
@@ -31,24 +35,22 @@ function Section({ label, children }) {
   );
 }
 
-function ToggleRow({ label, hint, value, onChange }) {
+// Riga icona+label+sublabel a sinistra, Toggle iOS a destra — usata per Destinazione,
+// Date e le due Flessibilità, al posto delle coppie di pill "attivo/non attivo".
+function ToggleRow({ icon, label, hint, checked, onChange }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "10px 0",
-      }}
-    >
-      <div>
-        <div style={{ fontSize: 13, color: COLORS.ink, fontWeight: 500 }}>{label}</div>
-        {hint && <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{hint}</div>}
+    <Card style={{ padding: 14, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{label}</div>
+            {hint && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{hint}</div>}
+          </div>
+        </div>
+        <Toggle checked={checked} onChange={onChange} />
       </div>
-      <Pill tone={value ? "accent" : "neutral"} onClick={() => onChange(!value)}>
-        {value ? "On" : "Off"}
-      </Pill>
-    </div>
+    </Card>
   );
 }
 
@@ -76,8 +78,8 @@ export function Search() {
   const [dateMode, setDateMode] = useState("anytime"); // "anytime" | "fixed"
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [nightsMin, setNightsMin] = useState("");
-  const [nightsMax, setNightsMax] = useState("");
+  const [nightsMin, setNightsMinState] = useState(0);
+  const [nightsMax, setNightsMaxState] = useState(MAX_NIGHTS);
   const [flexDeparture, setFlexDeparture] = useState(false);
   const [flexArrival, setFlexArrival] = useState(false);
   const [countryInput, setCountryInput] = useState("");
@@ -108,8 +110,8 @@ export function Search() {
     setDateMode("anytime");
     setDateFrom("");
     setDateTo("");
-    setNightsMin("");
-    setNightsMax("");
+    setNightsMinState(0);
+    setNightsMaxState(MAX_NIGHTS);
     setFlexDeparture(false);
     setFlexArrival(false);
     setCountryInput("");
@@ -117,14 +119,16 @@ export function Search() {
   };
 
   const runSearch = () => {
+    // Slider al range pieno (default) = nessun limite, coerente col comportamento originale
+    const noNightsLimit = nightsMin === 0 && nightsMax === MAX_NIGHTS;
     const filters = {
       origins,
       destination, // null = ovunque
       dateMode,
       dateFrom: dateMode === "fixed" ? dateFrom : null,
       dateTo: dateMode === "fixed" ? dateTo : null,
-      nightsMin: nightsMin === "" ? null : Number(nightsMin),
-      nightsMax: nightsMax === "" ? null : Number(nightsMax),
+      nightsMin: noNightsLimit ? null : nightsMin,
+      nightsMax: noNightsLimit ? null : nightsMax,
       flexDeparture,
       flexArrival,
       excludedCountries,
@@ -134,15 +138,35 @@ export function Search() {
 
   return (
     <div style={{ padding: 20, paddingBottom: 100 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ fontWeight: 600, fontSize: 22, color: COLORS.ink }}>Cerca voli</div>
+        <span
+          onClick={resetFilters}
+          style={{ fontSize: 13, fontWeight: 600, color: COLORS.plum, cursor: "pointer" }}
+        >
+          Azzera
+        </span>
+      </div>
+
       <Section label="Partenza">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-          {origins.map((o) => (
-            <Pill key={o} tone="accent" onClick={() => removeOrigin(o)}>
-              {o} ✕
-            </Pill>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        {origins.map((o) => (
+          <Card key={o} style={{ padding: 14, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>✈️</span>
+                <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>
+                  {cityName(o)} ({o})
+                </div>
+              </div>
+              {origins.length > 1 && (
+                <span onClick={() => removeOrigin(o)} style={{ color: COLORS.inkSoft, cursor: "pointer" }}>
+                  ✕
+                </span>
+              )}
+            </div>
+          </Card>
+        ))}
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <input
             value={originInput}
             onChange={(e) => setOriginInput(e.target.value)}
@@ -154,73 +178,66 @@ export function Search() {
       </Section>
 
       <Section label="Destinazione">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Pill tone={destination === null ? "accent" : "neutral"} onClick={() => setDestination(null)}>
-            Ovunque
-          </Pill>
-          <Pill tone={destination !== null ? "accent" : "neutral"} onClick={() => setDestination("")}>
-            Fissa
-          </Pill>
-        </div>
+        <ToggleRow
+          icon={destination === null ? "🌍" : "📍"}
+          label={destination === null ? "Ovunque" : "Fissa"}
+          hint={destination === null ? "Nessuna meta fissa" : "Scegli una destinazione precisa"}
+          checked={destination === null}
+          onChange={(isAnywhere) => setDestination(isAnywhere ? null : "")}
+        />
         {destination !== null && (
           <input
             value={destination}
             onChange={(e) => setDestination(e.target.value.toUpperCase())}
             placeholder="Codice IATA città o paese"
-            style={{ ...inputStyle, marginTop: 8 }}
+            style={{ ...inputStyle, width: "100%", marginBottom: 8 }}
           />
         )}
       </Section>
 
       <Section label="Date">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Pill tone={dateMode === "anytime" ? "accent" : "neutral"} onClick={() => setDateMode("anytime")}>
-            Sempre
-          </Pill>
-          <Pill tone={dateMode === "fixed" ? "accent" : "neutral"} onClick={() => setDateMode("fixed")}>
-            Fisse
-          </Pill>
-        </div>
+        <ToggleRow
+          icon={dateMode === "anytime" ? "🎫" : "📅"}
+          label={dateMode === "anytime" ? "Sempre" : "Fisse"}
+          hint={dateMode === "anytime" ? "Prossimi 3 mesi" : "Scegli le date esatte"}
+          checked={dateMode === "anytime"}
+          onChange={(isAnytime) => setDateMode(isAnytime ? "anytime" : "fixed")}
+        />
         {dateMode === "fixed" && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
           </div>
         )}
       </Section>
 
-      <Section label="Durata soggiorno (notti)">
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            type="number"
-            min={0}
-            value={nightsMin}
-            onChange={(e) => setNightsMin(e.target.value)}
-            placeholder="Min"
-            style={inputStyle}
+      <Section label="Durata soggiorno">
+        <Card style={{ padding: 16 }}>
+          <DualRangeSlider
+            min={nightsMin}
+            max={nightsMax}
+            onChange={(lo, hi) => {
+              setNightsMinState(lo);
+              setNightsMaxState(hi);
+            }}
           />
-          <input
-            type="number"
-            min={0}
-            value={nightsMax}
-            onChange={(e) => setNightsMax(e.target.value)}
-            placeholder="Max"
-            style={inputStyle}
-          />
-        </div>
+        </Card>
       </Section>
 
-      <Section label="Flessibilità">
+      <Section label="Flessibilità ripartenza">
         <ToggleRow
-          label="Ripartenza flessibile"
-          hint="Ripartire da un aeroporto/paese diverso vicino alla destinazione, se conviene"
-          value={flexDeparture}
+          label="Aeroporto diverso a destino"
+          hint="Se conviene, riparti da lì vicino"
+          checked={flexDeparture}
           onChange={setFlexDeparture}
         />
+      </Section>
+
+      <Section label="Flessibilità arrivo finale">
         <ToggleRow
-          label="Arrivo finale flessibile"
-          hint="Atterrare in un aeroporto/paese diverso vicino a casa, se conviene"
-          value={flexArrival}
+          label="Aeroporto diverso a casa"
+          hint="Se conviene, atterra lì vicino"
+          checked={flexArrival}
           onChange={setFlexArrival}
         />
       </Section>
@@ -265,17 +282,14 @@ export function Search() {
           padding: 16,
           background: COLORS.bg,
           borderTop: `1px solid ${COLORS.hairline}`,
-          display: "flex",
-          gap: 10,
         }}
       >
-        <PrimaryButton onClick={resetFilters}>Azzera filtri</PrimaryButton>
         <PrimaryButton
           variant="solid"
           onClick={runSearch}
-          style={{ flex: 1, justifyContent: "center" }}
+          style={{ width: "100%", justifyContent: "center", gap: 8 }}
         >
-          Cerca
+          🔍 Trova il più economico
         </PrimaryButton>
       </div>
     </div>
