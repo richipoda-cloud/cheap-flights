@@ -66,6 +66,12 @@ export async function fetchLatestPrices({
   return (json.data ?? []).map((r: any) => mapRawResult(r, origin));
 }
 
+export function filterByExcludedCountries(results: any[], excludedCountries?: string[] | null) {
+  if (!excludedCountries || excludedCountries.length === 0) return results;
+  const excluded = new Set(excludedCountries.map((c) => c.toUpperCase()));
+  return results.filter((r) => !r.countryCode || !excluded.has(r.countryCode.toUpperCase()));
+}
+
 export function filterByNights(results: any[], nightsMin?: number | null, nightsMax?: number | null) {
   if (nightsMin == null && nightsMax == null) return results;
   return results.filter((r) => {

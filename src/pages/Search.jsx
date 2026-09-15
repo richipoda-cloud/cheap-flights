@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { Pill } from "../components/Pill";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { FlagIcon } from "../components/FlagIcon";
+import { useAuth } from "../hooks/useAuth";
+import { useUserPreferences } from "../hooks/useUserPreferences";
+import { countryName } from "../lib/countryNames";
+import countryCodes from "../data/countryCodes.json";
 
 const DEFAULT_ORIGIN = "BGY"; // Bergamo Orio al Serio
 
@@ -47,8 +52,23 @@ function ToggleRow({ label, hint, value, onChange }) {
   );
 }
 
+// Nome->codice via Intl.DisplayNames costruito una volta sola (237 paesi, costo trascurabile).
+const NAME_TO_CODE = Object.fromEntries(countryCodes.map((code) => [countryName(code).toLowerCase(), code]));
+const CODE_SET = new Set(countryCodes.map((c) => c.toLowerCase()));
+
+function resolveCountryCode(input) {
+  const q = input.trim().toLowerCase();
+  if (!q) return null;
+  if (CODE_SET.has(q)) return q.toUpperCase();
+  return NAME_TO_CODE[q] ?? null;
+}
+
 export function Search() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // A differenza degli altri filtri (per-sessione), i paesi esclusi sono legati
+  // all'utente: caricati automaticamente qui e salvati ad ogni modifica.
+  const { excludedCountries, setExcludedCountries } = useUserPreferences(user?.id);
 
   const [origins, setOrigins] = useState([DEFAULT_ORIGIN]);
   const [originInput, setOriginInput] = useState("");
@@ -60,6 +80,7 @@ export function Search() {
   const [nightsMax, setNightsMax] = useState("");
   const [flexDeparture, setFlexDeparture] = useState(false);
   const [flexArrival, setFlexArrival] = useState(false);
+  const [countryInput, setCountryInput] = useState("");
 
   const addOrigin = () => {
     const code = originInput.trim().toUpperCase();
@@ -68,6 +89,32 @@ export function Search() {
   };
 
   const removeOrigin = (code) => setOrigins(origins.filter((o) => o !== code));
+
+  const addExcludedCountry = () => {
+    const code = resolveCountryCode(countryInput);
+    if (code && !excludedCountries.includes(code)) {
+      setExcludedCountries([...excludedCountries, code]);
+    }
+    setCountryInput("");
+  };
+
+  const removeExcludedCountry = (code) =>
+    setExcludedCountries(excludedCountries.filter((c) => c !== code));
+
+  const resetFilters = () => {
+    setOrigins([DEFAULT_ORIGIN]);
+    setOriginInput("");
+    setDestination(null);
+    setDateMode("anytime");
+    setDateFrom("");
+    setDateTo("");
+    setNightsMin("");
+    setNightsMax("");
+    setFlexDeparture(false);
+    setFlexArrival(false);
+    setCountryInput("");
+    setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
+  };
 
   const runSearch = () => {
     const filters = {
@@ -80,6 +127,7 @@ export function Search() {
       nightsMax: nightsMax === "" ? null : Number(nightsMax),
       flexDeparture,
       flexArrival,
+      excludedCountries,
     };
     navigate("/results", { state: { filters } });
   };
@@ -177,6 +225,37 @@ export function Search() {
         />
       </Section>
 
+      <Section label="Escludi paesi">
+        <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 8 }}>
+          Salvato sul tuo account — resta impostato anche nelle prossime ricerche
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+          {excludedCountries.map((code) => (
+            <Pill key={code} tone="plum" onClick={() => removeExcludedCountry(code)}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
+              </span>
+            </Pill>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            list="country-options"
+            value={countryInput}
+            onChange={(e) => setCountryInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addExcludedCountry()}
+            placeholder="Nome paese (es. Francia)"
+            style={inputStyle}
+          />
+          <datalist id="country-options">
+            {countryCodes.map((code) => (
+              <option key={code} value={countryName(code)} />
+            ))}
+          </datalist>
+          <PrimaryButton onClick={addExcludedCountry}>Escludi</PrimaryButton>
+        </div>
+      </Section>
+
       <div
         style={{
           position: "fixed",
@@ -186,9 +265,16 @@ export function Search() {
           padding: 16,
           background: COLORS.bg,
           borderTop: `1px solid ${COLORS.hairline}`,
+          display: "flex",
+          gap: 10,
         }}
       >
-        <PrimaryButton variant="solid" onClick={runSearch} style={{ width: "100%", justifyContent: "center" }}>
+        <PrimaryButton onClick={resetFilters}>Azzera filtri</PrimaryButton>
+        <PrimaryButton
+          variant="solid"
+          onClick={runSearch}
+          style={{ flex: 1, justifyContent: "center" }}
+        >
           Cerca
         </PrimaryButton>
       </div>

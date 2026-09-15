@@ -5,6 +5,7 @@ import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
   filterByNights,
+  filterByExcludedCountries,
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -30,7 +31,8 @@ Deno.serve(async (req) => {
       origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom }))
     );
     const merged = perOrigin.flat();
-    const filtered = filterByNights(merged, filters.nightsMin, filters.nightsMax);
+    const withoutExcluded = filterByExcludedCountries(merged, filters.excludedCountries);
+    const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
     const results = filtered.sort((a, b) => a.price - b.price);
 
     return new Response(JSON.stringify({ results }), {

@@ -12,6 +12,7 @@ import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
   filterByNights,
+  filterByExcludedCountries,
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -21,12 +22,12 @@ const SIGNIFICANT_SAVING_RATIO = 0.85; // stopover deve costare <85% del diretto
 
 const MIN_HUB_NIGHTS = 1; // sotto 1 notte all'hub non c'è finestra per il secondo biglietto
 
-async function findCandidates(origins: string[], count: number) {
+async function findCandidates(origins: string[], count: number, excludedCountries?: string[] | null) {
   const perOrigin = await Promise.all(
     origins.map((origin) => fetchLatestPrices({ origin, limit: 200 }))
   );
-  return perOrigin
-    .flat()
+  const withoutExcluded = filterByExcludedCountries(perOrigin.flat(), excludedCountries);
+  return withoutExcluded
     .filter((r) => (r.nights ?? 0) >= MIN_HUB_NIGHTS)
     .sort((a, b) => a.price - b.price)
     .slice(0, count);
@@ -54,17 +55,25 @@ Deno.serve(async (req) => {
     const cheapestDirect = directResults.flat().sort((a, b) => a.price - b.price)[0];
     const directPrice = cheapestDirect?.price ?? Infinity;
 
-    let candidates = await findCandidates(origins, INITIAL_CANDIDATES);
+    let candidates = await findCandidates(origins, INITIAL_CANDIDATES, filters.excludedCountries);
     let creativeResults = await buildCreativeResults(candidates, destination, directPrice);
 
     if (creativeResults.length === 0) {
       // Nessun risparmio significativo: allarga ad altri candidati
-      const moreCandidates = await findCandidates(origins, INITIAL_CANDIDATES + EXPANDED_CANDIDATES);
+      const moreCandidates = await findCandidates(
+        origins,
+        INITIAL_CANDIDATES + EXPANDED_CANDIDATES,
+        filters.excludedCountries
+      );
       candidates = moreCandidates.slice(INITIAL_CANDIDATES);
       creativeResults = await buildCreativeResults(candidates, destination, directPrice);
     }
 
-    const filtered = filterByNights(creativeResults, filters.nightsMin, filters.nightsMax);
+    // Il paese della destinazione finale va comunque ricontrollato: nel ramo "Ovunque" i
+    // candidati sono già la destinazione mostrata, ma qui filtriamo anche il ramo a
+    // destinazione fissa per coerenza (mai un risultato nel paese escluso, in nessun campo).
+    const withoutExcluded = filterByExcludedCountries(creativeResults, filters.excludedCountries);
+    const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
 
     return new Response(JSON.stringify({ results: filtered.sort((a, b) => a.price - b.price) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
