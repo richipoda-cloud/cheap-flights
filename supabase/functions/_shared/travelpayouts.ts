@@ -8,6 +8,9 @@ export function nightsBetween(departDate: string | null, returnDate: string | nu
 }
 
 export function mapRawResult(r: any, origin: string) {
+  // v2/prices/latest usa "value" per il prezzo (non "price") e non restituisce nome
+  // esteso/paese della destinazione — solo codice IATA. Bandiera/nome pieno: TODO,
+  // servirebbe incrociare con un dataset statico IATA->paese o l'endpoint /data/{locale}/cities.json.
   return {
     id: `${origin}-${r.destination}-${r.depart_date}-${r.return_date}`,
     origin,
@@ -16,7 +19,7 @@ export function mapRawResult(r: any, origin: string) {
     countryCode: r.destination_country_code ?? null,
     departDate: r.depart_date,
     returnDate: r.return_date,
-    price: r.price,
+    price: r.value,
     currency: "EUR",
     nights: nightsBetween(r.depart_date, r.return_date),
   };

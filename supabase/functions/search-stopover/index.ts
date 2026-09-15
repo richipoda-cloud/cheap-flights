@@ -13,6 +13,7 @@ import {
   fetchLatestPrices,
   filterByNights,
 } from "../_shared/travelpayouts.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const INITIAL_CANDIDATES = 3;
 const EXPANDED_CANDIDATES = 5;
@@ -27,10 +28,12 @@ async function findCandidates(origins: string[], count: number) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
   if (!TRAVELPAYOUTS_TOKEN) {
     return new Response(
       JSON.stringify({ error: "TRAVELPAYOUTS_TOKEN non configurato (supabase secrets set)." }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
@@ -59,12 +62,12 @@ Deno.serve(async (req) => {
     const filtered = filterByNights(creativeResults, filters.nightsMin, filters.nightsMax);
 
     return new Response(JSON.stringify({ results: filtered.sort((a, b) => a.price - b.price) }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
