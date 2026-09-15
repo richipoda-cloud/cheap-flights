@@ -111,6 +111,7 @@ export function FlightDetail() {
   const [inboundLeg, setInboundLeg] = useState(null);
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     if (!flight) {
@@ -151,6 +152,8 @@ export function FlightDetail() {
 
   const handleSaveFavorite = () => {
     addFavorite({ ...flight, price: verifiedPrice ?? flight.price, searchFilters: filters });
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
   };
 
   return (
@@ -252,19 +255,20 @@ export function FlightDetail() {
       {!isLegacySchema && (
         <button
           onClick={handleSaveFavorite}
+          disabled={justSaved}
           style={{
-            background: "transparent",
-            border: `1px solid ${COLORS.hairline}`,
+            background: justSaved ? COLORS.accentSoft : "transparent",
+            border: `1px solid ${justSaved ? COLORS.accent : COLORS.hairline}`,
             borderRadius: RADIUS.button,
             padding: "10px 16px",
             fontFamily: "'Inter', sans-serif",
             fontWeight: 600,
             fontSize: 13,
-            color: COLORS.plum,
-            cursor: "pointer",
+            color: justSaved ? COLORS.accent : COLORS.plum,
+            cursor: justSaved ? "default" : "pointer",
           }}
         >
-          ★ Salva nei preferiti
+          {justSaved ? "✓ Salvato nei preferiti" : "★ Salva nei preferiti"}
         </button>
       )}
 
