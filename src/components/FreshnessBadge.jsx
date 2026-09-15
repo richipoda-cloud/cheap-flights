@@ -1,33 +1,33 @@
-import { COLORS } from "../theme/colors";
+import { COLORS, RADIUS } from "../theme/colors";
 
-// Usato in Preferiti: prezzo cache Travelpayouts non è mai "confermato" finché non
-// riverificato (nel dettaglio volo, o qui via riverifica manuale). Se dopo la
-// riverifica il prezzo differisce da quello salvato in origine, mostra la variazione
-// esplicita invece del generico ✓/⟳.
-export function FreshnessBadge({ isFresh, savedAt, price, originalPrice }) {
-  const date = savedAt ? new Date(savedAt).toLocaleDateString("it-IT") : null;
+// Pillola colorata piena per lo stato di freschezza prezzo — usata in Preferiti insieme
+// al tempo relativo ("Salvato X fa"), reso separatamente dal chiamante (righe ai due
+// estremi, come nel mockup). Se il prezzo differisce da quello salvato in origine dopo
+// una riverifica, mostra la variazione esplicita invece del generico ✓/⟳.
+export function FreshnessBadge({ isFresh, price, originalPrice }) {
   const delta = originalPrice != null && price != null ? price - originalPrice : 0;
+
+  const pillStyle = (bg, color) => ({
+    fontSize: 11,
+    fontWeight: 600,
+    color,
+    background: bg,
+    borderRadius: RADIUS.pill,
+    padding: "3px 10px",
+    whiteSpace: "nowrap",
+  });
 
   if (delta !== 0) {
     const rose = delta > 0;
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.inkSoft }}>
-        <span style={{ fontWeight: 600, color: rose ? COLORS.warn : COLORS.accent }}>
-          {rose ? "🔺" : "🔻"} {rose ? "+" : ""}
-          {delta}€ dal salvataggio
-        </span>
-        {date && <span>· salvato il {date}</span>}
-      </div>
+      <span style={pillStyle(rose ? "#F3E3DE" : COLORS.accentSoft, rose ? COLORS.warn : COLORS.accent)}>
+        {rose ? "🔺" : "🔻"} {rose ? "+" : ""}
+        {delta}€
+      </span>
     );
   }
-
-  const label = isFresh ? "✓ aggiornato" : "⟳ da verificare";
-  const color = isFresh ? COLORS.accent : COLORS.warn;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.inkSoft }}>
-      <span style={{ fontWeight: 600, color }}>{label}</span>
-      {date && <span>· salvato il {date}</span>}
-    </div>
-  );
+  if (isFresh) {
+    return <span style={pillStyle(COLORS.accentSoft, COLORS.accent)}>✓ Prezzo aggiornato</span>;
+  }
+  return <span style={pillStyle("#F3E3DE", COLORS.warn)}>↻ Da verificare</span>;
 }
