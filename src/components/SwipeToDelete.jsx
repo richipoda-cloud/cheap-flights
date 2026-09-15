@@ -34,21 +34,34 @@ export function SwipeToDelete({ children, onDelete }) {
   return (
     <div style={{ position: "relative", overflow: "hidden", borderRadius: 14, marginBottom: 10 }}>
       <div
-        onClick={onDelete}
         style={{
           position: "absolute",
           top: 0,
           right: 0,
           bottom: 0,
           width: DELETE_WIDTH,
-          background: COLORS.warn,
+          background: COLORS.bg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          cursor: "pointer",
         }}
       >
-        <span style={{ fontSize: 22 }}>🗑️</span>
+        <div
+          onClick={onDelete}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: COLORS.warn,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            boxShadow: "0 2px 6px rgba(33,30,43,0.25)",
+          }}
+        >
+          <span style={{ fontSize: 18 }}>🗑️</span>
+        </div>
       </div>
       <div
         onTouchStart={(e) => begin(e.touches[0].clientX)}
