@@ -80,7 +80,7 @@ function ChoicePills({ options, value, onChange }) {
 // Riga icona+label+sublabel a sinistra, Toggle iOS a destra — per le due Flessibilità.
 function ToggleRow({ label, hint, checked, onChange }) {
   return (
-    <Card style={{ padding: 14, marginTop: 8 }}>
+    <Card style={{ padding: 14, marginBottom: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{label}</div>
@@ -89,6 +89,42 @@ function ToggleRow({ label, hint, checked, onChange }) {
         <Toggle checked={checked} onChange={onChange} />
       </div>
     </Card>
+  );
+}
+
+// Menu a tenda in fondo: raggruppa i filtri secondari (flessibilità, paesi esclusi)
+// fuori dal flusso principale Partenza/Destinazione/Date, chiuso di default.
+function Accordion({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+          padding: "14px 16px",
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.hairline}`,
+          borderRadius: RADIUS.card,
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{title}</span>
+        <span
+          style={{
+            fontSize: 12,
+            color: COLORS.inkSoft,
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform 0.2s",
+          }}
+        >
+          ▾
+        </span>
+      </div>
+      {open && <div style={{ marginTop: 12 }}>{children}</div>}
+    </div>
   );
 }
 
@@ -326,12 +362,6 @@ export function Search() {
             )}
           </>
         )}
-        <ToggleRow
-          label="Arrivo finale flessibile"
-          hint="Se conviene, atterra in un aeroporto diverso vicino a casa"
-          checked={flexArrival}
-          onChange={setFlexArrival}
-        />
       </Section>
 
       <Section label="Destinazione">
@@ -351,12 +381,6 @@ export function Search() {
             style={{ ...inputStyle, width: "100%", marginTop: 8 }}
           />
         )}
-        <ToggleRow
-          label="Ripartenza flessibile"
-          hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
-          checked={flexDeparture}
-          onChange={setFlexDeparture}
-        />
       </Section>
 
       <Section label="Date">
@@ -389,7 +413,23 @@ export function Search() {
         </Card>
       </Section>
 
-      <Section label="Escludi paesi">
+      <Accordion title="Altri filtri">
+        <ToggleRow
+          label="Arrivo finale flessibile"
+          hint="Se conviene, atterra in un aeroporto diverso vicino a casa"
+          checked={flexArrival}
+          onChange={setFlexArrival}
+        />
+        <ToggleRow
+          label="Ripartenza flessibile"
+          hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
+          checked={flexDeparture}
+          onChange={setFlexDeparture}
+        />
+
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 12, marginBottom: 8 }}>
+          Escludi paesi
+        </div>
         <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 8 }}>
           Salvato sul tuo account — resta impostato anche nelle prossime ricerche
         </div>
@@ -418,7 +458,7 @@ export function Search() {
           </datalist>
           <PrimaryButton onClick={addExcludedCountry}>Escludi</PrimaryButton>
         </div>
-      </Section>
+      </Accordion>
 
       <div
         style={{
