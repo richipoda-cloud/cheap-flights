@@ -5,7 +5,7 @@ import { FlagIcon } from "../components/FlagIcon";
 import { LegBox } from "../components/LegBox";
 import { LegRow } from "../components/LegRow";
 import { PrimaryButton } from "../components/PrimaryButton";
-import { searchDirect, searchStopover, verifyPrice } from "../lib/api";
+import { searchDirect, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 
@@ -88,13 +88,13 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
               <LegBox
                 title="Ritorno"
                 leg={verifyData.inboundLeg}
-                route={`${result.destination ?? "?"} → ${verifyData.inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
+                route={`${verifyData.inboundLeg?.originAirport ?? result.destination ?? "?"} → ${verifyData.inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
                 date={result.returnDate}
               />
               {verifyData.returnsElsewhere && (
                 <div style={{ fontSize: 11.5, color: COLORS.plum, marginBottom: 8, marginTop: -4 }}>
-                  ✈️ Ritorno su {verifyData.inboundLeg.destinationAirport} invece di {result.origin} — conviene, ma
-                  sono due biglietti separati
+                  ✈️ Ritorno {verifyData.inboundLeg.originAirport}→{verifyData.inboundLeg.destinationAirport} invece
+                  di {result.destination}→{result.origin} — conviene, ma sono due biglietti separati
                 </div>
               )}
               {verifyData.returnsElsewhere ? (
@@ -144,11 +144,9 @@ export function Results() {
 
   const filters = location.state?.filters;
   const [directResults, setDirectResults] = useState([]);
-  const [stopoverResults, setStopoverResults] = useState([]);
   const [verifiedData, setVerifiedData] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [loadingDirect, setLoadingDirect] = useState(true);
-  const [loadingStopover, setLoadingStopover] = useState(false);
   const [error, setError] = useState(null);
   const recordedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -179,10 +177,16 @@ export function Results() {
         // poterla verificare TUTTA dal vivo appena arriva, invece di lasciarla indicativa
         // finché non si apre il dettaglio — stessa somma tratte one-way del dettaglio.
         list.forEach((r) => {
-          // "Aeroporto di ritorno diverso dalla partenza": funzione distinta dai Percorsi
-          // creativi (scalo/altra destinazione) — stessa destinazione, il ritorno viene
-          // cercato su tutti gli aeroporti di Partenza dell'utente, non solo quello di andata.
-          const payload = filters.flexArrival ? { ...r, homeAirports: filters.origins } : r;
+          // "Aeroporto di ritorno diverso dalla partenza": il ritorno atterra su un
+          // aeroporto vicino a casa a scelta tra quelli di Partenza, non solo quello di
+          // andata. "Ripartenza flessibile": il ritorno PARTE da un aeroporto vicino alla
+          // destinazione invece che da quella esatta. Due leve indipendenti, entrambe
+          // gestite nello stesso verify-price (si possono anche combinare).
+          const payload = {
+            ...r,
+            ...(filters.flexArrival ? { homeAirports: filters.origins } : {}),
+            ...(filters.flexDeparture ? { flexReturnOrigin: true } : {}),
+          };
           verifyPrice(payload)
             .then((v) => {
               if (!mountedRef.current || v?.price == null) return;
@@ -193,14 +197,6 @@ export function Results() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingDirect(false));
-
-    if (filters.flexDeparture) {
-      setLoadingStopover(true);
-      searchStopover(filters)
-        .then((data) => setStopoverResults(data?.results ?? []))
-        .catch((e) => setError(e.message))
-        .finally(() => setLoadingStopover(false));
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -237,44 +233,6 @@ export function Results() {
             />
           ))}
         </FlatList>
-      )}
-
-      {filters.flexDeparture && (
-        <>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 16,
-              color: COLORS.plum,
-              marginTop: 24,
-              marginBottom: 12,
-            }}
-          >
-            Percorsi creativi
-          </div>
-          <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 12 }}>
-            Comprando andata e ritorno come due biglietti separati (invece che un unico A/R) a
-            volte si risparmia — se compare "via" è un vero scalo intermedio, altrimenti è la
-            stessa destinazione, solo un biglietto in più.
-          </div>
-          {loadingStopover && <div style={{ color: COLORS.inkSoft }}>Ricerca scali alternativi…</div>}
-          {!loadingStopover && stopoverResults.length === 0 && (
-            <div style={{ color: COLORS.inkSoft }}>Nessun percorso alternativo conveniente trovato.</div>
-          )}
-          {stopoverResults.length > 0 && (
-            <FlatList>
-              {stopoverResults.map((r, i) => (
-                <ResultRow
-                  key={r.id}
-                  result={r}
-                  isLast={i === stopoverResults.length - 1}
-                  expanded={expandedId === r.id}
-                  onToggle={() => toggleExpand(r.id)}
-                />
-              ))}
-            </FlatList>
-          )}
-        </>
       )}
     </div>
   );

@@ -51,6 +51,27 @@ function distanceKm(a: string, b: string): number | null {
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
+// "Ripartenza flessibile": nessuna lista fornita dall'utente per gli aeroporti vicino
+// alla DESTINAZIONE (a differenza di Partenza, che l'utente cura a mano) — li si scopre
+// scandendo tutte le coordinate note ed entro MAX_RETURN_DISTANCE_KM da `code`.
+function nearbyAirports(code: string, maxKm: number): string[] {
+  const origin = COORDS[code];
+  if (!origin) return [code];
+  const [lat1, lon1] = origin;
+  const result = [code];
+  for (const [airport, [lat2, lon2]] of Object.entries(COORDS)) {
+    if (airport === code) continue;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const x =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    if (2 * R * Math.asin(Math.sqrt(x)) <= maxKm) result.push(airport);
+  }
+  return result;
+}
+
 const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
 
 function buildDeepLink(flight: any) {
@@ -90,8 +111,15 @@ Deno.serve(async (req) => {
       const km = distanceKm(flight.origin, airport);
       return km != null && km <= MAX_RETURN_DISTANCE_KM;
     });
+    // "Ripartenza flessibile" (flight.flexReturnOrigin): il ritorno può PARTIRE da un
+    // aeroporto vicino alla destinazione invece che da quello usato all'andata — distinta
+    // da "Aeroporto di ritorno diverso dalla partenza" (che varia l'arrivo lato casa),
+    // le due si possono anche combinare (incrocio di entrambi i lati).
+    const returnOrigins = flight.flexReturnOrigin
+      ? nearbyAirports(flight.destination, MAX_RETURN_DISTANCE_KM)
+      : [flight.destination];
 
-    const [fresh, outboundOptions, inboundOptionsPerAirport] = await Promise.all([
+    const [fresh, outboundOptions, inboundOptionsPerPair] = await Promise.all([
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
       fetchOneWayPrices({
         origin: flight.origin,
@@ -100,13 +128,15 @@ Deno.serve(async (req) => {
         departureAt: flight.departDate,
       }),
       Promise.all(
-        homeAirports.map((airport) =>
-          fetchOneWayPrices({
-            origin: flight.destination,
-            destination: airport,
-            limit: 100,
-            departureAt: flight.returnDate,
-          })
+        returnOrigins.flatMap((returnOrigin) =>
+          homeAirports.map((airport) =>
+            fetchOneWayPrices({
+              origin: returnOrigin,
+              destination: airport,
+              limit: 100,
+              departureAt: flight.returnDate,
+            })
+          )
         )
       ),
     ]);
@@ -115,10 +145,14 @@ Deno.serve(async (req) => {
       (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
     );
     const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
-    const inboundLeg = pickCheapestOnDate(inboundOptionsPerAirport.flat(), flight.returnDate);
-    // true solo se il ritorno flessibile ha davvero trovato conveniente un aeroporto
-    // diverso da quello di partenza — round-trip combinato non ha più senso in quel caso.
-    const returnsElsewhere = Boolean(inboundLeg && inboundLeg.destinationAirport !== flight.origin);
+    const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
+    // true solo se la flessibilità ha davvero trovato conveniente un aeroporto diverso
+    // (partenza del ritorno vicino alla destinazione, o arrivo vicino a casa) — round-trip
+    // combinato non ha più senso in quel caso.
+    const returnsElsewhere = Boolean(
+      inboundLeg &&
+        (inboundLeg.originAirport !== flight.destination || inboundLeg.destinationAirport !== flight.origin)
+    );
 
     // Se abbiamo entrambe le tratte one-way (quelle di cui mostriamo orario/compagnia nei
     // box Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che

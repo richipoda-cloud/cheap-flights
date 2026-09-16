@@ -460,7 +460,13 @@ export function Search() {
             { value: "", icon: "📍", label: "Destinazione fissa" },
           ]}
           value={destination}
-          onChange={setDestination}
+          onChange={(value) => {
+            setDestination(value);
+            // "Ripartenza flessibile" ha senso solo con una destinazione precisa (serve
+            // per trovare aeroporti vicini a QUELLA destinazione) — passando a Ovunque
+            // il toggle sparisce dall'interfaccia, e va anche spento qui sotto.
+            if (value === null) setFlexDeparture(false);
+          }}
         />
         {destination !== undefined && destination !== null && (
           <input
@@ -509,12 +515,14 @@ export function Search() {
           checked={flexArrival}
           onChange={setFlexArrival}
         />
-        <ToggleRow
-          label="Aeroporto di arrivo flessibile"
-          hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
-          checked={flexDeparture}
-          onChange={setFlexDeparture}
-        />
+        {destination !== undefined && destination !== null && (
+          <ToggleRow
+            label="Ripartenza flessibile"
+            hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
+            checked={flexDeparture}
+            onChange={setFlexDeparture}
+          />
+        )}
 
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 12, marginBottom: 8 }}>
           Escludi paesi
