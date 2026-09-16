@@ -12,6 +12,13 @@
 // aviasales/v3/prices_for_dates (andata + ritorno) SOLO per arricchire i box Andata/Ritorno
 // con orario/compagnia/durata reali quando disponibili in cache per quella data esatta —
 // se non c'è un match, resta il placeholder onesto invece di dato mancante o inventato.
+//
+// "Aeroporto di ritorno diverso dalla partenza" (flight.homeAirports, distinto dai
+// Percorsi creativi/scalo): stessa destinazione, ma il RITORNO viene cercato su tutti gli
+// aeroporti di partenza dell'utente (non solo quello usato all'andata) — se conviene
+// atterrare su uno diverso, quello si mostra. Round-trip combinato non ha più senso se i
+// due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
+// biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices } from "../_shared/travelpayouts.ts";
 import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -47,8 +54,13 @@ Deno.serve(async (req) => {
 
   try {
     const flight = await req.json();
+    // Aeroporti di partenza dell'utente per il ritorno flessibile — se assente/vuoto il
+    // comportamento resta identico a prima (ritorno forzato sullo stesso flight.origin).
+    const homeAirports: string[] = Array.isArray(flight.homeAirports) && flight.homeAirports.length > 0
+      ? [...new Set(flight.homeAirports)]
+      : [flight.origin];
 
-    const [fresh, outboundOptions, inboundOptions] = await Promise.all([
+    const [fresh, outboundOptions, inboundOptionsPerAirport] = await Promise.all([
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
       fetchOneWayPrices({
         origin: flight.origin,
@@ -56,19 +68,26 @@ Deno.serve(async (req) => {
         limit: 100,
         departureAt: flight.departDate,
       }),
-      fetchOneWayPrices({
-        origin: flight.destination,
-        destination: flight.origin,
-        limit: 100,
-        departureAt: flight.returnDate,
-      }),
+      Promise.all(
+        homeAirports.map((airport) =>
+          fetchOneWayPrices({
+            origin: flight.destination,
+            destination: airport,
+            limit: 100,
+            departureAt: flight.returnDate,
+          })
+        )
+      ),
     ]);
 
     const match = fresh.find(
       (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
     );
     const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
-    const inboundLeg = pickCheapestOnDate(inboundOptions, flight.returnDate);
+    const inboundLeg = pickCheapestOnDate(inboundOptionsPerAirport.flat(), flight.returnDate);
+    // true solo se il ritorno flessibile ha davvero trovato conveniente un aeroporto
+    // diverso da quello di partenza — round-trip combinato non ha più senso in quel caso.
+    const returnsElsewhere = Boolean(inboundLeg && inboundLeg.destinationAirport !== flight.origin);
 
     // Se abbiamo entrambe le tratte one-way (quelle di cui mostriamo orario/compagnia nei
     // box Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che
@@ -80,9 +99,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         price,
-        deepLink: buildDeepLink(flight),
+        deepLink: returnsElsewhere ? null : buildDeepLink(flight),
         outboundLeg,
         inboundLeg,
+        returnsElsewhere,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

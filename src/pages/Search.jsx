@@ -504,8 +504,8 @@ export function Search() {
 
       <Accordion title="Altri filtri">
         <ToggleRow
-          label="Arrivo finale flessibile"
-          hint="Se conviene, atterra in un aeroporto diverso vicino a casa"
+          label="Aeroporto di ritorno diverso dalla partenza"
+          hint="Se conviene, il ritorno atterra su un altro dei tuoi aeroporti di partenza invece di quello di andata"
           checked={flexArrival}
           onChange={setFlexArrival}
         />

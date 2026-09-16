@@ -88,17 +88,44 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
               <LegBox
                 title="Ritorno"
                 leg={verifyData.inboundLeg}
-                route={`${result.destination ?? "?"} → ${result.origin ?? "?"}`}
+                route={`${result.destination ?? "?"} → ${verifyData.inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
                 date={result.returnDate}
               />
-              <PrimaryButton
-                variant="solid"
-                onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
-                disabled={!deepLink}
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                Vai alla prenotazione →
-              </PrimaryButton>
+              {verifyData.returnsElsewhere && (
+                <div style={{ fontSize: 11.5, color: COLORS.plum, marginBottom: 8, marginTop: -4 }}>
+                  ✈️ Ritorno su {verifyData.inboundLeg.destinationAirport} invece di {result.origin} — conviene, ma
+                  sono due biglietti separati
+                </div>
+              )}
+              {verifyData.returnsElsewhere ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <PrimaryButton
+                    variant="solid"
+                    onClick={() => window.open(verifyData.outboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
+                    disabled={!verifyData.outboundLeg?.deepLink}
+                    style={{ flex: 1, justifyContent: "center" }}
+                  >
+                    Prenota andata →
+                  </PrimaryButton>
+                  <PrimaryButton
+                    variant="solid"
+                    onClick={() => window.open(verifyData.inboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
+                    disabled={!verifyData.inboundLeg?.deepLink}
+                    style={{ flex: 1, justifyContent: "center" }}
+                  >
+                    Prenota ritorno →
+                  </PrimaryButton>
+                </div>
+              ) : (
+                <PrimaryButton
+                  variant="solid"
+                  onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
+                  disabled={!deepLink}
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
+                  Vai alla prenotazione →
+                </PrimaryButton>
+              )}
             </>
           ) : (
             <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>
@@ -152,7 +179,11 @@ export function Results() {
         // poterla verificare TUTTA dal vivo appena arriva, invece di lasciarla indicativa
         // finché non si apre il dettaglio — stessa somma tratte one-way del dettaglio.
         list.forEach((r) => {
-          verifyPrice(r)
+          // "Aeroporto di ritorno diverso dalla partenza": funzione distinta dai Percorsi
+          // creativi (scalo/altra destinazione) — stessa destinazione, il ritorno viene
+          // cercato su tutti gli aeroporti di Partenza dell'utente, non solo quello di andata.
+          const payload = filters.flexArrival ? { ...r, homeAirports: filters.origins } : r;
+          verifyPrice(payload)
             .then((v) => {
               if (!mountedRef.current || v?.price == null) return;
               setVerifiedData((prev) => ({ ...prev, [r.id]: v }));
@@ -163,7 +194,7 @@ export function Results() {
       .catch((e) => setError(e.message))
       .finally(() => setLoadingDirect(false));
 
-    if (filters.flexDeparture || filters.flexArrival) {
+    if (filters.flexDeparture) {
       setLoadingStopover(true);
       searchStopover(filters)
         .then((data) => setStopoverResults(data?.results ?? []))
@@ -208,7 +239,7 @@ export function Results() {
         </FlatList>
       )}
 
-      {(filters.flexDeparture || filters.flexArrival) && (
+      {filters.flexDeparture && (
         <>
           <div
             style={{
