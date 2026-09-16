@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { SwipeToDelete } from "../components/SwipeToDelete";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 import { cityName } from "../lib/cityNames";
@@ -52,11 +54,9 @@ export function History() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { searches, loading, removeSearch, removeAllSearches } = useSearches(user?.id);
+  const [confirmingClearAll, setConfirmingClearAll] = useState(false);
 
   const resume = (filters) => navigate("/results", { state: { filters } });
-  const removeAll = () => {
-    if (window.confirm("Cancellare tutto lo storico delle ricerche?")) removeAllSearches();
-  };
 
   return (
     <div style={{ padding: 20 }}>
@@ -64,7 +64,7 @@ export function History() {
         <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent }}>Storico</div>
         {searches.length > 0 && (
           <button
-            onClick={removeAll}
+            onClick={() => setConfirmingClearAll(true)}
             style={{
               fontFamily: "'Inter', sans-serif",
               fontWeight: 600,
@@ -112,6 +112,18 @@ export function History() {
           </SwipeToDelete>
         );
       })}
+
+      <ConfirmDialog
+        open={confirmingClearAll}
+        title="Cancellare tutto lo storico?"
+        message="Tutte le ricerche salvate verranno rimosse. L'operazione non si può annullare."
+        confirmLabel="Cancella tutti"
+        onCancel={() => setConfirmingClearAll(false)}
+        onConfirm={() => {
+          removeAllSearches();
+          setConfirmingClearAll(false);
+        }}
+      />
     </div>
   );
 }
