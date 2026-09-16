@@ -22,10 +22,33 @@
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices } from "../_shared/travelpayouts.ts";
 import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
 
 function pickCheapestOnDate(options: any[], date: string) {
   const matches = options.filter((o) => o.date === date);
   return matches.sort((a, b) => a.price - b.price)[0] ?? null;
+}
+
+// "Aeroporto di ritorno diverso dalla partenza" deve restare un'alternativa comoda, non
+// un altro viaggio: 150km ≈ max 2 ore di auto/treno (Bergamo-Malpensa 77km entra,
+// Milano/Bergamo-Bologna 180-240km resta fuori, coerente con l'esempio esplicito
+// dell'utente). Un aeroporto senza coordinate note viene escluso per prudenza.
+const MAX_RETURN_DISTANCE_KM = 150;
+const COORDS: Record<string, [number, number]> = airportCoords as Record<string, [number, number]>;
+
+function distanceKm(a: string, b: string): number | null {
+  const c1 = COORDS[a];
+  const c2 = COORDS[b];
+  if (!c1 || !c2) return null;
+  const R = 6371;
+  const [lat1, lon1] = c1;
+  const [lat2, lon2] = c2;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
 }
 
 const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
@@ -56,9 +79,17 @@ Deno.serve(async (req) => {
     const flight = await req.json();
     // Aeroporti di partenza dell'utente per il ritorno flessibile — se assente/vuoto il
     // comportamento resta identico a prima (ritorno forzato sullo stesso flight.origin).
-    const homeAirports: string[] = Array.isArray(flight.homeAirports) && flight.homeAirports.length > 0
+    // Filtrati per distanza da flight.origin: anche se l'utente ha messo in Partenza
+    // aeroporti lontani tra loro per altri motivi, qui contano solo quelli comodi da
+    // raggiungere al ritorno (max ~2 ore), altrimenti non è più "lo stesso viaggio".
+    const candidateAirports: string[] = Array.isArray(flight.homeAirports) && flight.homeAirports.length > 0
       ? [...new Set(flight.homeAirports)]
       : [flight.origin];
+    const homeAirports = candidateAirports.filter((airport) => {
+      if (airport === flight.origin) return true;
+      const km = distanceKm(flight.origin, airport);
+      return km != null && km <= MAX_RETURN_DISTANCE_KM;
+    });
 
     const [fresh, outboundOptions, inboundOptionsPerAirport] = await Promise.all([
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
