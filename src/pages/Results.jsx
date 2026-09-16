@@ -53,7 +53,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
             </div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
               {result.departDate} → {result.returnDate}
-              {result.isStopover && ` · via ${result.viaHub}`}
+              {result.isStopover && result.viaHub && ` · via ${result.viaHub}`}
             </div>
             {result.nights != null && (
               <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{result.nights} notti</div>
@@ -220,6 +220,11 @@ export function Results() {
             }}
           >
             Percorsi creativi
+          </div>
+          <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 12 }}>
+            Comprando andata e ritorno come due biglietti separati (invece che un unico A/R) a
+            volte si risparmia — se compare "via" è un vero scalo intermedio, altrimenti è la
+            stessa destinazione, solo un biglietto in più.
           </div>
           {loadingStopover && <div style={{ color: COLORS.inkSoft }}>Ricerca scali alternativi…</div>}
           {!loadingStopover && stopoverResults.length === 0 && (

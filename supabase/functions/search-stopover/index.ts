@@ -193,10 +193,16 @@ function buildResultFromChain(chain: { legs: any[]; total: number }, hub: string
   const last = legs[legs.length - 1];
   const arrivalLeg = legs.length === 4 ? legs[1] : legs[0]; // tratta che arriva alla destinazione finale
   const departureLeg = legs.length === 4 ? legs[2] : last; // tratta che riparte dalla destinazione finale
+  // Nel caso "Ovunque" (2 tratte) l'hub È la destinazione finale — non c'è nessuno scalo
+  // reale, è solo un normale andata/ritorno comprato come due biglietti one-way separati
+  // invece del round-trip aggregato (a volte più economico). Etichettarlo "via {hub}"
+  // in quel caso è fuorviante (sembra un vero scalo intermedio, non lo è): viaHub resta
+  // valorizzato solo per le 4 tratte con hub genuinamente diverso dalla destinazione.
+  const genuineHub = hub !== finalDestination ? hub : null;
   return {
     id: `multileg-${legs.map((l) => l.id).join("-")}`,
     isStopover: true,
-    viaHub: hub,
+    viaHub: genuineHub,
     origin: legs[0].originAirport,
     destination: finalDestination,
     destinationName: arrivalLeg.destinationName,

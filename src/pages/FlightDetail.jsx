@@ -157,8 +157,8 @@ export function FlightDetail() {
               lineHeight: 1.4,
             }}
           >
-            ✂️ Viaggio in {flight.legs.length} biglietti separati (via {flight.viaHub}) — completa
-            tutti gli acquisti, non solo l'ultimo. Prezzo totale indicativo: {flight.price} €.
+            ✂️ Viaggio in {flight.legs.length} biglietti separati{flight.viaHub ? ` (via ${flight.viaHub})` : ""} —
+            completa tutti gli acquisti, non solo l'ultimo. Prezzo totale indicativo: {flight.price} €.
           </div>
 
           {flight.legs.map((leg, i) => {
