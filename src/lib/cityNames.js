@@ -1,24 +1,51 @@
-// Nome città completo da codice — per la destinazione l'API dà già il codice città
-// aggregato (es. MIL per Milano), ma per l'ORIGINE l'utente inserisce sempre un codice
-// aeroporto specifico (es. BGY), che Travelpayouts aggrega sotto la città metropolitana
-// (BGY -> city_code MIL -> "Milan"), non il nome comune dell'aeroporto (Bergamo).
-// Override manuale solo per i casi dove differiscono in modo netto e noto (Bergamo è
-// l'origine di default del progetto) — non generalizzabile a tutti i 10k aeroporti.
+// Nome aeroporto/città da codice. Prima (bug segnalato: "Milano" mostrava un solo
+// aeroporto generico, Malpensa e Linate non si distinguevano) si usava solo cities.json
+// (dataset a livello di CITTÀ AGGREGATA, es. "MIL" per tutta Milano) più una manciata di
+// override manuali (solo Bergamo). Ora si usa airports.json — dataset ufficiale
+// Travelpayouts a livello di SINGOLO AEROPORTO (9269 scali, stessa fonte di cities.json/
+// airlines.json) — quindi ogni aeroporto ha il proprio nome reale (es. MXP -> "Milano
+// Malpensa Airport", LIN -> "Milano Linate Airport"), non più il nome della città che lo
+// aggrega. cities.json resta come fallback per i codici CITTÀ (es. "MIL", "ROM") che
+// compaiono come destinazione nell'aggregato v2/prices/latest.
 import cities from "../data/cities.json";
+import airports from "../data/airports.json";
 import airportCityMap from "../data/airportCityMap.json";
 
 const CITY_BY_CODE = Object.fromEntries(cities.map((c) => [c.code, c.name]));
+const AIRPORT_BY_CODE = Object.fromEntries(airports.map((a) => [a.code, a.name]));
 
-const ORIGIN_NAME_OVERRIDES = {
+// Preferenza sul nome colloquiale invece di quello ufficiale dell'aeroporto, solo dove
+// esplicitamente richiesto (Bergamo è l'origine di default del progetto) — per tutti gli
+// altri aeroporti il dataset è ormai autoritativo, non serve più indovinare caso per caso.
+const DISPLAY_NAME_OVERRIDES = {
   BGY: "Bergamo",
 };
 
-// Nomi comuni/gergali di aeroporti che non coincidono col nome città (o col nome
-// dell'unico aeroporto) usato da Travelpayouts — lista curata dei casi più cercati,
-// non esaustiva su tutti i ~10k aeroporti del dataset (impossibile da mantenere).
+export function cityName(code) {
+  if (!code) return code;
+  const upper = code.toUpperCase();
+  if (DISPLAY_NAME_OVERRIDES[upper]) return DISPLAY_NAME_OVERRIDES[upper];
+  if (AIRPORT_BY_CODE[upper]) return AIRPORT_BY_CODE[upper];
+  if (CITY_BY_CODE[upper]) return CITY_BY_CODE[upper];
+  const cityCode = airportCityMap[upper];
+  return (cityCode && CITY_BY_CODE[cityCode]) ?? code;
+}
+
+// Direzione inversa: l'utente scrive un NOME in un campo che poi va all'API come codice —
+// senza questa risoluzione, un nome scritto invece di un codice dà silenziosamente zero
+// risultati. Costruita sui nomi ufficiali di TUTTI i 9269 aeroporti (non solo una manciata
+// curata): scrivendo il nome esatto suggerito dall'autocomplete ("Milano Malpensa
+// Airport") si risolve sempre al codice giusto, per qualunque aeroporto del dataset.
+const CODE_BY_AIRPORT_NAME = Object.fromEntries(airports.map((a) => [a.name.toLowerCase(), a.code]));
+const CODE_BY_CITY_NAME = Object.fromEntries(cities.map((c) => [c.name.toLowerCase(), c.code]));
+
+// Alias informali per chi digita un nome corto invece del nome ufficiale completo
+// dell'aeroporto (es. "Malpensa" invece di "Milano Malpensa Airport") o un nome comune
+// che il dataset non usa affatto (es. "Bergamo" per l'aeroporto ufficialmente chiamato
+// "Orio al Serio International Airport") — lista curata dei casi più cercati, il dataset
+// sopra copre già la stragrande maggioranza per nome ufficiale esatto.
 const AIRPORT_NICKNAMES = {
-  // Italia — scali secondari di città con più aeroporti, o nomi ufficiali molto diffusi
-  "el prat": "BCN",
+  bergamo: "BGY",
   "orio al serio": "BGY",
   "il caravaggio": "BGY",
   malpensa: "MXP",
@@ -38,7 +65,9 @@ const AIRPORT_NICKNAMES = {
   elmas: "CAG",
   capodichino: "NAP",
   treviso: "TSF",
-  "canova": "TSF",
+  canova: "TSF",
+  "el prat": "BCN",
+  "josep tarradellas": "BCN",
   orly: "ORY",
   "charles de gaulle": "CDG",
   heathrow: "LHR",
@@ -46,34 +75,15 @@ const AIRPORT_NICKNAMES = {
   stansted: "STN",
   luton: "LTN",
   schiphol: "AMS",
-  "josep tarradellas": "BCN",
 };
-
-export function cityName(code) {
-  if (!code) return code;
-  const upper = code.toUpperCase();
-  if (ORIGIN_NAME_OVERRIDES[upper]) return ORIGIN_NAME_OVERRIDES[upper];
-  if (CITY_BY_CODE[upper]) return CITY_BY_CODE[upper];
-  const cityCode = airportCityMap[upper];
-  return (cityCode && CITY_BY_CODE[cityCode]) ?? code;
-}
-
-// Direzione inversa: l'utente scrive un NOME ("Bologna", "Bergamo") in un campo che poi
-// va all'API come codice — senza questa risoluzione, un nome scritto invece di un codice
-// dà silenziosamente zero risultati (l'API non riconosce "BOLOGNA" come codice valido).
-const CODE_BY_NAME = Object.fromEntries(cities.map((c) => [c.name.toLowerCase(), c.code]));
-const CODE_BY_OVERRIDE_NAME = Object.fromEntries(
-  Object.entries(ORIGIN_NAME_OVERRIDES).map(([code, name]) => [name.toLowerCase(), code])
-);
 
 export function resolveCityCode(input) {
   if (!input) return null;
   const trimmed = input.trim();
   const lower = trimmed.toLowerCase();
-  // Override espliciti prima (Bergamo -> BGY, non l'aggregato città MIL)
-  if (CODE_BY_OVERRIDE_NAME[lower]) return CODE_BY_OVERRIDE_NAME[lower];
   if (AIRPORT_NICKNAMES[lower]) return AIRPORT_NICKNAMES[lower];
-  if (CODE_BY_NAME[lower]) return CODE_BY_NAME[lower];
+  if (CODE_BY_AIRPORT_NAME[lower]) return CODE_BY_AIRPORT_NAME[lower];
+  if (CODE_BY_CITY_NAME[lower]) return CODE_BY_CITY_NAME[lower];
   // Già un codice valido (3 lettere, es. un aeroporto minore non coperto dal nome)
   if (/^[a-zA-Z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
   return null;

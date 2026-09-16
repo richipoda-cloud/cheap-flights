@@ -12,46 +12,15 @@ import { useUserPreferences } from "../hooks/useUserPreferences";
 import { countryName } from "../lib/countryNames";
 import { cityName, resolveCityCode } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
-import cities from "../data/cities.json";
+import airports from "../data/airports.json";
 
-// Suggerimenti di completamento per il campo Partenza — nomi città + gli alias/nickname
-// di aeroporto noti (vedi AIRPORT_NICKNAMES in lib/cityNames.js), altrimenti scrivendo
-// il nickname invece del nome città non compariva nessun suggerimento da scegliere.
-const ORIGIN_SUGGESTIONS = [
-  ...new Set([
-    ...cities.map((c) => c.name),
-    "Bergamo",
-    "El Prat",
-    "Orio al Serio",
-    "Il Caravaggio",
-    "Malpensa",
-    "Linate",
-    "Fiumicino",
-    "Leonardo da Vinci",
-    "Ciampino",
-    "Marco Polo",
-    "Tessera",
-    "Guglielmo Marconi",
-    "Amerigo Vespucci",
-    "Peretola",
-    "Caselle",
-    "Sandro Pertini",
-    "Falcone Borsellino",
-    "Punta Raisi",
-    "Elmas",
-    "Capodichino",
-    "Treviso",
-    "Canova",
-    "Orly",
-    "Charles de Gaulle",
-    "Heathrow",
-    "Gatwick",
-    "Stansted",
-    "Luton",
-    "Schiphol",
-    "Josep Tarradellas",
-  ]),
-];
+// Suggerimenti di completamento per il campo Partenza — nome ufficiale di ognuno dei
+// 9269 aeroporti del dataset Travelpayouts (non solo le città aggregate): digitando
+// "Milano" ora compaiono sia "Milano Malpensa Airport" sia "Milano Linate Airport" come
+// opzioni distinte, invece di un'unica voce generica per tutta la città. "Bergamo" resta
+// aggiunto a parte perché il nome ufficiale dello scalo ("Orio al Serio International
+// Airport") non contiene affatto la parola "Bergamo".
+const ORIGIN_SUGGESTIONS = [...new Set([...airports.map((a) => a.name), "Bergamo"])];
 
 function Section({ label, action, children }) {
   return (
