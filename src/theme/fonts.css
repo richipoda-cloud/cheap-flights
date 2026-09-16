@@ -16,6 +16,10 @@ body,
   /* Senza questo, l'overscroll/bounce (iOS Safari) o uno scroll oltre i margini
      rivela il bianco di default sotto il contenuto invece dello sfondo salvia. */
   background: #DBE4CC;
+  /* Alcuni browser mobile (Chrome/Firefox Android) ignorano user-scalable=no nel
+     meta viewport per motivi di accessibilità — questo blocca comunque il doppio-tap
+     e il pinch-to-zoom a livello di gestione touch, coerente col meta tag in index.html. */
+  touch-action: manipulation;
 }
 
 /* Slider durata soggiorno: due <input type="range"> sovrapposti sullo stesso track

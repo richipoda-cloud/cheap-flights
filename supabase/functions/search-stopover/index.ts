@@ -25,15 +25,25 @@ function addDays(dateStr: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function cheapestAfter(options: any[], afterDate: string, minGapDays: number) {
+// maxGapDays opzionale: senza limite superiore, la tratta "più economica compatibile"
+// poteva cadere mesi dopo se quella era la più economica in assoluto — la catena veniva
+// costruita ignorando del tutto il limite MASSIMO di notti richiesto (solo il minimo era
+// rispettato qui), e finiva scartata alla fine da filterByNights. Risultato: con una
+// durata soggiorno con un tetto massimo (es. "10-15 notti"), Percorsi creativi restava
+// quasi sempre vuoto anche quando esisteva una combinazione valida nella finestra giusta.
+function cheapestAfter(options: any[], afterDate: string, minGapDays: number, maxGapDays = Infinity) {
   const minDate = addDays(afterDate, minGapDays);
-  return options.filter((o) => o.date >= minDate).sort((a, b) => a.price - b.price)[0] ?? null;
+  const maxDate = Number.isFinite(maxGapDays) ? addDays(afterDate, maxGapDays) : null;
+  return options
+    .filter((o) => o.date >= minDate && (!maxDate || o.date <= maxDate))
+    .sort((a, b) => a.price - b.price)[0] ?? null;
 }
 
 // Prova le TOP_K partenze più economiche per la prima tratta, poi incastra a cascata
 // (greedy: tratta più economica compatibile) le successive — esplorare tutte le
 // combinazioni esploderebbe, questo ventaglio è un compromesso a costo zero di API.
-function pickCheapestChain(legOptionsList: any[][], minGapDaysList: number[]) {
+// gapConstraints[i] = { min, max } giorni di distacco richiesti per la tratta rest[i].
+function pickCheapestChain(legOptionsList: any[][], gapConstraints: { min: number; max?: number }[]) {
   const [first, ...rest] = legOptionsList;
   if (!first?.length) return null;
 
@@ -44,7 +54,8 @@ function pickCheapestChain(legOptionsList: any[][], minGapDaysList: number[]) {
     const legs = [start];
     let ok = true;
     for (let i = 0; i < rest.length; i++) {
-      const next = cheapestAfter(rest[i], legs[legs.length - 1].date, minGapDaysList[i] ?? 0);
+      const constraint = gapConstraints[i] ?? { min: 0 };
+      const next = cheapestAfter(rest[i], legs[legs.length - 1].date, constraint.min, constraint.max ?? Infinity);
       if (!next) {
         ok = false;
         break;
@@ -97,18 +108,19 @@ Deno.serve(async (req) => {
     const origins: string[] = filters.origins ?? [];
     const destination: string | null = filters.destination ?? null;
     const minNightsAtDest = filters.nightsMin ?? 0;
+    const maxNightsAtDest = filters.nightsMax ?? Infinity;
 
     // Prezzo diretto di riferimento (round-trip aggregato v2, coerente con search-direct)
     const directResults = await Promise.all(origins.map((o) => fetchLatestPrices({ origin: o, destination })));
     const directPrice = directResults.flat().sort((a, b) => a.price - b.price)[0]?.price ?? Infinity;
 
     let hubCandidates = await findHubCandidates(origins, INITIAL_CANDIDATES);
-    let results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
+    let results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, maxNightsAtDest, directPrice);
 
     if (results.length === 0) {
       const more = await findHubCandidates(origins, INITIAL_CANDIDATES + EXPANDED_CANDIDATES);
       hubCandidates = more.slice(INITIAL_CANDIDATES);
-      results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
+      results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, maxNightsAtDest, directPrice);
     }
 
     const withoutExcluded = filterByExcludedCountries(results, filters.excludedCountries);
@@ -130,6 +142,7 @@ async function buildResults(
   origins: string[],
   destination: string | null,
   minNightsAtDest: number,
+  maxNightsAtDest: number,
   directPrice: number
 ) {
   const results = await Promise.all(
@@ -139,7 +152,10 @@ async function buildResults(
         const leg4Options = (
           await Promise.all(origins.map((o) => fetchOneWayPrices({ origin: hub, destination: o, limit: 100 })))
         ).flat();
-        const chain = pickCheapestChain([leg1Options, leg4Options], [minNightsAtDest]);
+        const chain = pickCheapestChain(
+          [leg1Options, leg4Options],
+          [{ min: minNightsAtDest, max: maxNightsAtDest }]
+        );
         if (!chain || chain.total >= directPrice * SIGNIFICANT_SAVING_RATIO) return null;
         return buildResultFromChain(chain, hub, chain.legs[0].destination);
       }
@@ -155,7 +171,7 @@ async function buildResults(
       ]);
       const chain = pickCheapestChain(
         [leg1Options, leg2Options, leg3Options, leg4Options],
-        [0, minNightsAtDest, 0]
+        [{ min: 0 }, { min: minNightsAtDest, max: maxNightsAtDest }, { min: 0 }]
       );
       if (!chain || chain.total >= directPrice * SIGNIFICANT_SAVING_RATIO) return null;
       return buildResultFromChain(chain, hub, destination);
