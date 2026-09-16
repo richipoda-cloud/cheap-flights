@@ -67,7 +67,7 @@ export function Suggestions() {
       </div>
       {results.length > 0 && (
         <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 16 }}>
-          Prezzi indicativi (~) — si confermano aprendo il dettaglio del volo
+          Prezzi indicativi (~) — si aggiornano da soli in pochi secondi
         </div>
       )}
 
