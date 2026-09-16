@@ -102,20 +102,18 @@ function Accordion({ title, children }) {
         onClick={() => setOpen(!open)}
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          flexDirection: "column",
           alignItems: "center",
+          gap: 2,
+          width: "fit-content",
           cursor: "pointer",
-          padding: "14px 16px",
-          background: COLORS.surface,
-          border: `1px solid ${COLORS.hairline}`,
-          borderRadius: RADIUS.card,
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{title}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.accent }}>{title}</span>
         <span
           style={{
             fontSize: 12,
-            color: COLORS.inkSoft,
+            color: COLORS.accent,
             transform: open ? "rotate(180deg)" : "none",
             transition: "transform 0.2s",
           }}
