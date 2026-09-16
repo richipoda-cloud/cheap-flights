@@ -1,19 +1,23 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { COLORS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { FlagIcon } from "../components/FlagIcon";
-import { searchDirect } from "../lib/api";
+import { LegBox } from "../components/LegBox";
+import { PrimaryButton } from "../components/PrimaryButton";
+import { searchDirect, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSuggestions } from "../hooks/useSuggestions";
 
 export function Suggestions() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { suggestions, loading: loadingSuggestions } = useSuggestions(user?.id);
 
   const [results, setResults] = useState([]);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [verifiedData, setVerifiedData] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => (mountedRef.current = false), []);
 
   useEffect(() => {
     if (loadingSuggestions || suggestions.topOrigins.length === 0) return;
@@ -29,9 +33,24 @@ export function Suggestions() {
     };
     setLoadingResults(true);
     searchDirect(filters)
-      .then((data) => setResults(data?.results ?? []))
+      .then((data) => {
+        const list = data?.results ?? [];
+        setResults(list);
+        // Stesso trattamento di Risultati: lista corta (10 al massimo lato server),
+        // verificata tutta dal vivo appena arriva invece di restare solo indicativa.
+        list.forEach((r) => {
+          verifyPrice(r)
+            .then((v) => {
+              if (!mountedRef.current || v?.price == null) return;
+              setVerifiedData((prev) => ({ ...prev, [r.id]: v }));
+            })
+            .catch(() => {});
+        });
+      })
       .finally(() => setLoadingResults(false));
   }, [loadingSuggestions, suggestions]);
+
+  const toggleExpand = (id) => setExpandedId((current) => (current === id ? null : id));
 
   const reasonFor = () => {
     const origin = suggestions.topOrigins[0];
@@ -61,31 +80,67 @@ export function Suggestions() {
         </div>
       )}
 
-      {results.map((r) => (
-        <Card
-          key={r.id}
-          onClick={() => navigate("/flight", { state: { flight: r } })}
-          style={{ padding: 14, marginBottom: 10 }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <FlagIcon countryCode={r.countryCode} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
-                  {r.destinationName ?? r.destination}
-                </div>
-                <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
-                  {r.departDate} → {r.returnDate}
+      {results.map((r) => {
+        const verify = verifiedData[r.id];
+        const price = verify?.price ?? r.price;
+        const expanded = expandedId === r.id;
+        return (
+          <Card key={r.id} onClick={() => toggleExpand(r.id)} style={{ padding: 14, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <FlagIcon countryCode={r.countryCode} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
+                    {r.destinationName ?? r.destination}
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+                    {r.departDate} → {r.returnDate}
+                  </div>
                 </div>
               </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
+                  {verify == null ? "~" : ""}
+                  {price} {r.currency ?? "€"}
+                </div>
+                {verify != null && <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>}
+              </div>
             </div>
-            <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-              ~{r.price} {r.currency ?? "€"}
-            </div>
-          </div>
-          <div style={{ fontSize: 11.5, color: COLORS.plum, marginTop: 6 }}>{reasonFor()}</div>
-        </Card>
-      ))}
+            <div style={{ fontSize: 11.5, color: COLORS.plum, marginTop: 6 }}>{reasonFor()}</div>
+
+            {expanded && (
+              <div style={{ marginTop: 10 }} onClick={(e) => e.stopPropagation()}>
+                {verify ? (
+                  <>
+                    <LegBox
+                      title="Andata"
+                      leg={verify.outboundLeg}
+                      route={`${r.origin ?? "?"} → ${r.destination ?? "?"}`}
+                      date={r.departDate}
+                    />
+                    <LegBox
+                      title="Ritorno"
+                      leg={verify.inboundLeg}
+                      route={`${r.destination ?? "?"} → ${r.origin ?? "?"}`}
+                      date={r.returnDate}
+                    />
+                    <PrimaryButton
+                      variant="solid"
+                      onClick={() => window.open(verify.deepLink ?? r.deepLink, "_blank", "noopener,noreferrer")}
+                      disabled={!(verify.deepLink ?? r.deepLink)}
+                      style={{ width: "100%", justifyContent: "center" }}
+                    >
+                      Vai alla prenotazione →
+                    </PrimaryButton>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }
