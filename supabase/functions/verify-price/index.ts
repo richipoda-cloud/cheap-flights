@@ -50,8 +50,18 @@ Deno.serve(async (req) => {
 
     const [fresh, outboundOptions, inboundOptions] = await Promise.all([
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
-      fetchOneWayPrices({ origin: flight.origin, destination: flight.destination, limit: 100 }),
-      fetchOneWayPrices({ origin: flight.destination, destination: flight.origin, limit: 100 }),
+      fetchOneWayPrices({
+        origin: flight.origin,
+        destination: flight.destination,
+        limit: 100,
+        departureAt: flight.departDate,
+      }),
+      fetchOneWayPrices({
+        origin: flight.destination,
+        destination: flight.origin,
+        limit: 100,
+        departureAt: flight.returnDate,
+      }),
     ]);
 
     const match = fresh.find(

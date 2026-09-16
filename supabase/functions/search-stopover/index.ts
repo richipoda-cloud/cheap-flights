@@ -67,10 +67,14 @@ function groupByDestination(options: any[]) {
   return groups;
 }
 
-async function findHubCandidates(origins: string[], count: number, excludedCountries?: string[] | null) {
+// Un hub è solo il punto di transito tra due biglietti one-way separati, non la meta del
+// viaggio (come lo scalo di un volo commerciale normale, mai soggetto a "escludi paesi").
+// Filtrarlo per paese escluso qui svuotava i Percorsi creativi: con parecchie esclusioni
+// attive, gli hub economici vicini finivano quasi tutti in un paese escluso e sparivano —
+// il filtro va applicato solo alla destinazione FINALE, non ai candidati hub intermedi.
+async function findHubCandidates(origins: string[], count: number) {
   const perOrigin = await Promise.all(origins.map((origin) => fetchOneWayPrices({ origin, limit: 200 })));
-  const all = filterByExcludedCountries(perOrigin.flat(), excludedCountries);
-  const groups = groupByDestination(all);
+  const groups = groupByDestination(perOrigin.flat());
   const ranked = [...groups.entries()]
     .map(([hub, options]) => ({ hub, options, minPrice: Math.min(...options.map((o) => o.price)) }))
     .sort((a, b) => a.minPrice - b.minPrice)
@@ -98,15 +102,11 @@ Deno.serve(async (req) => {
     const directResults = await Promise.all(origins.map((o) => fetchLatestPrices({ origin: o, destination })));
     const directPrice = directResults.flat().sort((a, b) => a.price - b.price)[0]?.price ?? Infinity;
 
-    let hubCandidates = await findHubCandidates(origins, INITIAL_CANDIDATES, filters.excludedCountries);
+    let hubCandidates = await findHubCandidates(origins, INITIAL_CANDIDATES);
     let results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
 
     if (results.length === 0) {
-      const more = await findHubCandidates(
-        origins,
-        INITIAL_CANDIDATES + EXPANDED_CANDIDATES,
-        filters.excludedCountries
-      );
+      const more = await findHubCandidates(origins, INITIAL_CANDIDATES + EXPANDED_CANDIDATES);
       hubCandidates = more.slice(INITIAL_CANDIDATES);
       results = await buildResults(hubCandidates, origins, destination, minNightsAtDest, directPrice);
     }

@@ -45,10 +45,17 @@ export async function fetchOneWayPrices({
   origin,
   destination,
   limit = 30,
+  departureAt,
 }: {
   origin: string;
   destination?: string | null;
   limit?: number;
+  // Data esatta (YYYY-MM-DD) di cui si vogliono orario/compagnia reali — es. verify-price,
+  // che già sa quale volo mostrare. Senza questo si pescavano solo i `limit` più economici
+  // IN ASSOLUTO su quella rotta (sorting=price), e se la data richiesta non era tra quelli
+  // il match falliva e restava il placeholder "disponibili al passo di prenotazione" anche
+  // per voli verificati e prenotabili. Passando la data all'API si cerca proprio quella.
+  departureAt?: string | null;
 }) {
   if (!TRAVELPAYOUTS_TOKEN) throw new Error("TRAVELPAYOUTS_TOKEN non configurato");
 
@@ -60,6 +67,7 @@ export async function fetchOneWayPrices({
     sorting: "price",
     one_way: "true",
     ...(destination ? { destination } : {}),
+    ...(departureAt ? { departure_at: departureAt } : {}),
   });
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
