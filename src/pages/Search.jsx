@@ -430,18 +430,6 @@ export function Search() {
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 12, marginBottom: 8 }}>
           Escludi paesi
         </div>
-        <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 8 }}>
-          Salvato sul tuo account — resta impostato anche nelle prossime ricerche
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-          {excludedCountries.map((code) => (
-            <Pill key={code} onClick={() => removeExcludedCountry(code)}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
-              </span>
-            </Pill>
-          ))}
-        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <input
             list="country-options"
@@ -457,6 +445,15 @@ export function Search() {
             ))}
           </datalist>
           <PrimaryButton onClick={addExcludedCountry}>Escludi</PrimaryButton>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          {excludedCountries.map((code) => (
+            <Pill key={code} onClick={() => removeExcludedCountry(code)}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
+              </span>
+            </Pill>
+          ))}
         </div>
       </Accordion>
 
