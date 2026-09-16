@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { FlagIcon } from "../components/FlagIcon";
-import { searchDirect, searchStopover } from "../lib/api";
+import { searchDirect, searchStopover, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 
@@ -23,7 +23,8 @@ function FlatList({ children }) {
   );
 }
 
-function ResultRow({ result, isLast, onClick }) {
+function ResultRow({ result, isLast, onClick, verifiedPrice }) {
+  const price = verifiedPrice ?? result.price;
   return (
     <div
       onClick={onClick}
@@ -51,8 +52,14 @@ function ResultRow({ result, isLast, onClick }) {
           )}
         </div>
       </div>
-      <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-        ~{result.price} {result.currency ?? "€"}
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
+          {verifiedPrice == null ? "~" : ""}
+          {price} {result.currency ?? "€"}
+        </div>
+        {verifiedPrice != null && (
+          <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
+        )}
       </div>
     </div>
   );
@@ -67,10 +74,13 @@ export function Results() {
   const filters = location.state?.filters;
   const [directResults, setDirectResults] = useState([]);
   const [stopoverResults, setStopoverResults] = useState([]);
+  const [verifiedPrices, setVerifiedPrices] = useState({});
   const [loadingDirect, setLoadingDirect] = useState(true);
   const [loadingStopover, setLoadingStopover] = useState(false);
   const [error, setError] = useState(null);
   const recordedRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => (mountedRef.current = false), []);
 
   // Separato dall'effect di ricerca: user?.id arriva async (sessione risolta dopo il
   // mount), quindi va aspettato con la sua dependency, non catturato nella closure
@@ -90,7 +100,21 @@ export function Results() {
 
     setLoadingDirect(true);
     searchDirect(filters)
-      .then((data) => setDirectResults(data?.results ?? []))
+      .then((data) => {
+        const list = data?.results ?? [];
+        setDirectResults(list);
+        // Lista tenuta volutamente corta (10 al massimo, vedi search-direct) proprio per
+        // poterla verificare TUTTA dal vivo appena arriva, invece di lasciarla indicativa
+        // finché non si apre il dettaglio — stessa somma tratte one-way del dettaglio.
+        list.forEach((r) => {
+          verifyPrice(r)
+            .then((v) => {
+              if (!mountedRef.current || v?.price == null) return;
+              setVerifiedPrices((prev) => ({ ...prev, [r.id]: v.price }));
+            })
+            .catch(() => {});
+        });
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingDirect(false));
 
@@ -114,7 +138,7 @@ export function Results() {
         Risultati
       </div>
       <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 16 }}>
-        Prezzi indicativi (~) — si confermano aprendo il dettaglio del volo
+        Prezzi indicativi (~) — si aggiornano da soli in pochi secondi
       </div>
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
@@ -131,6 +155,7 @@ export function Results() {
               result={r}
               isLast={i === directResults.length - 1}
               onClick={() => openDetail(r)}
+              verifiedPrice={verifiedPrices[r.id]}
             />
           ))}
         </FlatList>

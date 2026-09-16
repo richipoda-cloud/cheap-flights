@@ -9,6 +9,13 @@ import {
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Restituire 30-50 risultati aveva senso solo se restavano tutti "indicativi" per
+// sempre: nessuno li avrebbe verificati uno per uno. Tenendone pochi, il client può
+// verificarli TUTTI dal vivo (somma delle tratte one-way, stessa logica del dettaglio
+// volo) subito dopo il caricamento — prezzi reali invece di indicativi, senza esplodere
+// le chiamate verso Travelpayouts.
+const MAX_RESULTS = 10;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -33,7 +40,7 @@ Deno.serve(async (req) => {
     const merged = perOrigin.flat();
     const withoutExcluded = filterByExcludedCountries(merged, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
-    const results = filtered.sort((a, b) => a.price - b.price);
+    const results = filtered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
