@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { FlagIcon } from "../components/FlagIcon";
+import { LegBox } from "../components/LegBox";
+import { LegRow } from "../components/LegRow";
+import { PrimaryButton } from "../components/PrimaryButton";
 import { searchDirect, searchStopover, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
@@ -23,44 +26,85 @@ function FlatList({ children }) {
   );
 }
 
-function ResultRow({ result, isLast, onClick, verifiedPrice }) {
+// Espande sul posto invece di navigare al dettaglio (stesso pattern di Preferiti) —
+// per i diretti riusa il verifyData già ottenuto per il badge "✓ verificato" (nessuna
+// chiamata doppia), per i percorsi creativi mostra le tratte già pronte da search-stopover.
+function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyData }) {
   const price = verifiedPrice ?? result.price;
+  const deepLink = verifyData?.deepLink ?? result.deepLink;
+
   return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: "14px 16px",
-        borderBottom: isLast ? "none" : `1px solid ${COLORS.hairline}`,
-        cursor: "pointer",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <FlagIcon countryCode={result.countryCode} />
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
-            {result.destinationName ?? result.destination}
+    <div style={{ borderBottom: isLast ? "none" : `1px solid ${COLORS.hairline}` }}>
+      <div
+        onClick={onToggle}
+        style={{
+          padding: "14px 16px",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <FlagIcon countryCode={result.countryCode} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>
+              {result.destinationName ?? result.destination}
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+              {result.departDate} → {result.returnDate}
+              {result.isStopover && ` · via ${result.viaHub}`}
+            </div>
+            {result.nights != null && (
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{result.nights} notti</div>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
-            {result.departDate} → {result.returnDate}
-            {result.isStopover && ` · via ${result.viaHub}`}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
+            {verifiedPrice == null ? "~" : ""}
+            {price} {result.currency ?? "€"}
           </div>
-          {result.nights != null && (
-            <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{result.nights} notti</div>
+          {verifiedPrice != null && (
+            <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
           )}
         </div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-          {verifiedPrice == null ? "~" : ""}
-          {price} {result.currency ?? "€"}
+
+      {expanded && (
+        <div style={{ padding: "0 16px 16px" }} onClick={(e) => e.stopPropagation()}>
+          {result.isStopover ? (
+            result.legs?.map((leg, i) => (
+              <LegRow key={leg.id} index={i + 1} total={result.legs.length} leg={leg} />
+            ))
+          ) : verifyData ? (
+            <>
+              <LegBox
+                title="Andata"
+                leg={verifyData.outboundLeg}
+                route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
+                date={result.departDate}
+              />
+              <LegBox
+                title="Ritorno"
+                leg={verifyData.inboundLeg}
+                route={`${result.destination ?? "?"} → ${result.origin ?? "?"}`}
+                date={result.returnDate}
+              />
+              <PrimaryButton
+                variant="solid"
+                onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
+                disabled={!deepLink}
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                Vai alla prenotazione →
+              </PrimaryButton>
+            </>
+          ) : (
+            <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>
+          )}
         </div>
-        {verifiedPrice != null && (
-          <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -74,7 +118,8 @@ export function Results() {
   const filters = location.state?.filters;
   const [directResults, setDirectResults] = useState([]);
   const [stopoverResults, setStopoverResults] = useState([]);
-  const [verifiedPrices, setVerifiedPrices] = useState({});
+  const [verifiedData, setVerifiedData] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
   const [loadingDirect, setLoadingDirect] = useState(true);
   const [loadingStopover, setLoadingStopover] = useState(false);
   const [error, setError] = useState(null);
@@ -110,7 +155,7 @@ export function Results() {
           verifyPrice(r)
             .then((v) => {
               if (!mountedRef.current || v?.price == null) return;
-              setVerifiedPrices((prev) => ({ ...prev, [r.id]: v.price }));
+              setVerifiedData((prev) => ({ ...prev, [r.id]: v }));
             })
             .catch(() => {});
         });
@@ -130,7 +175,7 @@ export function Results() {
 
   if (!filters) return null;
 
-  const openDetail = (result) => navigate("/flight", { state: { flight: result, filters } });
+  const toggleExpand = (id) => setExpandedId((current) => (current === id ? null : id));
 
   return (
     <div style={{ padding: 20 }}>
@@ -154,8 +199,10 @@ export function Results() {
               key={r.id}
               result={r}
               isLast={i === directResults.length - 1}
-              onClick={() => openDetail(r)}
-              verifiedPrice={verifiedPrices[r.id]}
+              expanded={expandedId === r.id}
+              onToggle={() => toggleExpand(r.id)}
+              verifiedPrice={verifiedData[r.id]?.price}
+              verifyData={verifiedData[r.id]}
             />
           ))}
         </FlatList>
@@ -185,7 +232,8 @@ export function Results() {
                   key={r.id}
                   result={r}
                   isLast={i === stopoverResults.length - 1}
-                  onClick={() => openDetail(r)}
+                  expanded={expandedId === r.id}
+                  onToggle={() => toggleExpand(r.id)}
                 />
               ))}
             </FlatList>
