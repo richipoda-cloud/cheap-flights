@@ -16,6 +16,13 @@ import { corsHeaders } from "../_shared/cors.ts";
 // le chiamate verso Travelpayouts.
 const MAX_RESULTS = 10;
 
+// v2/prices/latest ordina per prezzo e il default (30) prendeva solo i 30 più economici
+// IN ASSOLUTO, PRIMA di togliere i paesi esclusi — con parecchie esclusioni attive, i 30
+// più economici potevano finire tutti in un paese escluso e sparire, lasciando zero
+// risultati anche se esistevano destinazioni valide (solo un po' meno economiche) più giù
+// nella lista. Pescando un pool ampio PRIMA del filtro, quelle destinazioni restano visibili.
+const FETCH_LIMIT = 1000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -35,7 +42,7 @@ Deno.serve(async (req) => {
     const dateFrom = filters.dateMode === "fixed" ? filters.dateFrom : null;
 
     const perOrigin = await Promise.all(
-      origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom }))
+      origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom, limit: FETCH_LIMIT }))
     );
     const merged = perOrigin.flat();
     const withoutExcluded = filterByExcludedCountries(merged, filters.excludedCountries);
