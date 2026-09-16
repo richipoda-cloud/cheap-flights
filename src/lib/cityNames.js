@@ -13,10 +13,40 @@ const ORIGIN_NAME_OVERRIDES = {
   BGY: "Bergamo",
 };
 
-// Nomi comuni/gergali di aeroporti che non coincidono col nome città usato da Travelpayouts
-// (es. l'aeroporto di Barcellona è notissimo come "El Prat" ma il dataset ha solo "Barcelona").
+// Nomi comuni/gergali di aeroporti che non coincidono col nome città (o col nome
+// dell'unico aeroporto) usato da Travelpayouts — lista curata dei casi più cercati,
+// non esaustiva su tutti i ~10k aeroporti del dataset (impossibile da mantenere).
 const AIRPORT_NICKNAMES = {
+  // Italia — scali secondari di città con più aeroporti, o nomi ufficiali molto diffusi
   "el prat": "BCN",
+  "orio al serio": "BGY",
+  "il caravaggio": "BGY",
+  malpensa: "MXP",
+  linate: "LIN",
+  fiumicino: "FCO",
+  "leonardo da vinci": "FCO",
+  ciampino: "CIA",
+  "marco polo": "VCE",
+  tessera: "VCE",
+  "guglielmo marconi": "BLQ",
+  "amerigo vespucci": "FLR",
+  peretola: "FLR",
+  caselle: "TRN",
+  "sandro pertini": "TRN",
+  "falcone borsellino": "PMO",
+  "punta raisi": "PMO",
+  elmas: "CAG",
+  capodichino: "NAP",
+  treviso: "TSF",
+  "canova": "TSF",
+  orly: "ORY",
+  "charles de gaulle": "CDG",
+  heathrow: "LHR",
+  gatwick: "LGW",
+  stansted: "STN",
+  luton: "LTN",
+  schiphol: "AMS",
+  "josep tarradellas": "BCN",
 };
 
 export function cityName(code) {

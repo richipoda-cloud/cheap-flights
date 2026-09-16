@@ -14,9 +14,44 @@ import { cityName, resolveCityCode } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
 import cities from "../data/cities.json";
 
-// Suggerimenti di completamento per il campo Partenza — nomi città + gli override
-// manuali (Bergamo, aggregata da Travelpayouts sotto Milano ma cercata col suo nome).
-const ORIGIN_SUGGESTIONS = [...new Set([...cities.map((c) => c.name), "Bergamo", "El Prat"])];
+// Suggerimenti di completamento per il campo Partenza — nomi città + gli alias/nickname
+// di aeroporto noti (vedi AIRPORT_NICKNAMES in lib/cityNames.js), altrimenti scrivendo
+// il nickname invece del nome città non compariva nessun suggerimento da scegliere.
+const ORIGIN_SUGGESTIONS = [
+  ...new Set([
+    ...cities.map((c) => c.name),
+    "Bergamo",
+    "El Prat",
+    "Orio al Serio",
+    "Il Caravaggio",
+    "Malpensa",
+    "Linate",
+    "Fiumicino",
+    "Leonardo da Vinci",
+    "Ciampino",
+    "Marco Polo",
+    "Tessera",
+    "Guglielmo Marconi",
+    "Amerigo Vespucci",
+    "Peretola",
+    "Caselle",
+    "Sandro Pertini",
+    "Falcone Borsellino",
+    "Punta Raisi",
+    "Elmas",
+    "Capodichino",
+    "Treviso",
+    "Canova",
+    "Orly",
+    "Charles de Gaulle",
+    "Heathrow",
+    "Gatwick",
+    "Stansted",
+    "Luton",
+    "Schiphol",
+    "Josep Tarradellas",
+  ]),
+];
 
 function Section({ label, action, children }) {
   return (
@@ -186,10 +221,24 @@ function Accordion({ title, children }) {
 const NAME_TO_CODE = Object.fromEntries(countryCodes.map((code) => [countryName(code).toLowerCase(), code]));
 const CODE_SET = new Set(countryCodes.map((c) => c.toLowerCase()));
 
-// Nomi comuni che non sono il nome ufficiale ISO (Intl.DisplayNames dà "Regno Unito",
-// non "Inghilterra") — senza questo, digitare il nome informale dà zero match.
+// Nomi comuni/informali che non sono il nome ufficiale ISO restituito da Intl.DisplayNames
+// (es. "Regno Unito" non "Inghilterra") — lista curata dei casi più frequenti, non di
+// ogni possibile nickname/regione di ogni paese (non generalizzabile ai 237 paesi ISO).
 const COUNTRY_NICKNAMES = {
   inghilterra: "GB",
+  scozia: "GB",
+  galles: "GB",
+  "gran bretagna": "GB",
+  olanda: "NL",
+  "repubblica ceca": "CZ",
+  "stati uniti d'america": "US",
+  usa: "US",
+  america: "US",
+  "emirati arabi": "AE",
+  dubai: "AE",
+  "corea del sud": "KR",
+  "corea del nord": "KP",
+  birmania: "MM",
 };
 
 function resolveCountryCode(input) {
@@ -232,7 +281,7 @@ export function Search() {
   const { user } = useAuth();
   // A differenza degli altri filtri (per-sessione), i paesi esclusi sono legati
   // all'utente: caricati automaticamente qui e salvati ad ogni modifica.
-  const { excludedCountries, setExcludedCountries } = useUserPreferences(user?.id);
+  const { excludedCountries, setExcludedCountries, loading: prefsLoading } = useUserPreferences(user?.id);
 
   const [origins, setOrigins] = useState(() => loadPersistedFilters().origins);
   const [originInput, setOriginInput] = useState("");
@@ -293,7 +342,11 @@ export function Search() {
 
   const removeOrigin = (code) => setOrigins(origins.filter((o) => o !== code));
 
+  // Guardia anti-race: se l'elenco paesi esclusi non ha ancora finito di caricare dal
+  // server, aggiungerne uno adesso scriverebbe [nuovo] sopra il valore vero non ancora
+  // arrivato, cancellando di fatto quelli salvati in precedenza (bug: "spariscono").
   const addExcludedCountry = () => {
+    if (prefsLoading) return;
     const code = resolveCountryCode(countryInput);
     if (code && !excludedCountries.includes(code)) {
       setExcludedCountries([...excludedCountries, code]);
@@ -301,8 +354,10 @@ export function Search() {
     setCountryInput("");
   };
 
-  const removeExcludedCountry = (code) =>
+  const removeExcludedCountry = (code) => {
+    if (prefsLoading) return;
     setExcludedCountries(excludedCountries.filter((c) => c !== code));
+  };
 
   const resetFilters = () => {
     setOrigins([]);
@@ -317,7 +372,7 @@ export function Search() {
     setFlexDeparture(false);
     setFlexArrival(false);
     setCountryInput("");
-    setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
+    if (!prefsLoading) setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
   };
 
   const canSearch =
@@ -501,7 +556,8 @@ export function Search() {
             value={countryInput}
             onChange={(e) => setCountryInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addExcludedCountry()}
-            placeholder="Nome paese (es. Francia)"
+            placeholder={prefsLoading ? "Caricamento…" : "Nome paese (es. Francia)"}
+            disabled={prefsLoading}
             style={inputStyle}
           />
           <datalist id="country-options">
@@ -509,7 +565,9 @@ export function Search() {
               <option key={code} value={countryName(code)} />
             ))}
           </datalist>
-          <PrimaryButton onClick={addExcludedCountry}>Escludi</PrimaryButton>
+          <PrimaryButton onClick={addExcludedCountry} disabled={prefsLoading}>
+            Escludi
+          </PrimaryButton>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {excludedCountries.map((code) => (

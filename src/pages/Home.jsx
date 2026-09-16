@@ -52,8 +52,8 @@ export function Home() {
       : "In base alle tue ricerche passate";
 
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: 20, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
         <SearchCard onClick={() => navigate("/search")} />
 
         <div style={{ display: "flex", gap: 12 }}>

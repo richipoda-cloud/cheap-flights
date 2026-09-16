@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { COLORS } from "../theme/colors";
+import { COLORS, RADIUS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { SwipeToDelete } from "../components/SwipeToDelete";
@@ -51,17 +51,37 @@ function describeDetails(f) {
 export function History() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { searches, loading, removeSearch } = useSearches(user?.id);
+  const { searches, loading, removeSearch, removeAllSearches } = useSearches(user?.id);
 
   const resume = (filters) => navigate("/results", { state: { filters } });
+  const removeAll = () => {
+    if (window.confirm("Cancellare tutto lo storico delle ricerche?")) removeAllSearches();
+  };
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <span onClick={() => navigate(-1)} style={{ fontSize: 20, color: COLORS.ink, cursor: "pointer" }}>
-          ←
-        </span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent }}>Storico</div>
+        {searches.length > 0 && (
+          <button
+            onClick={removeAll}
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 600,
+              fontSize: 11.5,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: COLORS.plum,
+              background: COLORS.surface,
+              border: `1px solid ${COLORS.hairline}`,
+              borderRadius: RADIUS.pill,
+              padding: "5px 12px",
+              cursor: "pointer",
+            }}
+          >
+            Cancella tutti
+          </button>
+        )}
       </div>
 
       {loading && <div style={{ color: COLORS.inkSoft }}>Caricamento…</div>}

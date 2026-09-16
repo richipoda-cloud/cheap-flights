@@ -43,9 +43,14 @@ export function Suggestions() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 16 }}>
+      <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 4 }}>
         Suggeriti per te
       </div>
+      {results.length > 0 && (
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 16 }}>
+          Prezzi indicativi (~) — si confermano aprendo il dettaglio del volo
+        </div>
+      )}
 
       {(loadingSuggestions || loadingResults) && (
         <div style={{ color: COLORS.inkSoft }}>Caricamento…</div>
@@ -75,7 +80,7 @@ export function Suggestions() {
               </div>
             </div>
             <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-              {r.price} {r.currency ?? "€"}
+              ~{r.price} {r.currency ?? "€"}
             </div>
           </div>
           <div style={{ fontSize: 11.5, color: COLORS.plum, marginTop: 6 }}>{reasonFor()}</div>
