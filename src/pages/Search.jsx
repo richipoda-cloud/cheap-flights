@@ -195,18 +195,26 @@ export function Search() {
 
   const [originError, setOriginError] = useState(null);
 
-  // Passando a "Date fisse" i campi non devono apparire vuoti: prima data = oggi,
-  // seconda = oggi + durata soggiorno minima già impostata sullo slider.
+  // Passando a "Date fisse" il campo "da" non deve apparire vuoto: default oggi.
+  // Il campo "a" resta derivato dalla durata soggiorno (vedi effect sotto) — così
+  // segue lo slider anche se lo si cambia DOPO aver già scelto le date fisse.
   const handleDateModeChange = (mode) => {
     setDateMode(mode);
-    if (mode === "fixed" && !dateFrom && !dateTo) {
-      const today = new Date();
-      const to = new Date(today);
-      to.setDate(to.getDate() + daysMin);
-      setDateFrom(today.toISOString().slice(0, 10));
-      setDateTo(to.toISOString().slice(0, 10));
+    if (mode === "fixed" && !dateFrom) {
+      setDateFrom(new Date().toISOString().slice(0, 10));
     }
   };
+
+  // Tiene "a" sempre allineato a "da" + durata soggiorno minima corrente, invece di
+  // calcolarlo una sola volta al momento dello switch (bug: restava fisso anche
+  // spostando poi lo slider della durata).
+  useEffect(() => {
+    if (dateMode !== "fixed" || !dateFrom) return;
+    const to = new Date(dateFrom + "T00:00:00");
+    to.setDate(to.getDate() + daysMin);
+    setDateTo(to.toISOString().slice(0, 10));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMode, dateFrom, daysMin]);
 
   const addOrigin = () => {
     const code = resolveCityCode(originInput);
@@ -381,6 +389,19 @@ export function Search() {
         )}
       </Section>
 
+      <Section label="Durata soggiorno">
+        <Card style={{ padding: 16 }}>
+          <DualRangeSlider
+            min={daysMin}
+            max={daysMax}
+            onChange={(lo, hi) => {
+              setDaysMinState(lo);
+              setDaysMaxState(hi);
+            }}
+          />
+        </Card>
+      </Section>
+
       <Section label="Date">
         <ChoicePills
           options={[
@@ -396,19 +417,6 @@ export function Search() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
           </div>
         )}
-      </Section>
-
-      <Section label="Durata soggiorno">
-        <Card style={{ padding: 16 }}>
-          <DualRangeSlider
-            min={daysMin}
-            max={daysMax}
-            onChange={(lo, hi) => {
-              setDaysMinState(lo);
-              setDaysMaxState(hi);
-            }}
-          />
-        </Card>
       </Section>
 
       <Accordion title="Altri filtri">
