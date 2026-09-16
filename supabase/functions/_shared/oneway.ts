@@ -65,5 +65,9 @@ export async function fetchOneWayPrices({
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
   if (!res.ok) return [];
   const json = await res.json();
-  return (json.data ?? []).map(mapOneWayResult);
+  // v3/prices_for_dates può restituire anche voli con scalo (campo "transfers") anche
+  // filtrando per prezzo più basso — mostrarli come "Diretto" con l'orario di arrivo
+  // finale dava durate assurde (es. 7h per una tratta di 1h) e un prezzo che poi in
+  // fase di prenotazione risultava per un volo diverso da quello indicato.
+  return (json.data ?? []).filter((r: any) => (r.transfers ?? 0) === 0).map(mapOneWayResult);
 }

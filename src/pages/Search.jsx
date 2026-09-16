@@ -16,7 +16,7 @@ import cities from "../data/cities.json";
 
 // Suggerimenti di completamento per il campo Partenza — nomi città + gli override
 // manuali (Bergamo, aggregata da Travelpayouts sotto Milano ma cercata col suo nome).
-const ORIGIN_SUGGESTIONS = [...new Set([...cities.map((c) => c.name), "Bergamo"])];
+const ORIGIN_SUGGESTIONS = [...new Set([...cities.map((c) => c.name), "Bergamo", "El Prat"])];
 
 function Section({ label, action, children }) {
   return (
@@ -77,6 +77,63 @@ function ChoicePills({ options, value, onChange }) {
   );
 }
 
+// Suggerimenti custom invece del <datalist> nativo: con ~9600 opzioni il datalist di
+// sistema è inaffidabile (non compare affatto su alcuni browser mobile, altrove tronca
+// silenziosamente la lista) — qui filtriamo e mostriamo noi il menu, sotto controllo.
+function Autocomplete({ value, onChange, onPick, onKeyDown, suggestions, placeholder, style, autoFocus }) {
+  const [open, setOpen] = useState(false);
+  const query = value.trim().toLowerCase();
+  const matches = query.length > 0 ? suggestions.filter((s) => s.toLowerCase().includes(query)).slice(0, 8) : [];
+
+  return (
+    <div style={{ position: "relative", flex: 1 }}>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        style={{ ...style, width: "100%" }}
+        autoFocus={autoFocus}
+      />
+      {open && matches.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            background: COLORS.surface,
+            border: `1px solid ${COLORS.hairline}`,
+            borderRadius: RADIUS.button,
+            boxShadow: "0 4px 12px rgba(33,30,43,0.15)",
+            zIndex: 30,
+            maxHeight: 220,
+            overflowY: "auto",
+          }}
+        >
+          {matches.map((m) => (
+            <div
+              key={m}
+              onMouseDown={() => {
+                onPick(m);
+                setOpen(false);
+              }}
+              style={{ padding: "9px 12px", fontSize: 13, color: COLORS.ink, cursor: "pointer" }}
+            >
+              {m}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Riga icona+label+sublabel a sinistra, Toggle iOS a destra — per le due Flessibilità.
 function ToggleRow({ label, hint, checked, onChange }) {
   return (
@@ -102,9 +159,8 @@ function Accordion({ title, children }) {
         onClick={() => setOpen(!open)}
         style={{
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          gap: 2,
+          gap: 4,
           width: "fit-content",
           cursor: "pointer",
         }}
@@ -130,10 +186,17 @@ function Accordion({ title, children }) {
 const NAME_TO_CODE = Object.fromEntries(countryCodes.map((code) => [countryName(code).toLowerCase(), code]));
 const CODE_SET = new Set(countryCodes.map((c) => c.toLowerCase()));
 
+// Nomi comuni che non sono il nome ufficiale ISO (Intl.DisplayNames dà "Regno Unito",
+// non "Inghilterra") — senza questo, digitare il nome informale dà zero match.
+const COUNTRY_NICKNAMES = {
+  inghilterra: "GB",
+};
+
 function resolveCountryCode(input) {
   const q = input.trim().toLowerCase();
   if (!q) return null;
   if (CODE_SET.has(q)) return q.toUpperCase();
+  if (COUNTRY_NICKNAMES[q]) return COUNTRY_NICKNAMES[q];
   return NAME_TO_CODE[q] ?? null;
 }
 
@@ -344,23 +407,19 @@ export function Search() {
         {(origins.length === 0 || addingOrigin) && (
           <>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input
-                list="origin-options"
+              <Autocomplete
                 value={originInput}
-                onChange={(e) => {
-                  setOriginInput(e.target.value);
+                onChange={(v) => {
+                  setOriginInput(v);
                   setOriginError(null);
                 }}
+                onPick={(name) => setOriginInput(name)}
                 onKeyDown={(e) => e.key === "Enter" && addOrigin()}
+                suggestions={ORIGIN_SUGGESTIONS}
                 placeholder="Città o codice IATA (es. Bergamo, MXP)"
                 style={inputStyle}
                 autoFocus={addingOrigin}
               />
-              <datalist id="origin-options">
-                {ORIGIN_SUGGESTIONS.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
               <PrimaryButton onClick={addOrigin}>Aggiungi</PrimaryButton>
             </div>
             {originError && (

@@ -13,6 +13,12 @@ const ORIGIN_NAME_OVERRIDES = {
   BGY: "Bergamo",
 };
 
+// Nomi comuni/gergali di aeroporti che non coincidono col nome città usato da Travelpayouts
+// (es. l'aeroporto di Barcellona è notissimo come "El Prat" ma il dataset ha solo "Barcelona").
+const AIRPORT_NICKNAMES = {
+  "el prat": "BCN",
+};
+
 export function cityName(code) {
   if (!code) return code;
   const upper = code.toUpperCase();
@@ -36,6 +42,7 @@ export function resolveCityCode(input) {
   const lower = trimmed.toLowerCase();
   // Override espliciti prima (Bergamo -> BGY, non l'aggregato città MIL)
   if (CODE_BY_OVERRIDE_NAME[lower]) return CODE_BY_OVERRIDE_NAME[lower];
+  if (AIRPORT_NICKNAMES[lower]) return AIRPORT_NICKNAMES[lower];
   if (CODE_BY_NAME[lower]) return CODE_BY_NAME[lower];
   // Già un codice valido (3 lettere, es. un aeroporto minore non coperto dal nome)
   if (/^[a-zA-Z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
