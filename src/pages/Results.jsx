@@ -78,55 +78,74 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
               <LegRow key={leg.id} index={i + 1} total={result.legs.length} leg={leg} />
             ))
           ) : verifyData ? (
-            <>
-              <LegBox
-                title="Andata"
-                leg={verifyData.outboundLeg}
-                route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
-                date={result.departDate}
-              />
-              <LegBox
-                title="Ritorno"
-                leg={verifyData.inboundLeg}
-                route={`${verifyData.inboundLeg?.originAirport ?? result.destination ?? "?"} → ${verifyData.inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
-                date={result.returnDate}
-              />
-              {verifyData.returnsElsewhere && (
-                <div style={{ fontSize: 11.5, color: COLORS.plum, marginBottom: 8, marginTop: -4 }}>
-                  ✈️ Ritorno {verifyData.inboundLeg.originAirport}→{verifyData.inboundLeg.destinationAirport} invece
-                  di {result.destination}→{result.origin} — conviene, ma sono due biglietti separati
-                </div>
-              )}
-              {verifyData.returnsElsewhere ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <PrimaryButton
-                    variant="solid"
-                    onClick={() => window.open(verifyData.outboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
-                    disabled={!verifyData.outboundLeg?.deepLink}
-                    style={{ flex: 1, justifyContent: "center" }}
-                  >
-                    Prenota andata →
-                  </PrimaryButton>
-                  <PrimaryButton
-                    variant="solid"
-                    onClick={() => window.open(verifyData.inboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
-                    disabled={!verifyData.inboundLeg?.deepLink}
-                    style={{ flex: 1, justifyContent: "center" }}
-                  >
-                    Prenota ritorno →
-                  </PrimaryButton>
-                </div>
-              ) : (
-                <PrimaryButton
-                  variant="solid"
-                  onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
-                  disabled={!deepLink}
-                  style={{ width: "100%", justifyContent: "center" }}
-                >
-                  Vai alla prenotazione →
-                </PrimaryButton>
-              )}
-            </>
+            (() => {
+              const outboundLegs = verifyData.outboundLegs ?? (verifyData.outboundLeg ? [verifyData.outboundLeg] : []);
+              const inboundLegs = verifyData.inboundLegs ?? (verifyData.inboundLeg ? [verifyData.inboundLeg] : []);
+              const hasStop = verifyData.hasStop || outboundLegs.length > 1 || inboundLegs.length > 1;
+
+              // Con uno scalo (andata e/o ritorno) l'itinerario è sempre a biglietti
+              // separati — stessa presentazione già usata per i vecchi percorsi creativi.
+              if (hasStop) {
+                const allLegs = [...outboundLegs, ...inboundLegs];
+                return allLegs.map((leg, i) => (
+                  <LegRow key={leg.id ?? i} index={i + 1} total={allLegs.length} leg={leg} />
+                ));
+              }
+
+              const outboundLeg = outboundLegs[0];
+              const inboundLeg = inboundLegs[0];
+              return (
+                <>
+                  <LegBox
+                    title="Andata"
+                    leg={outboundLeg}
+                    route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
+                    date={result.departDate}
+                  />
+                  <LegBox
+                    title="Ritorno"
+                    leg={inboundLeg}
+                    route={`${inboundLeg?.originAirport ?? result.destination ?? "?"} → ${inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
+                    date={result.returnDate}
+                  />
+                  {verifyData.returnsElsewhere && (
+                    <div style={{ fontSize: 11.5, color: COLORS.plum, marginBottom: 8, marginTop: -4 }}>
+                      ✈️ Ritorno {inboundLeg.originAirport}→{inboundLeg.destinationAirport} invece di{" "}
+                      {result.destination}→{result.origin} — conviene, ma sono due biglietti separati
+                    </div>
+                  )}
+                  {verifyData.returnsElsewhere ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <PrimaryButton
+                        variant="solid"
+                        onClick={() => window.open(outboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
+                        disabled={!outboundLeg?.deepLink}
+                        style={{ flex: 1, justifyContent: "center" }}
+                      >
+                        Prenota andata →
+                      </PrimaryButton>
+                      <PrimaryButton
+                        variant="solid"
+                        onClick={() => window.open(inboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
+                        disabled={!inboundLeg?.deepLink}
+                        style={{ flex: 1, justifyContent: "center" }}
+                      >
+                        Prenota ritorno →
+                      </PrimaryButton>
+                    </div>
+                  ) : (
+                    <PrimaryButton
+                      variant="solid"
+                      onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
+                      disabled={!deepLink}
+                      style={{ width: "100%", justifyContent: "center" }}
+                    >
+                      Vai alla prenotazione →
+                    </PrimaryButton>
+                  )}
+                </>
+              );
+            })()
           ) : (
             <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>
           )}
@@ -150,6 +169,7 @@ export function Results() {
   const [error, setError] = useState(null);
   const recordedRef = useRef(false);
   const mountedRef = useRef(true);
+  const stopCheckedRef = useRef(new Set());
   useEffect(() => () => (mountedRef.current = false), []);
 
   // Separato dall'effect di ricerca: user?.id arriva async (sessione risolta dopo il
@@ -202,7 +222,30 @@ export function Results() {
 
   if (!filters) return null;
 
-  const toggleExpand = (id) => setExpandedId((current) => (current === id ? null : id));
+  const toggleExpand = (id) => {
+    setExpandedId((current) => (current === id ? null : id));
+    // "Andata/Ritorno con scalo": ricerca costosa (5 hub candidati x 2 chiamate ciascuno),
+    // per questo NON gira per tutti i 10 risultati come le altre flessibilità, ma solo per
+    // la card che l'utente apre davvero, e solo una volta (stopCheckedRef).
+    if ((filters.flexOutboundStop || filters.flexReturnStop) && !stopCheckedRef.current.has(id)) {
+      stopCheckedRef.current.add(id);
+      const result = directResults.find((r) => r.id === id);
+      if (!result) return;
+      const payload = {
+        ...result,
+        ...(filters.flexArrival ? { homeAirports: filters.origins } : {}),
+        ...(filters.flexDeparture ? { flexReturnOrigin: true } : {}),
+        ...(filters.flexOutboundStop ? { checkOutboundStop: true } : {}),
+        ...(filters.flexReturnStop ? { checkReturnStop: true } : {}),
+      };
+      verifyPrice(payload)
+        .then((v) => {
+          if (!mountedRef.current || v?.price == null) return;
+          setVerifiedData((prev) => ({ ...prev, [id]: v }));
+        })
+        .catch(() => {});
+    }
+  };
 
   return (
     <div style={{ padding: 20 }}>

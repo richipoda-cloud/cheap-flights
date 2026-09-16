@@ -72,6 +72,48 @@ function nearbyAirports(code: string, maxKm: number): string[] {
   return result;
 }
 
+// "Andata/Ritorno con scalo" (flight.checkOutboundStop / flight.checkReturnStop): cerca
+// un vero scalo (2 biglietti separati via un hub) per QUELLA tratta specifica, solo se
+// batte il prezzo diretto — calcolato on-demand (chiamato solo quando l'utente espande
+// un risultato con il relativo interruttore attivo, mai per i 10 risultati insieme:
+// il costo in chiamate sarebbe eccessivo per una verifica automatica di massa).
+const CONNECTION_HUB_CANDIDATES = 5;
+
+async function findConnectionHubs(origin: string, excludeDestination: string, count: number) {
+  const options = await fetchOneWayPrices({ origin, limit: 200 });
+  const cheapestByHub = new Map<string, number>();
+  for (const o of options) {
+    if (o.destination === excludeDestination) continue;
+    const current = cheapestByHub.get(o.destination);
+    if (current == null || o.price < current) cheapestByHub.set(o.destination, o.price);
+  }
+  return [...cheapestByHub.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, count)
+    .map(([hub]) => hub);
+}
+
+async function cheapestConnection(origin: string, destination: string, date: string) {
+  const hubs = await findConnectionHubs(origin, destination, CONNECTION_HUB_CANDIDATES);
+  const attempts = await Promise.all(
+    hubs.map(async (hub) => {
+      const [leg1Options, leg2Options] = await Promise.all([
+        fetchOneWayPrices({ origin, destination: hub, limit: 50, departureAt: date }),
+        fetchOneWayPrices({ origin: hub, destination, limit: 50, departureAt: date }),
+      ]);
+      const leg1 = pickCheapestOnDate(leg1Options, date);
+      if (!leg1) return null;
+      // Vincolo di sequenza: la seconda tratta deve partire dopo l'arrivo della prima,
+      // altrimenti l'itinerario è fisicamente impossibile da seguire.
+      const leg2 = leg2Options.filter((o: any) => o.date >= leg1.date).sort((a: any, b: any) => a.price - b.price)[0];
+      if (!leg2) return null;
+      return { legs: [leg1, leg2], total: leg1.price + leg2.price };
+    })
+  );
+  const valid = attempts.filter((a): a is { legs: any[]; total: number } => a !== null);
+  return valid.sort((a, b) => a.total - b.total)[0] ?? null;
+}
+
 const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
 
 function buildDeepLink(flight: any) {
@@ -154,20 +196,50 @@ Deno.serve(async (req) => {
         (inboundLeg.originAirport !== flight.destination || inboundLeg.destinationAirport !== flight.origin)
     );
 
-    // Se abbiamo entrambe le tratte one-way (quelle di cui mostriamo orario/compagnia nei
-    // box Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che
-    // può riferirsi a una combinazione voli diversa da quella effettivamente mostrata in
-    // pagina (fonti scorrelate: prima si vedevano orari di un volo e il prezzo di un altro).
-    // Il v2 aggregato resta solo un fallback quando manca il match one-way esatto.
-    const price = outboundLeg && inboundLeg ? outboundLeg.price + inboundLeg.price : match?.price ?? flight.price;
+    // "Andata/Ritorno con scalo", solo su richiesta esplicita (vedi sopra) — confrontato
+    // col diretto già trovato, tenuto solo se davvero più economico.
+    const [outboundConnection, returnConnection] = await Promise.all([
+      flight.checkOutboundStop
+        ? cheapestConnection(flight.origin, flight.destination, flight.departDate)
+        : null,
+      flight.checkReturnStop ? cheapestConnection(flight.destination, flight.origin, flight.returnDate) : null,
+    ]);
+    const outboundLegs =
+      outboundConnection && (!outboundLeg || outboundConnection.total < outboundLeg.price)
+        ? outboundConnection.legs
+        : outboundLeg
+        ? [outboundLeg]
+        : [];
+    const inboundLegs =
+      returnConnection && (!inboundLeg || returnConnection.total < inboundLeg.price)
+        ? returnConnection.legs
+        : inboundLeg
+        ? [inboundLeg]
+        : [];
+    const hasStop = outboundLegs.length > 1 || inboundLegs.length > 1;
+
+    // Se abbiamo tutte le tratte one-way (quelle di cui mostriamo orario/compagnia nei box
+    // Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che può
+    // riferirsi a una combinazione voli diversa da quella effettivamente mostrata in pagina
+    // (fonti scorrelate: prima si vedevano orari di un volo e il prezzo di un altro). Il v2
+    // aggregato resta solo un fallback quando mancano entrambe le tratte one-way.
+    const allLegs = [...outboundLegs, ...inboundLegs];
+    const price = allLegs.length > 0 ? allLegs.reduce((sum, l) => sum + l.price, 0) : match?.price ?? flight.price;
+    // Un unico deep link round-trip ha senso solo per il caso semplice (1 tratta per
+    // direzione, stessi aeroporti di andata/ritorno) — con uno scalo o un aeroporto
+    // diverso sono biglietti separati, ognuno col proprio deepLink già su ogni leg.
+    const singleTicket = !returnsElsewhere && !hasStop;
 
     return new Response(
       JSON.stringify({
         price,
-        deepLink: returnsElsewhere ? null : buildDeepLink(flight),
-        outboundLeg,
-        inboundLeg,
+        deepLink: singleTicket ? buildDeepLink(flight) : null,
+        outboundLeg: outboundLegs[0] ?? null,
+        inboundLeg: inboundLegs[0] ?? null,
+        outboundLegs,
+        inboundLegs,
         returnsElsewhere,
+        hasStop,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

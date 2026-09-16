@@ -28,3 +28,4 @@ Un "percorso creativo" è modellato come N biglietti one-way indipendenti (già 
 - **Home da rivedere**: spaziatura sistemata (padding standard, card compatte), ma il layout/contenuto della schermata potrebbe avere altri aggiustamenti da valutare — non ancora considerata definitiva.
 - Dedup preferiti: "Salva nei preferiti" non previene duplicati se cliccato più volte di seguito (bug noto minore, trovato durante l'audit mockup).
 - "1 notti" invece di "1 notte" nei Risultati (plurale errato al singolare, trovato durante il redesign, mai corretto).
+- **Audit visibilità toggle Altri filtri**: rivedere quando compare/scompare ciascuno dei 4 toggle flessibilità (Aeroporto di ritorno diverso dalla partenza, Ripartenza flessibile, Andata con scalo, Ritorno con scalo) a seconda di Ovunque/Destinazione fissa — richiesto esplicitamente dall'utente, non ancora fatto sistematicamente.

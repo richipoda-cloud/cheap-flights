@@ -234,6 +234,8 @@ const DEFAULT_FILTERS = {
   daysMax: MAX_DAYS,
   flexDeparture: false,
   flexArrival: false,
+  flexOutboundStop: false,
+  flexReturnStop: false,
 };
 
 function loadPersistedFilters() {
@@ -263,16 +265,42 @@ export function Search() {
   const [daysMax, setDaysMaxState] = useState(() => loadPersistedFilters().daysMax);
   const [flexDeparture, setFlexDeparture] = useState(() => loadPersistedFilters().flexDeparture);
   const [flexArrival, setFlexArrival] = useState(() => loadPersistedFilters().flexArrival);
+  const [flexOutboundStop, setFlexOutboundStop] = useState(() => loadPersistedFilters().flexOutboundStop);
+  const [flexReturnStop, setFlexReturnStop] = useState(() => loadPersistedFilters().flexReturnStop);
   const [countryInput, setCountryInput] = useState("");
 
   useEffect(() => {
-    const state = { origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival };
+    const state = {
+      origins,
+      destination,
+      dateMode,
+      dateFrom,
+      dateTo,
+      daysMin,
+      daysMax,
+      flexDeparture,
+      flexArrival,
+      flexOutboundStop,
+      flexReturnStop,
+    };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // storage non disponibile (privata/bloccato): i filtri restano solo per la sessione corrente
     }
-  }, [origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival]);
+  }, [
+    origins,
+    destination,
+    dateMode,
+    dateFrom,
+    dateTo,
+    daysMin,
+    daysMax,
+    flexDeparture,
+    flexArrival,
+    flexOutboundStop,
+    flexReturnStop,
+  ]);
 
   const [originError, setOriginError] = useState(null);
 
@@ -340,6 +368,8 @@ export function Search() {
     setDaysMaxState(MAX_DAYS);
     setFlexDeparture(false);
     setFlexArrival(false);
+    setFlexOutboundStop(false);
+    setFlexReturnStop(false);
     setCountryInput("");
     if (!prefsLoading) setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
   };
@@ -366,6 +396,8 @@ export function Search() {
       nightsMax: noLimit ? null : daysMax - 1,
       flexDeparture,
       flexArrival,
+      flexOutboundStop,
+      flexReturnStop,
       excludedCountries,
     };
     navigate("/results", { state: { filters } });
@@ -523,6 +555,18 @@ export function Search() {
             onChange={setFlexDeparture}
           />
         )}
+        <ToggleRow
+          label="Andata con scalo"
+          hint="Se conviene, l'andata può avere uno scalo intermedio invece del volo diretto"
+          checked={flexOutboundStop}
+          onChange={setFlexOutboundStop}
+        />
+        <ToggleRow
+          label="Ritorno con scalo"
+          hint="Se conviene, il ritorno può avere uno scalo intermedio invece del volo diretto"
+          checked={flexReturnStop}
+          onChange={setFlexReturnStop}
+        />
 
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 12, marginBottom: 8 }}>
           Escludi paesi
