@@ -161,6 +161,19 @@ export function Search() {
 
   const [originError, setOriginError] = useState(null);
 
+  // Passando a "Date fisse" i campi non devono apparire vuoti: prima data = oggi,
+  // seconda = oggi + durata soggiorno minima già impostata sullo slider.
+  const handleDateModeChange = (mode) => {
+    setDateMode(mode);
+    if (mode === "fixed" && !dateFrom && !dateTo) {
+      const today = new Date();
+      const to = new Date(today);
+      to.setDate(to.getDate() + daysMin);
+      setDateFrom(today.toISOString().slice(0, 10));
+      setDateTo(to.toISOString().slice(0, 10));
+    }
+  };
+
   const addOrigin = () => {
     const code = resolveCityCode(originInput);
     if (!code) {
@@ -353,7 +366,7 @@ export function Search() {
             { value: "fixed", icon: "📅", label: "Date fisse" },
           ]}
           value={dateMode}
-          onChange={setDateMode}
+          onChange={handleDateModeChange}
         />
         {dateMode === "fixed" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -382,7 +395,7 @@ export function Search() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           {excludedCountries.map((code) => (
-            <Pill key={code} tone="plum" onClick={() => removeExcludedCountry(code)}>
+            <Pill key={code} onClick={() => removeExcludedCountry(code)}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
               </span>

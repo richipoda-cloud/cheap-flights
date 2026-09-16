@@ -24,6 +24,7 @@ export function DualRangeSlider({ min, max, onChange }) {
         {lo} — {hi === MAX_DAYS ? `${MAX_DAYS}+` : hi} giorni
       </div>
       <div className="dual-range">
+        <div className="dual-range-track" />
         <input
           type="range"
           min={MIN_DAYS}

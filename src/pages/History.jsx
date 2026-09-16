@@ -8,6 +8,22 @@ import { useSearches } from "../hooks/useSearches";
 import { cityName } from "../lib/cityNames";
 import { formatRelativeTime } from "../lib/formatters";
 
+// Icona rotazione piena (arco ~300° + freccia), non il glifo unicode ↻ che risultava
+// troppo sottile/incompleto — stroke currentColor per ereditare il bianco del bottone.
+function RefreshIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+      <path
+        d="M21 12a9 9 0 1 1-3.2-6.88"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      <path d="M21 3v6h-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function describeFilters(f) {
   const origin = f.origins?.map(cityName).join(", ") ?? "?";
   const dest = f.destination ? cityName(f.destination) : "Ovunque";
@@ -69,7 +85,7 @@ export function History() {
                   </div>
                 </div>
                 <PrimaryButton variant="solid" onClick={() => resume(s.filters)}>
-                  ↻ Riprendi
+                  <RefreshIcon /> Riprendi
                 </PrimaryButton>
               </div>
             </Card>
