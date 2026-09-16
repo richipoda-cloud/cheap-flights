@@ -14,9 +14,17 @@ import { fetchLatestPrices, filterByNights, filterByExcludedCountries } from "..
 import { TRAVELPAYOUTS_TOKEN, fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const INITIAL_CANDIDATES = 5;
-const EXPANDED_CANDIDATES = 10;
-const SIGNIFICANT_SAVING_RATIO = 0.85;
+// Ampliato da 5+10: con piu' partenze combinate e/o parecchi paesi esclusi attivi, il
+// pool di hub candidati (ranking globale per prezzo minimo su TUTTE le origini insieme)
+// veniva dominato da poche rotte, e la manciata che restava finiva spesso in un paese
+// escluso — zero risultati anche quando ne esistevano di validi più giù in classifica.
+const INITIAL_CANDIDATES = 10;
+const EXPANDED_CANDIDATES = 20;
+// Soglia di risparmio minimo per mostrare un percorso creativo (era 0.85 = -15%): troppo
+// severa da sola scartava quasi tutte le combinazioni trovate, indipendentemente dal
+// numero di hub candidati provati — abbassata a -8% su richiesta esplicita per vedere
+// più percorsi anche con risparmio più modesto.
+const SIGNIFICANT_SAVING_RATIO = 0.92;
 const TOP_K_FIRST_LEG = 8; // ventaglio di partenze provate per la prima tratta, gratis (solo CPU)
 
 function addDays(dateStr: string, days: number) {
