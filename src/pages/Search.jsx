@@ -510,7 +510,7 @@ export function Search() {
           onChange={setFlexArrival}
         />
         <ToggleRow
-          label="Ripartenza flessibile"
+          label="Aeroporto di arrivo flessibile"
           hint="Se conviene, riparti da un aeroporto diverso vicino alla destinazione"
           checked={flexDeparture}
           onChange={setFlexDeparture}
