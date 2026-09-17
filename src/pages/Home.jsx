@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import { Card } from "../components/Card";
 import { COLORS, RADIUS } from "../theme/colors";
 import { useAuth } from "../hooks/useAuth";
@@ -21,10 +22,11 @@ function SearchCard({ onClick }) {
       }}
     >
       <div style={{ fontSize: 24, lineHeight: 1 }}>🔍</div>
-      <div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 17, color: "#FFFFFF" }}>Cerca voli</div>
         <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
       </div>
+      <ChevronRight size={20} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
     </Card>
   );
 }
@@ -49,6 +51,7 @@ function SmallCard({ icon, title, subtitle, onClick }) {
           </div>
         )}
       </div>
+      <ChevronRight size={18} color={COLORS.inkSoft} style={{ flexShrink: 0, marginLeft: "auto" }} />
     </Card>
   );
 }
