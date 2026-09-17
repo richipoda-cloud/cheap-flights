@@ -19,15 +19,32 @@ export function TabBar() {
   const navigate = useNavigate();
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        left: 16,
-        right: 16,
-        bottom: "max(28px, env(safe-area-inset-bottom))",
-        height: 96,
-        zIndex: 20,
-      }}
+    <>
+      {/* Sfumatura sotto il contenuto (dal progetto guardaroba): il verde di sfondo si
+          scurisce leggermente verso il fondo, ammorbidendo il taglio netto tra contenuto
+          e tab bar invece di un bordo di sfocatura vero — pointerEvents:none per non
+          intercettare i tocchi su contenuto/tab bar sotto. */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 220,
+          background: "linear-gradient(to bottom, rgba(219,228,204,0) 0%, rgba(219,228,204,0.35) 55%, rgba(219,228,204,0.95) 100%)",
+          pointerEvents: "none",
+          zIndex: 19,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          left: 16,
+          right: 16,
+          bottom: "max(28px, env(safe-area-inset-bottom))",
+          height: 96,
+          zIndex: 20,
+        }}
     >
       <svg
         width="100%"
@@ -134,6 +151,7 @@ export function TabBar() {
         <House size={19} color="#fff" strokeWidth={2.4} />
         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700, color: "#fff" }}>Home</span>
       </button>
-    </div>
+      </div>
+    </>
   );
 }
