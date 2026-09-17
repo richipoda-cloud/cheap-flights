@@ -159,55 +159,42 @@ function Accordion({ title, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginBottom: 20 }}>
+      {/* Il divisore "riga-testo-riga" (stile guardaroba) È l'intestazione cliccabile stessa,
+          sempre presente (aperto o chiuso) — non più un link semplice che poi ripete la stessa
+          scritta dentro il contenuto espanso: sarebbe ridondante vedere "Altri filtri" due volte. */}
       <div
         onClick={() => setOpen(!open)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          width: "fit-content",
-          cursor: "pointer",
-        }}
+        style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
       >
-        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.accent }}>{title}</span>
+        <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
         <span
           style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 700,
             fontSize: 12,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
             color: COLORS.accent,
-            transform: open ? "rotate(180deg)" : "none",
-            transition: "transform 0.2s",
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
           }}
         >
-          ▾
+          {title}
+          <span
+            style={{
+              fontSize: 12,
+              transform: open ? "rotate(180deg)" : "none",
+              transition: "transform 0.2s",
+            }}
+          >
+            ▾
+          </span>
         </span>
+        <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
       </div>
-      {open && (
-        <div style={{ marginTop: 12 }}>
-          {/* Divisore "riga-testo-riga" — stesso stile del progetto guardaroba, usato lì per
-              separare i gruppi dentro una sezione già aperta (es. "Consigliato per oggi" /
-              "Accessori"). Qui segna l'inizio del contenuto espanso, che ora ospita più
-              sotto-sezioni (flessibilità + escludi paesi) — le etichette dei campi principali
-              (Partenza/Destinazione/ecc.) restano invece etichette semplici, senza righe. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
-            <span
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                color: COLORS.accent,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {title}
-            </span>
-            <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
-          </div>
-          {children}
-        </div>
-      )}
+      {open && <div style={{ marginTop: 16 }}>{children}</div>}
     </div>
   );
 }
