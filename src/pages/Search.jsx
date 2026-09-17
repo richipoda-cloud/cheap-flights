@@ -32,7 +32,7 @@ function Section({ label, action, children }) {
             fontWeight: 600,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
-            color: COLORS.inkSoft,
+            color: COLORS.accent,
           }}
         >
           {label}
@@ -181,7 +181,33 @@ function Accordion({ title, children }) {
           ▾
         </span>
       </div>
-      {open && <div style={{ marginTop: 12 }}>{children}</div>}
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          {/* Divisore "riga-testo-riga" — stesso stile del progetto guardaroba, usato lì per
+              separare i gruppi dentro una sezione già aperta (es. "Consigliato per oggi" /
+              "Accessori"). Qui segna l'inizio del contenuto espanso, che ora ospita più
+              sotto-sezioni (flessibilità + escludi paesi) — le etichette dei campi principali
+              (Partenza/Destinazione/ecc.) restano invece etichette semplici, senza righe. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
+            <span
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: COLORS.accent,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {title}
+            </span>
+            <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
+          </div>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -568,7 +594,7 @@ export function Search() {
           onChange={setFlexReturnStop}
         />
 
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.inkSoft, marginTop: 12, marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.accent, marginTop: 12, marginBottom: 8 }}>
           Escludi paesi
         </div>
         <div style={{ display: "flex", gap: 8 }}>
