@@ -44,6 +44,11 @@ export function TabBar() {
           bottom: "max(28px, env(safe-area-inset-bottom))",
           height: 96,
           zIndex: 20,
+          // Il filtro sta qui (contenitore semplice), non sull'<svg> che usa una mask
+          // interna — su alcune versioni di Safari/WebKit filter+mask sullo stesso
+          // elemento SVG produce un ritaglio errato del contenuto (bug noto), causa
+          // sospetta del cerchio Home tagliato in alto segnalato su dispositivo reale.
+          filter: "drop-shadow(0 4px 18px rgba(33,30,43,0.16))",
         }}
     >
       <svg
@@ -51,7 +56,7 @@ export function TabBar() {
         height="116"
         viewBox="0 -50 328 116"
         preserveAspectRatio="none"
-        style={{ position: "absolute", top: 0, left: 0, filter: "drop-shadow(0 4px 18px rgba(33,30,43,0.16))" }}
+        style={{ position: "absolute", top: 0, left: 0 }}
       >
         <defs>
           <mask id="tabbar-pill-mask">
@@ -59,7 +64,7 @@ export function TabBar() {
               d="M 20 0 L 308 0 A 20 20 0 0 1 328 20 L 328 26 A 20 20 0 0 1 308 46 L 20 46 A 20 20 0 0 1 0 26 L 0 20 A 20 20 0 0 1 20 0 Z"
               fill="#fff"
             />
-            <ellipse cx="164" cy="23" rx="35.46" ry="40" fill="#000" />
+            <ellipse cx="164" cy="23" rx="35.46" ry="44" fill="#000" />
           </mask>
         </defs>
         <path
