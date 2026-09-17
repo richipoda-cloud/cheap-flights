@@ -606,7 +606,7 @@ export function Search() {
           position: "fixed",
           // Sopra la tab bar (fissa in fondo su tutte le schermate tranne Home), non più
           // attaccato al bordo — altrimenti le due barre fisse si sovrapporrebbero.
-          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 68px)",
+          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 54px)",
           left: 0,
           right: 0,
           padding: 16,
