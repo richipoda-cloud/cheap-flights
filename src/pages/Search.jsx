@@ -33,7 +33,7 @@ function Section({ label, action, children }) {
             letterSpacing: "0.04em",
             textTransform: "uppercase",
             color: COLORS.accent,
-            background: COLORS.accentSoft,
+            background: COLORS.surface,
             borderRadius: RADIUS.pill,
             padding: "3px 10px",
             display: "inline-block",
