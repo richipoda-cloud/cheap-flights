@@ -611,7 +611,6 @@ export function Search() {
           right: 0,
           padding: 16,
           background: COLORS.bg,
-          borderTop: `1px solid ${COLORS.hairline}`,
         }}
       >
         <PrimaryButton
