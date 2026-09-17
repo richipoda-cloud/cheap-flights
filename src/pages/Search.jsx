@@ -611,6 +611,8 @@ export function Search() {
           right: 0,
           padding: 16,
           background: COLORS.bg,
+          // Sopra la sfumatura della tab bar (z-index 19) — altrimenti la scurisce.
+          zIndex: 21,
         }}
       >
         <PrimaryButton
