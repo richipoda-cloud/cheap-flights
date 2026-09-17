@@ -28,11 +28,15 @@ function Section({ label, action, children }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div
           style={{
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: 600,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
             color: COLORS.accent,
+            background: COLORS.accentSoft,
+            borderRadius: RADIUS.pill,
+            padding: "3px 10px",
+            display: "inline-block",
           }}
         >
           {label}
