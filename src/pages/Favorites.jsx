@@ -165,7 +165,7 @@ export function Favorites() {
   const { favorites, loading, verifyFavorite, removeFavorite } = useFavorites(user?.id);
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, paddingBottom: 130 }}>
       <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 16 }}>Preferiti</div>
 
       {loading && <div style={{ color: COLORS.inkSoft }}>Caricamento…</div>}

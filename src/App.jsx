@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { COLORS } from "./theme/colors";
 import { isSupabaseConfigured } from "./lib/supabaseClient";
 import { useAuth } from "./hooks/useAuth";
@@ -11,6 +11,26 @@ import { FlightDetail } from "./pages/FlightDetail";
 import { Favorites } from "./pages/Favorites";
 import { History } from "./pages/History";
 import { Suggestions } from "./pages/Suggestions";
+import { TabBar } from "./components/TabBar";
+
+function AppRoutes() {
+  const location = useLocation();
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/results" element={<Results />} />
+        <Route path="/flight" element={<FlightDetail />} />
+        <Route path="/favorites" element={<Favorites />} />
+        <Route path="/history" element={<History />} />
+        <Route path="/suggestions" element={<Suggestions />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      {location.pathname !== "/" && <TabBar />}
+    </>
+  );
+}
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -30,16 +50,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div style={{ minHeight: "100vh", background: COLORS.bg }}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/results" element={<Results />} />
-          <Route path="/flight" element={<FlightDetail />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/suggestions" element={<Suggestions />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppRoutes />
       </div>
     </BrowserRouter>
   );

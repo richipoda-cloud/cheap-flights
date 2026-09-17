@@ -248,7 +248,7 @@ export function Results() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, paddingBottom: 130 }}>
       <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 4 }}>
         Risultati
       </div>

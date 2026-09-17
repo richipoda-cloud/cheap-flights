@@ -59,7 +59,7 @@ export function History() {
   const resume = (filters) => navigate("/results", { state: { filters } });
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, paddingBottom: 130 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent }}>Storico</div>
         {searches.length > 0 && (

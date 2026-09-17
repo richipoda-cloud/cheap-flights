@@ -404,7 +404,7 @@ export function Search() {
   };
 
   return (
-    <div style={{ padding: 20, paddingBottom: 100 }}>
+    <div style={{ padding: 20, paddingBottom: 220 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontWeight: 600, fontSize: 22, color: COLORS.ink }}>Cerca voli</div>
         <button
@@ -604,7 +604,9 @@ export function Search() {
       <div
         style={{
           position: "fixed",
-          bottom: 0,
+          // Sopra la tab bar (fissa in fondo su tutte le schermate tranne Home), non più
+          // attaccato al bordo — altrimenti le due barre fisse si sovrapporrebbero.
+          bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 112px)",
           left: 0,
           right: 0,
           padding: 16,

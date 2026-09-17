@@ -110,7 +110,7 @@ export function FlightDetail() {
   };
 
   return (
-    <div style={{ padding: 20, paddingBottom: flight.isStopover ? 40 : 100 }}>
+    <div style={{ padding: 20, paddingBottom: flight.isStopover ? 130 : 220 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <span onClick={() => navigate(-1)} style={{ fontSize: 20, color: COLORS.ink, cursor: "pointer" }}>
           ←
@@ -234,7 +234,7 @@ export function FlightDetail() {
         <div
           style={{
             position: "fixed",
-            bottom: 0,
+            bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 112px)",
             left: 0,
             right: 0,
             padding: 16,
