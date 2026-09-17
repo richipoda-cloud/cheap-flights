@@ -6,8 +6,19 @@ import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
 import { useSearches } from "../hooks/useSearches";
 import { useSuggestions } from "../hooks/useSuggestions";
+import { cityName } from "../lib/cityNames";
 
-function SearchCard({ onClick }) {
+// Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
+// "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
+// Cerca voli al posto del testo generico, solo se l'utente ha già cercato qualcosa.
+function describeLastSearch(filters) {
+  if (!filters) return null;
+  const dest = filters.destination ? cityName(filters.destination) : "Ovunque";
+  if (filters.nightsMin == null && filters.nightsMax == null) return dest;
+  return `${dest} · ${filters.nightsMin ?? 0}-${filters.nightsMax ?? "∞"} notti`;
+}
+
+function SearchCard({ onClick, subtitle }) {
   return (
     <Card
       onClick={onClick}
@@ -24,7 +35,17 @@ function SearchCard({ onClick }) {
       <div style={{ fontSize: 24, lineHeight: 1 }}>🔍</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 17, color: "#FFFFFF" }}>Cerca voli</div>
-        <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
+        <div
+          style={{
+            fontSize: 12.5,
+            color: "rgba(255,255,255,0.85)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {subtitle}
+        </div>
       </div>
       <ChevronRight size={20} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
     </Card>
@@ -65,6 +86,7 @@ export function Home() {
 
   const favCount = favorites.length;
   const searchCount = searches.length;
+  const lastSearchSubtitle = describeLastSearch(searches[0]?.filters) ?? "Ovunque · Sempre · Filtri";
 
   const suggestSubtitle =
     suggestions.topOrigins.length > 0
@@ -78,7 +100,7 @@ export function Home() {
           <div style={{ fontWeight: 600, fontSize: 24, color: COLORS.ink }}>Ciao 👋</div>
           <div style={{ fontSize: 14, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
         </div>
-        <SearchCard onClick={() => navigate("/search")} />
+        <SearchCard onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
