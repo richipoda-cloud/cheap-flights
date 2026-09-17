@@ -446,7 +446,14 @@ export function Search() {
           origins.length > 0 && !addingOrigin ? (
             <span
               onClick={() => setAddingOrigin(true)}
-              style={{ fontSize: 12, fontWeight: 600, color: COLORS.accent, cursor: "pointer" }}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: COLORS.accent,
+                cursor: "pointer",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+              }}
             >
               + Aggiungi
             </span>
