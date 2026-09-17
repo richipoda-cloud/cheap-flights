@@ -69,8 +69,8 @@ export function Home() {
       : "In base alle tue ricerche passate";
 
   return (
-    <div style={{ padding: 20, minHeight: "100vh" }}>
-      <div style={{ width: "100%", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ padding: 20, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ marginBottom: 4 }}>
           <div style={{ fontWeight: 600, fontSize: 24, color: COLORS.ink }}>Ciao 👋</div>
           <div style={{ fontSize: 14, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
