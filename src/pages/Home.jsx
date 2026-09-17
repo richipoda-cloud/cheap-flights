@@ -11,27 +11,44 @@ function SearchCard({ onClick }) {
     <Card
       onClick={onClick}
       style={{
-        padding: 16,
+        padding: 14,
         background: COLORS.accent,
         border: "none",
         boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
       }}
     >
-      <div style={{ fontSize: 26, lineHeight: 1, marginBottom: 4 }}>🔍</div>
-      <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF", marginBottom: 2 }}>
-        Cerca voli
+      <div style={{ fontSize: 24, lineHeight: 1 }}>🔍</div>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 17, color: "#FFFFFF" }}>Cerca voli</div>
+        <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
       </div>
-      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Ovunque · Sempre · Filtri</div>
     </Card>
   );
 }
 
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
-    <Card onClick={onClick} style={{ padding: 14 }}>
-      <div style={{ fontSize: 20, lineHeight: 1, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink, marginBottom: 2 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{subtitle}</div>}
+    <Card onClick={onClick} style={{ padding: 12, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ fontSize: 18, lineHeight: 1 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 14.5, color: COLORS.ink }}>{title}</div>
+        {subtitle && (
+          <div
+            style={{
+              fontSize: 11.5,
+              color: COLORS.inkSoft,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -52,15 +69,15 @@ export function Home() {
       : "In base alle tue ricerche passate";
 
   return (
-    <div style={{ padding: 20, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: 20, minHeight: "100vh" }}>
+      <div style={{ width: "100%", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ marginBottom: 4 }}>
           <div style={{ fontWeight: 600, fontSize: 24, color: COLORS.ink }}>Ciao 👋</div>
           <div style={{ fontSize: 14, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
         </div>
         <SearchCard onClick={() => navigate("/search")} />
 
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
             <SmallCard
               icon="⭐"
@@ -79,13 +96,7 @@ export function Home() {
           </div>
         </div>
 
-        <Card onClick={() => navigate("/suggestions")} style={{ padding: 16 }}>
-          <div style={{ fontSize: 22, lineHeight: 1, marginBottom: 4 }}>✨</div>
-          <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.ink, marginBottom: 2 }}>
-            Suggeriti per te
-          </div>
-          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{suggestSubtitle}</div>
-        </Card>
+        <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
       </div>
     </div>
   );
