@@ -234,7 +234,7 @@ export function FlightDetail() {
         <div
           style={{
             position: "fixed",
-            bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 112px)",
+            bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 112px)",
             left: 0,
             right: 0,
             padding: 16,

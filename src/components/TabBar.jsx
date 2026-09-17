@@ -24,7 +24,7 @@ export function TabBar() {
         position: "fixed",
         left: 16,
         right: 16,
-        bottom: "max(16px, env(safe-area-inset-bottom))",
+        bottom: "max(28px, env(safe-area-inset-bottom))",
         height: 96,
         zIndex: 20,
       }}
