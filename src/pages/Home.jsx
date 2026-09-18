@@ -103,7 +103,7 @@ export function Home() {
         <SearchCard onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
 
         <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <SmallCard
               icon="⭐"
               title="Preferiti"
@@ -111,7 +111,7 @@ export function Home() {
               onClick={() => navigate("/favorites")}
             />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <SmallCard
               icon="🕐"
               title="Storico"
