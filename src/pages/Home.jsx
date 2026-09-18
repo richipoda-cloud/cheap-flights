@@ -7,6 +7,7 @@ import { useFavorites } from "../hooks/useFavorites";
 import { useSearches } from "../hooks/useSearches";
 import { useSuggestions } from "../hooks/useSuggestions";
 import { cityName } from "../lib/cityNames";
+import { formatRelativeTime } from "../lib/formatters";
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
@@ -24,7 +25,7 @@ function describeLastSearch(filters) {
   return [dest, nights, dateLabel].filter(Boolean).join(" · ");
 }
 
-function SearchCard({ onClick, subtitle }) {
+function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
   return (
     <Card
       onClick={onClick}
@@ -33,27 +34,60 @@ function SearchCard({ onClick, subtitle }) {
         background: COLORS.accent,
         border: "none",
         boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
-        display: "flex",
-        alignItems: "center",
-        gap: 15,
       }}
     >
-      <div style={{ fontSize: 29, lineHeight: 1 }}>🔍</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF" }}>Cerca voli</div>
-        <div
-          style={{
-            fontSize: 15,
-            color: "rgba(255,255,255,0.85)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {subtitle}
+      <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
+        <div style={{ fontSize: 29, lineHeight: 1 }}>🔍</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF" }}>Cerca voli</div>
+          <div
+            style={{
+              fontSize: 15,
+              color: "rgba(255,255,255,0.85)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            <span>🕐</span>
+            <span>{subtitle}</span>
+          </div>
         </div>
+        <ChevronRight size={24} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
       </div>
-      <ChevronRight size={24} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
+
+      {lastSearchAt && (
+        <>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.25)", margin: "14px 0 12px" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
+              Ultima ricerca: {formatRelativeTime(lastSearchAt)}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRepeat();
+              }}
+              style={{
+                border: "none",
+                background: "rgba(255,255,255,0.2)",
+                color: "#FFFFFF",
+                fontSize: 13,
+                fontWeight: 600,
+                borderRadius: RADIUS.pill,
+                padding: "6px 12px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ↻ Ripeti
+            </button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -85,7 +119,9 @@ export function Home() {
 
   const favCount = favorites.length;
   const searchCount = searches.length;
-  const lastSearchSubtitle = describeLastSearch(searches[0]?.filters) ?? "Ovunque · Sempre · Filtri";
+  const lastSearch = searches[0];
+  const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
+  const repeatLastSearch = () => navigate("/results", { state: { filters: lastSearch.filters } });
 
   const suggestSubtitle =
     suggestions.topOrigins.length > 0
@@ -99,7 +135,12 @@ export function Home() {
           <div style={{ fontWeight: 600, fontSize: 28, color: COLORS.ink }}>Ciao 👋</div>
           <div style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
         </div>
-        <SearchCard onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
+        <SearchCard
+          onClick={() => navigate("/search")}
+          subtitle={lastSearchSubtitle}
+          lastSearchAt={lastSearch?.created_at}
+          onRepeat={repeatLastSearch}
+        />
 
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
