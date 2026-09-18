@@ -33,7 +33,7 @@ export function TabBar() {
           height: 220,
           background: "linear-gradient(to bottom, rgba(219,228,204,0) 0%, rgba(219,228,204,0.35) 55%, rgba(219,228,204,0.95) 100%)",
           pointerEvents: "none",
-          zIndex: 19,
+          zIndex: 5,
         }}
       />
       <div
@@ -43,7 +43,11 @@ export function TabBar() {
           right: 16,
           bottom: "max(28px, env(safe-area-inset-bottom))",
           height: 96,
-          zIndex: 20,
+          // Sempre sopra qualunque barra fissa di pagina (es. il bottone di Cerca voli,
+          // z-index 10): se le due si sfiorano/sovrappongono di qualche px, a vincere
+          // dev'essere sempre la tab bar (il cerchio Home non va mai coperto), non il
+          // contrario — invece di dover distanziare i due elementi con precisione millimetrica.
+          zIndex: 25,
           // Il filtro sta qui (contenitore semplice), non sull'<svg> che usa una mask
           // interna — su alcune versioni di Safari/WebKit filter+mask sullo stesso
           // elemento SVG produce un ritaglio errato del contenuto (bug noto), causa

@@ -628,19 +628,17 @@ export function Search() {
       <div
         style={{
           position: "fixed",
-          // Sopra la tab bar (fissa in fondo su tutte le schermate tranne Home), non più
-          // attaccato al bordo — altrimenti le due barre fisse si sovrapporrebbero.
-          // 46px lo faceva sovrapporre al cerchio Home della tab bar (bordo superiore del
-          // cerchio a ~89px da fondo schermo su iPhone con safe-area) — segnalato come
-          // "taglio" sopra il cerchio: il bottone, con z-index piu' alto, lo copriva in
-          // parte. 64px lascia un margine pulito senza sovrapposizione.
-          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)", // TEST temporaneo
+          // Vicino alla tab bar (46px, richiesto esplicitamente) — a quella distanza il
+          // bottone sfiora/sovrappone di qualche px il cerchio Home. Invece di allontanarlo
+          // ulteriormente, la tab bar ha z-index piu' alto (vedi TabBar.jsx): se si toccano,
+          // vince sempre lei, il cerchio non viene mai coperto.
+          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)",
           left: 0,
           right: 0,
           padding: 16,
           background: COLORS.bg,
-          // Sopra la sfumatura della tab bar (z-index 19) — altrimenti la scurisce.
-          zIndex: 21,
+          // Sopra la sfumatura (z-index 5) ma sotto la tab bar (z-index 25).
+          zIndex: 10,
         }}
       >
         <PrimaryButton
