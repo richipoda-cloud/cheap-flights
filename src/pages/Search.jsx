@@ -630,7 +630,11 @@ export function Search() {
           position: "fixed",
           // Sopra la tab bar (fissa in fondo su tutte le schermate tranne Home), non più
           // attaccato al bordo — altrimenti le due barre fisse si sovrapporrebbero.
-          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)",
+          // 46px lo faceva sovrapporre al cerchio Home della tab bar (bordo superiore del
+          // cerchio a ~89px da fondo schermo su iPhone con safe-area) — segnalato come
+          // "taglio" sopra il cerchio: il bottone, con z-index piu' alto, lo copriva in
+          // parte. 64px lascia un margine pulito senza sovrapposizione.
+          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 64px)",
           left: 0,
           right: 0,
           padding: 16,
