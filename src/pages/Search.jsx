@@ -634,7 +634,7 @@ export function Search() {
           // cerchio a ~89px da fondo schermo su iPhone con safe-area) — segnalato come
           // "taglio" sopra il cerchio: il bottone, con z-index piu' alto, lo copriva in
           // parte. 64px lascia un margine pulito senza sovrapposizione.
-          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 64px)",
+          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)", // TEST temporaneo
           left: 0,
           right: 0,
           padding: 16,
