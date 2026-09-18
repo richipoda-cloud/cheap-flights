@@ -32,6 +32,11 @@ function FlatList({ children }) {
 function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyData }) {
   const price = verifiedPrice ?? result.price;
   const deepLink = verifyData?.deepLink ?? result.deepLink;
+  // "✓ verificato" solo se verify-price ha davvero trovato cache abbastanza fresca da
+  // confermare il prezzo (somma tratte one-way o match aggregato) — se è ricaduto sul
+  // prezzo originale non ricontrollato, resta onestamente "~" come i risultati non ancora
+  // verificati, invece di promettere un'affidabilità che non c'è.
+  const confirmed = Boolean(verifyData?.confirmed);
 
   return (
     <div style={{ borderBottom: isLast ? "none" : `1px solid ${COLORS.hairline}` }}>
@@ -62,11 +67,15 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-            {verifiedPrice == null ? "~" : ""}
+            {confirmed ? "" : "~"}
             {price} {result.currency ?? "€"}
           </div>
-          {verifiedPrice != null && (
+          {confirmed ? (
             <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
+          ) : (
+            verifiedPrice != null && (
+              <div style={{ fontSize: 10.5, color: COLORS.inkSoft }}>da confermare al link</div>
+            )
           )}
         </div>
       </div>

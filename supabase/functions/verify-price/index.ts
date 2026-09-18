@@ -233,10 +233,16 @@ Deno.serve(async (req) => {
     // direzione, stessi aeroporti di andata/ritorno) — con uno scalo o un aeroporto
     // diverso sono biglietti separati, ognuno col proprio deepLink già su ogni leg.
     const singleTicket = !returnsElsewhere && !hasStop;
+    // Onesto: "confermato" solo se il prezzo mostrato viene DAVVERO da cache abbastanza
+    // fresca (somma tratte one-way o match v2 filtrati per età sopra) — se entrambi mancano
+    // il prezzo è rimasto quello originale non ri-controllato (flight.price), il client non
+    // deve mostrare "✓ verificato" in quel caso (era fuorviante prima di questo campo).
+    const confirmed = allLegs.length > 0 || Boolean(match);
 
     return new Response(
       JSON.stringify({
         price,
+        confirmed,
         deepLink: singleTicket ? buildDeepLink(flight) : null,
         outboundLeg: outboundLegs[0] ?? null,
         inboundLeg: inboundLegs[0] ?? null,

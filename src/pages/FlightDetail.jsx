@@ -59,6 +59,7 @@ export function FlightDetail() {
   const filters = location.state?.filters;
 
   const [verifiedPrice, setVerifiedPrice] = useState(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [deepLink, setDeepLink] = useState(flight?.deepLink ?? null);
   const [outboundLeg, setOutboundLeg] = useState(null);
   const [inboundLeg, setInboundLeg] = useState(null);
@@ -81,6 +82,7 @@ export function FlightDetail() {
     verifyPrice(flight)
       .then((data) => {
         setVerifiedPrice(data?.price ?? flight.price);
+        setConfirmed(Boolean(data?.confirmed));
         if (data?.deepLink) setDeepLink(data.deepLink);
         if (data?.outboundLeg) setOutboundLeg(data.outboundLeg);
         if (data?.inboundLeg) setInboundLeg(data.inboundLeg);
@@ -250,7 +252,7 @@ export function FlightDetail() {
               {verifying ? "…" : `${verifiedPrice ?? flight.price} €`}
             </div>
             <div style={{ fontSize: 11, color: COLORS.inkSoft }}>
-              {verifying ? "Verifica in corso…" : "Prezzo verificato ora"}
+              {verifying ? "Verifica in corso…" : confirmed ? "Prezzo verificato ora" : "Prezzo da confermare al link"}
             </div>
           </div>
           <PrimaryButton variant="solid" onClick={handleBooking} disabled={verifying || !deepLink}>

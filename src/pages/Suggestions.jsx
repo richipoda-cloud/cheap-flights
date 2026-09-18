@@ -83,6 +83,7 @@ export function Suggestions() {
       {results.map((r) => {
         const verify = verifiedData[r.id];
         const price = verify?.price ?? r.price;
+        const confirmed = Boolean(verify?.confirmed);
         const expanded = expandedId === r.id;
         return (
           <Card key={r.id} onClick={() => toggleExpand(r.id)} style={{ padding: 14, marginBottom: 10 }}>
@@ -100,10 +101,16 @@ export function Suggestions() {
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontWeight: 600, fontSize: 15, color: COLORS.accent }}>
-                  {verify == null ? "~" : ""}
+                  {confirmed ? "" : "~"}
                   {price} {r.currency ?? "€"}
                 </div>
-                {verify != null && <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>}
+                {confirmed ? (
+                  <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
+                ) : (
+                  verify != null && (
+                    <div style={{ fontSize: 10.5, color: COLORS.inkSoft }}>da confermare al link</div>
+                  )
+                )}
               </div>
             </div>
             <div style={{ fontSize: 11.5, color: COLORS.plum, marginTop: 6 }}>{reasonFor()}</div>
