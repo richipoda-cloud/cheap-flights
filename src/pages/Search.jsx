@@ -158,16 +158,18 @@ function ToggleRow({ label, hint, checked, onChange }) {
 }
 
 // Menu a tenda in fondo: raggruppa i filtri secondari (flessibilità, paesi esclusi)
-// fuori dal flusso principale Partenza/Destinazione/Date, chiuso di default.
-function Accordion({ title, children }) {
-  const [open, setOpen] = useState(false);
+// fuori dal flusso principale Partenza/Destinazione/Date, chiuso di default. Controllato
+// dal genitore (invece di uno stato interno): il pulsante "Trova il più economico" deve
+// sapere se è aperto o chiuso per decidere la propria posizione (fissa in fondo, o subito
+// sotto il divisore quando è chiuso e non c'è nulla sotto da coprire).
+function Accordion({ title, open, onToggle, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
       {/* Il divisore "riga-testo-riga" (stile guardaroba) È l'intestazione cliccabile stessa,
           sempre presente (aperto o chiuso) — non più un link semplice che poi ripete la stessa
           scritta dentro il contenuto espanso: sarebbe ridondante vedere "Altri filtri" due volte. */}
       <div
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
       >
         <div style={{ flex: 1, borderTop: `1px solid ${COLORS.accent}` }} />
@@ -271,6 +273,9 @@ export function Search() {
   // all'utente: caricati automaticamente qui e salvati ad ogni modifica.
   const { excludedCountries, setExcludedCountries, loading: prefsLoading } = useUserPreferences(user?.id);
 
+  // Stato di apertura di "Altri filtri" sollevato qui (non più interno all'Accordion):
+  // serve anche al bottone "Trova il più economico" per decidere la propria posizione.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [origins, setOrigins] = useState(() => loadPersistedFilters().origins);
   const [originInput, setOriginInput] = useState("");
   const [addingOrigin, setAddingOrigin] = useState(false); // mostra il campo per aggiungerne altre dopo la prima
@@ -421,7 +426,7 @@ export function Search() {
   };
 
   return (
-    <div style={{ padding: 20, paddingBottom: 220 }}>
+    <div style={{ padding: 20, paddingBottom: filtersOpen ? 220 : 130 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ fontWeight: 600, fontSize: 22, color: COLORS.ink }}>Cerca voli</div>
         <button
@@ -564,7 +569,7 @@ export function Search() {
         )}
       </Section>
 
-      <Accordion title="Altri filtri">
+      <Accordion title="Altri filtri" open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)}>
         <ToggleRow
           label="Aeroporto di ritorno diverso dalla partenza"
           hint="Se conviene, il ritorno atterra su un altro dei tuoi aeroporti di partenza invece di quello di andata"
@@ -625,21 +630,29 @@ export function Search() {
         </div>
       </Accordion>
 
+      {/* Posizione dinamica legata ad "Altri filtri": chiuso, il bottone segue il flusso
+          normale della pagina (subito sotto il divisore, niente più spazio vuoto inutile);
+          aperto, torna fisso in fondo come oggi per non finire coperto dal contenuto della
+          tendina che si allunga sotto. */}
       <div
-        style={{
-          position: "fixed",
-          // Vicino alla tab bar (46px, richiesto esplicitamente) — a quella distanza il
-          // bottone sfiora/sovrappone di qualche px il cerchio Home. Invece di allontanarlo
-          // ulteriormente, la tab bar ha z-index piu' alto (vedi TabBar.jsx): se si toccano,
-          // vince sempre lei, il cerchio non viene mai coperto.
-          bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)",
-          left: 0,
-          right: 0,
-          padding: 16,
-          background: COLORS.bg,
-          // Sopra la sfumatura (z-index 5) ma sotto la tab bar (z-index 25).
-          zIndex: 10,
-        }}
+        style={
+          filtersOpen
+            ? {
+                position: "fixed",
+                // Vicino alla tab bar (46px, richiesto esplicitamente) — a quella distanza
+                // il bottone sfiora/sovrappone di qualche px il cerchio Home. Invece di
+                // allontanarlo ulteriormente, la tab bar ha z-index piu' alto (vedi
+                // TabBar.jsx): se si toccano, vince sempre lei, il cerchio non viene mai coperto.
+                bottom: "calc(max(28px, env(safe-area-inset-bottom)) + 46px)",
+                left: 0,
+                right: 0,
+                padding: 16,
+                background: COLORS.bg,
+                // Sopra la sfumatura (z-index 5) ma sotto la tab bar (z-index 25).
+                zIndex: 10,
+              }
+            : { marginTop: 4 }
+        }
       >
         <PrimaryButton
           variant="solid"
