@@ -23,21 +23,21 @@ function SearchCard({ onClick, subtitle }) {
     <Card
       onClick={onClick}
       style={{
-        padding: 14,
+        padding: 18,
         background: COLORS.accent,
         border: "none",
         boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 15,
       }}
     >
-      <div style={{ fontSize: 24, lineHeight: 1 }}>🔍</div>
+      <div style={{ fontSize: 29, lineHeight: 1 }}>🔍</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 17, color: "#FFFFFF" }}>Cerca voli</div>
+        <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF" }}>Cerca voli</div>
         <div
           style={{
-            fontSize: 12.5,
+            fontSize: 15,
             color: "rgba(255,255,255,0.85)",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -47,21 +47,21 @@ function SearchCard({ onClick, subtitle }) {
           {subtitle}
         </div>
       </div>
-      <ChevronRight size={20} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={24} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
     </Card>
   );
 }
 
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
-    <Card onClick={onClick} style={{ padding: 12, display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ fontSize: 18, lineHeight: 1 }}>{icon}</div>
+    <Card onClick={onClick} style={{ padding: 15, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14.5, color: COLORS.ink }}>{title}</div>
+        <div style={{ fontWeight: 600, fontSize: 17, color: COLORS.ink }}>{title}</div>
         {subtitle && (
           <div
             style={{
-              fontSize: 11.5,
+              fontSize: 13.5,
               color: COLORS.inkSoft,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -72,7 +72,7 @@ function SmallCard({ icon, title, subtitle, onClick }) {
           </div>
         )}
       </div>
-      <ChevronRight size={18} color={COLORS.inkSoft} style={{ flexShrink: 0, marginLeft: "auto" }} />
+      <ChevronRight size={21} color={COLORS.inkSoft} style={{ flexShrink: 0, marginLeft: "auto" }} />
     </Card>
   );
 }
@@ -95,14 +95,14 @@ export function Home() {
 
   return (
     <div style={{ padding: 20, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ marginBottom: 4 }}>
-          <div style={{ fontWeight: 600, fontSize: 24, color: COLORS.ink }}>Ciao 👋</div>
-          <div style={{ fontSize: 14, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
+          <div style={{ fontWeight: 600, fontSize: 28, color: COLORS.ink }}>Ciao 👋</div>
+          <div style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
         </div>
         <SearchCard onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <SmallCard
               icon="⭐"
