@@ -6,6 +6,7 @@ import {
   fetchLatestPrices,
   filterByNights,
   filterByExcludedCountries,
+  filterByFreshness,
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -45,7 +46,10 @@ Deno.serve(async (req) => {
       origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom, limit: FETCH_LIMIT }))
     );
     const merged = perOrigin.flat();
-    const withoutExcluded = filterByExcludedCountries(merged, filters.excludedCountries);
+    // Scarta prezzi in cache troppo vecchi PRIMA di scegliere i più economici: un prezzo
+    // sballato (magari visto settimane fa) altrimenti vince facilmente il ranking per prezzo.
+    const fresh = filterByFreshness(merged);
+    const withoutExcluded = filterByExcludedCountries(fresh, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
     const results = filtered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
 

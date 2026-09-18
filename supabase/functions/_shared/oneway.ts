@@ -37,6 +37,7 @@ export function mapOneWayResult(r: any) {
     price: r.price,
     currency: "EUR",
     deepLink: r.link ? `https://www.aviasales.com${r.link}${sep}marker=${MARKER}` : null,
+    foundAt: r.found_at ?? null,
   };
 }
 

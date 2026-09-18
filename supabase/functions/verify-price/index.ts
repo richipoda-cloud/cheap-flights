@@ -19,7 +19,7 @@
 // atterrare su uno diverso, quello si mostra. Round-trip combinato non ha più senso se i
 // due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
-import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices } from "../_shared/travelpayouts.ts";
+import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_shared/travelpayouts.ts";
 import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
@@ -101,11 +101,13 @@ async function cheapestConnection(origin: string, destination: string, date: str
         fetchOneWayPrices({ origin, destination: hub, limit: 50, departureAt: date }),
         fetchOneWayPrices({ origin: hub, destination, limit: 50, departureAt: date }),
       ]);
-      const leg1 = pickCheapestOnDate(leg1Options, date);
+      const leg1 = pickCheapestOnDate(filterByFreshness(leg1Options), date);
       if (!leg1) return null;
       // Vincolo di sequenza: la seconda tratta deve partire dopo l'arrivo della prima,
       // altrimenti l'itinerario è fisicamente impossibile da seguire.
-      const leg2 = leg2Options.filter((o: any) => o.date >= leg1.date).sort((a: any, b: any) => a.price - b.price)[0];
+      const leg2 = filterByFreshness(leg2Options)
+        .filter((o: any) => o.date >= leg1.date)
+        .sort((a: any, b: any) => a.price - b.price)[0];
       if (!leg2) return null;
       return { legs: [leg1, leg2], total: leg1.price + leg2.price };
     })
@@ -161,7 +163,7 @@ Deno.serve(async (req) => {
       ? nearbyAirports(flight.destination, MAX_RETURN_DISTANCE_KM)
       : [flight.destination];
 
-    const [fresh, outboundOptions, inboundOptionsPerPair] = await Promise.all([
+    const [latestPrices, outboundOptions, inboundOptionsPerPair] = await Promise.all([
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
       fetchOneWayPrices({
         origin: flight.origin,
@@ -183,11 +185,13 @@ Deno.serve(async (req) => {
       ),
     ]);
 
-    const match = fresh.find(
+    // Solo cache abbastanza recente conta come "conferma" del prezzo — una vecchia è
+    // il probabile colpevole di prezzi visti in lista molto più bassi del reale.
+    const match = filterByFreshness(latestPrices).find(
       (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
     );
-    const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
-    const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
+    const outboundLeg = pickCheapestOnDate(filterByFreshness(outboundOptions), flight.departDate);
+    const inboundLeg = pickCheapestOnDate(filterByFreshness(inboundOptionsPerPair.flat()), flight.returnDate);
     // true solo se la flessibilità ha davvero trovato conveniente un aeroporto diverso
     // (partenza del ritorno vicino alla destinazione, o arrivo vicino a casa) — round-trip
     // combinato non ha più senso in quel caso.

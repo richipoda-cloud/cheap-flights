@@ -30,7 +30,28 @@ export function mapRawResult(r: any, origin: string) {
     price: r.value,
     currency: "EUR",
     nights: nightsBetween(r.depart_date, r.return_date),
+    foundAt: r.found_at ?? null,
   };
+}
+
+// L'API gratuita restituisce prezzi in CACHE (visti da altri utenti), non prezzi live —
+// oltre una certa età sono spesso sballati (segnalato dall'utente: risultati fino a 3x il
+// prezzo reale). Niente di meglio disponibile senza un accordo commerciale (Real-Time
+// Search API richiede 50k utenti attivi/mese, vedi supporto Travelpayouts), quindi si
+// scartano le cache troppo vecchie invece di mostrarle come affidabili.
+export const MAX_PRICE_AGE_DAYS = 14;
+
+export function isFresh(foundAt: string | null | undefined, maxDays: number = MAX_PRICE_AGE_DAYS): boolean {
+  if (!foundAt) return false;
+  const ageMs = Date.now() - new Date(foundAt).getTime();
+  return ageMs <= maxDays * 86400000;
+}
+
+export function filterByFreshness<T extends { foundAt?: string | null }>(
+  results: T[],
+  maxDays: number = MAX_PRICE_AGE_DAYS
+): T[] {
+  return results.filter((r) => isFresh(r.foundAt, maxDays));
 }
 
 // origin/destination accettano sia codice città che codice paese (v2) — questo è ciò
