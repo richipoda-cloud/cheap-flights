@@ -14,8 +14,14 @@ import { cityName } from "../lib/cityNames";
 function describeLastSearch(filters) {
   if (!filters) return null;
   const dest = filters.destination ? cityName(filters.destination) : "Ovunque";
-  if (filters.nightsMin == null && filters.nightsMax == null) return dest;
-  return `${dest} · ${filters.nightsMin ?? 0}-${filters.nightsMax ?? "∞"} notti`;
+  const dateLabel = filters.dateMode === "fixed" ? "Date fisse" : "Sempre";
+  const nights =
+    filters.nightsMin != null || filters.nightsMax != null
+      ? `${filters.nightsMin ?? 0}-${filters.nightsMax ?? "∞"} notti`
+      : null;
+  // Sempre almeno destinazione + date, altrimenti con una ricerca "Ovunque" senza
+  // limite di notti mostrava solo "Ovunque" da solo — troppo povero come sottotitolo.
+  return [dest, nights, dateLabel].filter(Boolean).join(" · ");
 }
 
 function SearchCard({ onClick, subtitle }) {
