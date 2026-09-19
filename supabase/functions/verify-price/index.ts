@@ -153,7 +153,48 @@ function buildRichDeepLink(link: string | null) {
   return `https://www.aviasales.com${link}${sep}marker=${MARKER}`;
 }
 
-async function buildSingleTicketDeepLink(flight: any) {
+// Link diretti al sito della compagnia aerea (non più Aviasales), dedotti il 19/09/2026
+// osservando manualmente una ricerca A/R su ciascun sito reale (non sono API ufficiali,
+// possono rompersi se la compagnia cambia il proprio sito). Verificati dal vivo:
+// - Ryanair (FR): apre già il volo/tariffa specifica indicata da originIata/destinationIata.
+// - Wizz Air (W6): path pulito, nessun parametro di query.
+// easyJet (U2) e Vueling (VY) SONO STATE PROVATE e scartate di proposito: entrambe tengono
+// lo stato della ricerca in localStorage/sessione lato client, l'URL finale non porta MAI
+// origine/destinazione/date (verificato: forzare parametri di query su easyJet produce una
+// pagina di errore). Volotea (V7) non ha dato uno schema osservabile in tempo utile. Per
+// tutte queste (e qualunque altra compagnia) si ricade sul link Aviasales come da comportamento
+// precedente — nessun tentativo, nessun link rotto silenzioso.
+function buildAirlineDeepLink(
+  airlineCode: string | null | undefined,
+  origin: string | null | undefined,
+  destination: string | null | undefined,
+  departDate: string | null | undefined,
+  returnDate: string | null | undefined
+): string | null {
+  if (!airlineCode || !origin || !destination || !departDate || !returnDate) return null;
+  switch (airlineCode) {
+    case "FR":
+      return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=${returnDate}&isConnectedFlight=false&discount=0&promoCode=&isReturn=true&originIata=${origin}&destinationIata=${destination}`;
+    case "W6":
+      return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/${returnDate}/1/0/0`;
+    default:
+      return null;
+  }
+}
+
+async function buildSingleTicketDeepLink(flight: any, outboundLeg: any) {
+  // Aeroporti FISICI reali (es. CRL, non il codice città BRU) e compagnia dal volo one-way
+  // già trovato sopra — è esattamente il dato che serve al link diretto della compagnia,
+  // niente chiamata aggiuntiva.
+  const airlineLink = buildAirlineDeepLink(
+    outboundLeg?.airline,
+    outboundLeg?.originAirport ?? flight.origin,
+    outboundLeg?.destinationAirport ?? flight.destination,
+    flight.departDate,
+    flight.returnDate
+  );
+  if (airlineLink) return airlineLink;
+
   const roundTripOffers = await fetchRoundTripOffers({
     origin: flight.origin,
     destination: flight.destination,
@@ -280,7 +321,7 @@ Deno.serve(async (req) => {
     // il prezzo è rimasto quello originale non ri-controllato (flight.price), il client non
     // deve mostrare "✓ verificato" in quel caso (era fuorviante prima di questo campo).
     const confirmed = allLegs.length > 0 || Boolean(match);
-    const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight) : null;
+    const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg) : null;
 
     return new Response(
       JSON.stringify({
