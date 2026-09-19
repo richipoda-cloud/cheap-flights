@@ -23,6 +23,19 @@ import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_s
 import { fetchOneWayPrices, fetchRoundTripOffers } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
+import airportCityMap from "../_shared/airportCityMap.json" with { type: "json" };
+
+// flight.destination può essere un codice CITTÀ Travelpayouts che aggrega più aeroporti
+// fisici (es. BRU = Bruxelles aggrega anche CRL/Charleroi) — interrogando quella città
+// come "origin" del volo di ritorno, l'API può restituire legittimamente un volo che
+// atterra/parte da CRL invece che da BRU: stesso viaggio, non una vera "ripartenza da un
+// aeroporto diverso" scoperta dalla flessibilità. Confronto per città, non per aeroporto
+// esatto, solo sul lato destinazione (l'unico che può essere un codice città aggregato —
+// flight.origin è sempre un aeroporto specifico scelto dall'utente in Partenza).
+const CITY_BY_AIRPORT: Record<string, string> = airportCityMap as Record<string, string>;
+function cityOf(code: string): string {
+  return CITY_BY_AIRPORT[code] ?? code;
+}
 
 function pickCheapestOnDate(options: any[], date: string) {
   const matches = options.filter((o) => o.date === date);
@@ -225,7 +238,8 @@ Deno.serve(async (req) => {
     // combinato non ha più senso in quel caso.
     const returnsElsewhere = Boolean(
       inboundLeg &&
-        (inboundLeg.originAirport !== flight.destination || inboundLeg.destinationAirport !== flight.origin)
+        (cityOf(inboundLeg.originAirport) !== cityOf(flight.destination) ||
+          inboundLeg.destinationAirport !== flight.origin)
     );
 
     // "Andata/Ritorno con scalo", solo su richiesta esplicita (vedi sopra) — confrontato
