@@ -20,7 +20,7 @@
 // due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_shared/travelpayouts.ts";
-import { fetchOneWayPrices } from "../_shared/oneway.ts";
+import { fetchOneWayPrices, fetchRoundTripOffers } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
 
@@ -101,13 +101,11 @@ async function cheapestConnection(origin: string, destination: string, date: str
         fetchOneWayPrices({ origin, destination: hub, limit: 50, departureAt: date }),
         fetchOneWayPrices({ origin: hub, destination, limit: 50, departureAt: date }),
       ]);
-      const leg1 = pickCheapestOnDate(filterByFreshness(leg1Options), date);
+      const leg1 = pickCheapestOnDate(leg1Options, date);
       if (!leg1) return null;
       // Vincolo di sequenza: la seconda tratta deve partire dopo l'arrivo della prima,
       // altrimenti l'itinerario è fisicamente impossibile da seguire.
-      const leg2 = filterByFreshness(leg2Options)
-        .filter((o: any) => o.date >= leg1.date)
-        .sort((a: any, b: any) => a.price - b.price)[0];
+      const leg2 = leg2Options.filter((o: any) => o.date >= leg1.date).sort((a: any, b: any) => a.price - b.price)[0];
       if (!leg2) return null;
       return { legs: [leg1, leg2], total: leg1.price + leg2.price };
     })
@@ -128,6 +126,32 @@ function buildDeepLink(flight: any) {
   if (!origin || !destination || !flight.departDate || !flight.returnDate) return null;
   const path = `${origin}${fmt(flight.departDate)}${destination}${fmt(flight.returnDate)}1`;
   return `https://www.aviasales.com/search/${path}?marker=${MARKER}`;
+}
+
+// ESPERIMENTO (esito incerto, richiesto esplicitamente dall'utente dopo aver verificato
+// che nessun link Travelpayouts salta la pagina di confronto Aviasales): il link "ricco"
+// di v3 one_way=false porta una firma del volo (t=) ed expected_price_uuid/currency che
+// la documentazione descrive come pensati per evidenziare quella specifica offerta — MAI
+// verificato se Aviasales lo usa davvero. Se non troviamo un match esatto per quelle date
+// si ricade sul link generico di sempre (comportamento identico a prima, nessun regresso).
+function buildRichDeepLink(link: string | null) {
+  if (!link) return null;
+  const sep = link.includes("?") ? "&" : "?";
+  return `https://www.aviasales.com${link}${sep}marker=${MARKER}`;
+}
+
+async function buildSingleTicketDeepLink(flight: any) {
+  const roundTripOffers = await fetchRoundTripOffers({
+    origin: flight.origin,
+    destination: flight.destination,
+    departureAt: flight.departDate,
+    returnAt: flight.returnDate,
+    limit: 30,
+  });
+  const exactMatch = roundTripOffers
+    .filter((o) => o.departDate === flight.departDate && o.returnDate === flight.returnDate && o.link)
+    .sort((a, b) => a.price - b.price)[0];
+  return exactMatch ? buildRichDeepLink(exactMatch.link) : buildDeepLink(flight);
 }
 
 Deno.serve(async (req) => {
@@ -185,13 +209,17 @@ Deno.serve(async (req) => {
       ),
     ]);
 
-    // Solo cache abbastanza recente conta come "conferma" del prezzo — una vecchia è
-    // il probabile colpevole di prezzi visti in lista molto più bassi del reale.
+    // Filtro di freschezza (found_at) solo sul v2 aggregato: è l'unico dei due che può
+    // restare in cache per giorni/settimane (v2/prices/latest). v3/prices_for_dates (le
+    // tratte one-way qui sotto) non espone found_at nella risposta perché per definizione
+    // Travelpayouts lo popola solo con prezzi trovati nelle ultime 48 ore — filtrarlo per
+    // freschezza con un campo che non esiste azzerava SEMPRE i risultati (bug scoperto
+    // durante l'esperimento round-trip: 0 match su 6 rotte reali testate dal vivo).
     const match = filterByFreshness(latestPrices).find(
       (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
     );
-    const outboundLeg = pickCheapestOnDate(filterByFreshness(outboundOptions), flight.departDate);
-    const inboundLeg = pickCheapestOnDate(filterByFreshness(inboundOptionsPerPair.flat()), flight.returnDate);
+    const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
+    const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
     // true solo se la flessibilità ha davvero trovato conveniente un aeroporto diverso
     // (partenza del ritorno vicino alla destinazione, o arrivo vicino a casa) — round-trip
     // combinato non ha più senso in quel caso.
@@ -238,12 +266,13 @@ Deno.serve(async (req) => {
     // il prezzo è rimasto quello originale non ri-controllato (flight.price), il client non
     // deve mostrare "✓ verificato" in quel caso (era fuorviante prima di questo campo).
     const confirmed = allLegs.length > 0 || Boolean(match);
+    const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight) : null;
 
     return new Response(
       JSON.stringify({
         price,
         confirmed,
-        deepLink: singleTicket ? buildDeepLink(flight) : null,
+        deepLink,
         outboundLeg: outboundLegs[0] ?? null,
         inboundLeg: inboundLegs[0] ?? null,
         outboundLegs,

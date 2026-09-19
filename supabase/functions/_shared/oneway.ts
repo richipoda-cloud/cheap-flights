@@ -80,3 +80,48 @@ export async function fetchOneWayPrices({
   // fase di prenotazione risultava per un volo diverso da quello indicato.
   return (json.data ?? []).filter((r: any) => (r.transfers ?? 0) === 0).map(mapOneWayResult);
 }
+
+// ESPERIMENTO (esito incerto, da verificare dal vivo): stessa v3/prices_for_dates ma
+// one_way=false — restituisce l'offerta round-trip completa con un "link" più ricco di
+// quello one-way (contiene anche una firma del volo "t=" ed expected_price_uuid/currency,
+// documentati da Travelpayouts come pensati per far evidenziare/preselezionare quella
+// specifica offerta su Aviasales). NON documentato che salti la pagina di confronto —
+// nella migliore ipotesi la offerta scelta arriva già evidenziata invece che generica.
+export async function fetchRoundTripOffers({
+  origin,
+  destination,
+  departureAt,
+  returnAt,
+  limit = 30,
+}: {
+  origin: string;
+  destination: string;
+  departureAt?: string | null;
+  returnAt?: string | null;
+  limit?: number;
+}) {
+  if (!TRAVELPAYOUTS_TOKEN) throw new Error("TRAVELPAYOUTS_TOKEN non configurato");
+
+  const params = new URLSearchParams({
+    origin,
+    destination,
+    currency: "eur",
+    token: TRAVELPAYOUTS_TOKEN,
+    limit: String(limit),
+    sorting: "price",
+    one_way: "false",
+    ...(departureAt ? { departure_at: departureAt } : {}),
+    ...(returnAt ? { return_at: returnAt } : {}),
+  });
+
+  const res = await fetch(`${BASE_URL}?${params.toString()}`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return ((json.data ?? []) as any[]).map((r) => ({
+    departDate: r.departure_at?.slice(0, 10) ?? null,
+    returnDate: r.return_at?.slice(0, 10) ?? null,
+    price: r.price,
+    link: r.link ?? null,
+    foundAt: r.found_at ?? null,
+  }));
+}
