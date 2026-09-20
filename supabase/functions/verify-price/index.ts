@@ -202,6 +202,7 @@ function buildAirlineDeepLink(
     case "FR":
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=${returnDate}&isConnectedFlight=false&discount=0&promoCode=&isReturn=true&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
+    case "W4": // Wizz Air Malta, stesso sito/motore di prenotazione di Wizz Air (W6) — verificato dal vivo il 21/09/2026
       return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/${returnDate}/1/0/0`;
     case "VY":
       return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&rd=${returnDate}&adt=1&c=it-IT&cur=EUR`;
@@ -284,6 +285,7 @@ function buildAirlineOneWayDeepLink(
     case "FR":
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=&isConnectedFlight=false&discount=0&promoCode=&isReturn=false&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
+    case "W4": // Wizz Air Malta, stesso sito di Wizz Air (W6)
       return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/1/0/0`;
     case "VY":
       // Documentazione: "rd" solo per andata/ritorno, va omesso per la sola andata.
