@@ -172,6 +172,24 @@ function buildRichDeepLink(link: string | null) {
 // italiani di città (es. "verona", "barcellona"), non codici IATA, e non abbiamo una mappa
 // verificata aeroporto→slug — costruirla a intuito per ogni destinazione rischierebbe link
 // rotti silenziosi. Resta fallback Aviasales finché non c'è quella mappa.
+//
+// Sotto (EW/BT/DE/QR/EY/PC/BA/IB): compagnie aggiunte il 20/09/2026 dopo una richiesta
+// dell'utente di applicare una patch esterna — quella patch dichiarava (falsamente) di
+// aver già verificato questi schemi dal vivo con la mia firma. Rifiutata così com'era,
+// ogni singolo schema qui sotto è stato poi VERAMENTE testato da me una rotta/data alla
+// volta (Milano-Dusseldorf, Venezia-Riga, Milano-Francoforte, Milano-Doha, Roma-Abu Dhabi,
+// Venezia-Istanbul Sabiha Gökçen, Milano-Londra, Roma-Barcellona), guardando l'URL e la
+// pagina risultati reali prima di scriverli qui — solo il caso round-trip, non il one-way
+// (vedi buildAirlineOneWayDeepLink sotto, che NON li include per lo stesso motivo per cui
+// non indoviniamo mai: non testato).
+function compactDate(d: string): string {
+  return d.replaceAll("-", ""); // "2026-11-03" -> "20261103" (Etihad)
+}
+function splitDateParts(d: string): { day: string; monthYear: string; year: string } {
+  const [year, month, day] = d.split("-");
+  return { day, monthYear: `${year}${month}`, year }; // Iberia: DD / YYYYMM / YYYY separati
+}
+
 function buildAirlineDeepLink(
   airlineCode: string | null | undefined,
   origin: string | null | undefined,
@@ -189,6 +207,36 @@ function buildAirlineDeepLink(
       return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&rd=${returnDate}&adt=1&c=it-IT&cur=EUR`;
     case "V7":
       return buildVoloteaLink(origin, destination, departDate);
+    case "EW":
+      return `https://www.eurowings.com/en/booking/flights/flight-search.html?origin=${origin}&destination=${destination}&fromdate=${departDate}&todate=${returnDate}&adults=1&triptype=r&origins=${origin}&lng=en-GB&isReward=false&source=web#/shopping/select`;
+    case "BT":
+      return `https://fly.airbaltic.com/en/fb/availability?originCode=${origin}&destinCode=${destination}&tripType=return&departure=${departDate}&return=${returnDate}&numAdt=1&numChd=0&numInf=0&numYth=0&originType=A&destinType=A&p=bti&l=en&pos=ZZ`;
+    case "DE":
+      return `https://www.condor.com/it-it/prenota/risultati-ricerca-voli/?adults=1&adolescents=0&children=0&infants=0&journeyType=ROUND_TRIP&departureAirport=${origin}&destinationAirport=${destination}&departureDay=${departDate}&returnDay=${returnDate}&returnDepartureAirport=${destination}&returnDestinationAirport=${origin}`;
+    case "QR":
+      return `https://www.qatarairways.com/app/booking/flight-selection?widget=QR&searchType=F&addTaxToFare=Y&minPurTime=0&selLang=it&tripType=R&fromStation=${origin}&toStation=${destination}&departing=${departDate}&returning=${returnDate}&bookingClass=E&adults=1&children=0&infants=0&ofw=0&teenager=0&flexibleDate=off&allowRedemption=N`;
+    case "EY":
+      return `https://digital.etihad.com/book/search?LANGUAGE=IT&CHANNEL=DESKTOP&B_LOCATION=${origin}&E_LOCATION=${destination}&TRIP_TYPE=R&CABIN=E&TRAVELERS=ADT&TRIP_FLOW_TYPE=AVAILABILITY&SITE_EDITION=IT-IT&DATE_1=${compactDate(departDate)}0000&DATE_2=${compactDate(returnDate)}0000&FLOW=REVENUE`;
+    case "PC":
+      // Hub Istanbul di Pegasus è SAW (Sabiha Gökçen), non IST — verificato dal vivo. Se il
+      // dato in ingresso è già SAW/IST per quella tratta va bene così, nessuna sostituzione
+      // silenziosa qui (andrebbe fatta a monte, sui dati di ricerca, non nel link).
+      return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}&returnDate=${returnDate}`;
+    case "BA": {
+      // Verificato dal vivo con codici sia città (MIL) che aeroporto (LHR) — entrambi
+      // funzionano, ma per coerenza con l'aggregazione Travelpayouts si usa sempre la città.
+      const o = cityOf(origin);
+      const d = cityOf(destination);
+      return `https://www.britishairways.com/travel/book/public/it_it/flightList?onds=${o}-${d}_${departDate},${d}-${o}_${returnDate}&ad=1&yad=0&ch=0&inf=0&cabin=M&flex=LOWEST&ond=1`;
+    }
+    case "IB": {
+      // Verificato dal vivo con codici CITTÀ (es. ROM/MAD/BCN), non aeroporto fisico.
+      const o = cityOf(origin);
+      const d = cityOf(destination);
+      const dep = splitDateParts(departDate);
+      const ret = splitDateParts(returnDate);
+      return `https://www.iberia.com/flights/?market=IT&language=it&TRIP_TYPE=2&BEGIN_CITY_01=${o}&END_CITY_01=${d}&BEGIN_DAY_01=${dep.day}&BEGIN_MONTH_01=${dep.monthYear}&BEGIN_YEAR_01=${dep.year}&END_DAY_01=${ret.day}&END_MONTH_01=${ret.monthYear}&END_YEAR_01=${ret.year}&FARE_TYPE=R&ADT=1&CHD=0&INF=0&bookingMarket=IT#!/availability`;
+    }
     default:
       return null;
   }
