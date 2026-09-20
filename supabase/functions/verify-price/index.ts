@@ -182,6 +182,39 @@ function buildAirlineDeepLink(
   }
 }
 
+// Stessa idea ma per una SINGOLA tratta (biglietti separati: "Aeroporto di ritorno
+// diverso"/"Ripartenza flessibile" con returnsElsewhere, o "Andata/Ritorno con scalo" con
+// hasStop) — schema one-way dedotto il 20/09/2026 osservando "Sola andata" sui due siti:
+// Ryanair usa lo stesso URL round-trip con isReturn=false e dateIn vuoto; Wizz Air usa un
+// path più corto (senza il segmento data di ritorno). Verificato dal vivo su entrambi.
+function buildAirlineOneWayDeepLink(
+  airlineCode: string | null | undefined,
+  origin: string | null | undefined,
+  destination: string | null | undefined,
+  departDate: string | null | undefined
+): string | null {
+  if (!airlineCode || !origin || !destination || !departDate) return null;
+  switch (airlineCode) {
+    case "FR":
+      return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=&isConnectedFlight=false&discount=0&promoCode=&isReturn=false&originIata=${origin}&destinationIata=${destination}`;
+    case "W6":
+      return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/1/0/0`;
+    default:
+      return null;
+  }
+}
+
+// Il bug segnalato dall'utente era qui: nei casi a biglietti separati (returnsElsewhere/
+// hasStop) il client usa leg.deepLink di OGNI singola tratta, MAI passato dal link
+// compagnia-diretta di ieri (che copriva solo il caso "biglietto unico" sopra) — restava
+// sempre il link Aviasales costruito in mapOneWayResult (oneway.ts). Si sovrascrive qui,
+// con fallback al link Aviasales della tratta se la compagnia non è tra quelle note.
+function withAirlineDeepLink(leg: any) {
+  if (!leg) return leg;
+  const airlineLink = buildAirlineOneWayDeepLink(leg.airline, leg.originAirport, leg.destinationAirport, leg.date);
+  return airlineLink ? { ...leg, deepLink: airlineLink } : leg;
+}
+
 async function buildSingleTicketDeepLink(flight: any, outboundLeg: any) {
   // Aeroporti FISICI reali (es. CRL, non il codice città BRU) e compagnia dal volo one-way
   // già trovato sopra — è esattamente il dato che serve al link diretto della compagnia,
@@ -304,6 +337,11 @@ Deno.serve(async (req) => {
         ? [inboundLeg]
         : [];
     const hasStop = outboundLegs.length > 1 || inboundLegs.length > 1;
+    // Biglietti separati (returnsElsewhere/hasStop): ogni tratta ha il proprio bottone
+    // "Prenota andata/ritorno" legato al SUO leg.deepLink — va sostituito qui, non solo nel
+    // link "biglietto unico" sopra, altrimenti resta sempre quello Aviasales per questi casi.
+    const outboundLegsWithLinks = outboundLegs.map(withAirlineDeepLink);
+    const inboundLegsWithLinks = inboundLegs.map(withAirlineDeepLink);
 
     // Se abbiamo tutte le tratte one-way (quelle di cui mostriamo orario/compagnia nei box
     // Andata/Ritorno), il prezzo deve essere la LORO somma — non l'aggregato v2, che può
@@ -328,10 +366,10 @@ Deno.serve(async (req) => {
         price,
         confirmed,
         deepLink,
-        outboundLeg: outboundLegs[0] ?? null,
-        inboundLeg: inboundLegs[0] ?? null,
-        outboundLegs,
-        inboundLegs,
+        outboundLeg: outboundLegsWithLinks[0] ?? null,
+        inboundLeg: inboundLegsWithLinks[0] ?? null,
+        outboundLegs: outboundLegsWithLinks,
+        inboundLegs: inboundLegsWithLinks,
         returnsElsewhere,
         hasStop,
       }),
