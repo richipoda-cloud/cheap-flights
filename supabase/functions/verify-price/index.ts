@@ -153,17 +153,24 @@ function buildRichDeepLink(link: string | null) {
   return `https://www.aviasales.com${link}${sep}marker=${MARKER}`;
 }
 
-// Link diretti al sito della compagnia aerea (non più Aviasales), dedotti il 19/09/2026
-// osservando manualmente una ricerca A/R su ciascun sito reale (non sono API ufficiali,
-// possono rompersi se la compagnia cambia il proprio sito). Verificati dal vivo:
-// - Ryanair (FR): apre già il volo/tariffa specifica indicata da originIata/destinationIata.
-// - Wizz Air (W6): path pulito, nessun parametro di query.
-// easyJet (U2) e Vueling (VY) SONO STATE PROVATE e scartate di proposito: entrambe tengono
-// lo stato della ricerca in localStorage/sessione lato client, l'URL finale non porta MAI
-// origine/destinazione/date (verificato: forzare parametri di query su easyJet produce una
-// pagina di errore). Volotea (V7) non ha dato uno schema osservabile in tempo utile. Per
-// tutte queste (e qualunque altra compagnia) si ricade sul link Aviasales come da comportamento
-// precedente — nessun tentativo, nessun link rotto silenzioso.
+// Link diretti al sito/app della compagnia aerea (non più Aviasales). Verificati dal vivo:
+// - Ryanair (FR), Wizz Air (W6): dedotti il 19/09/2026 osservando manualmente una ricerca
+//   A/R sul sito reale (non sono API ufficiali, possono rompersi se la compagnia cambia sito).
+// - Vueling (VY): AGGIORNATO il 20/09/2026 — ieri avevo escluso Vueling osservando solo il
+//   widget del sito (che tiene lo stato in sessione, URL finale senza parametri). Oggi trovata
+//   una pagina DEVELOPER pubblica (vueling.com/developer/flightcalendar/flightcalendar-deeplink)
+//   con uno schema di deep link ufficiale e documentato, separato dal widget: interrogato dal
+//   vivo (tickets.vueling.com/booking?o=...&d=...&dd=...&rd=...) e apre davvero andata+ritorno
+//   precompilati. Non è un Universal Link verso l'app (il suo apple-app-site-association non
+//   lo elenca tra i path associati), ma è un link sito funzionante — molto meglio del fallback.
+// easyJet (U2): confermata l'esclusione di ieri con più tentativi (anche i nomi di campo del
+// suo stesso stato interno "Origin/Destination/Outbound/Return" come query param) — stesso
+// errore generico identico, nessuno schema pubblico trovato. Resta fallback Aviasales.
+// Volotea (V7): il suo apple-app-site-association ELENCA "/it/offerte-voli/*" come Universal
+// Link verso l'app — un vero deep link nativo esiste. Non implementato: l'URL usa slug
+// italiani di città (es. "verona", "barcellona"), non codici IATA, e non abbiamo una mappa
+// verificata aeroporto→slug — costruirla a intuito per ogni destinazione rischierebbe link
+// rotti silenziosi. Resta fallback Aviasales finché non c'è quella mappa.
 function buildAirlineDeepLink(
   airlineCode: string | null | undefined,
   origin: string | null | undefined,
@@ -177,6 +184,8 @@ function buildAirlineDeepLink(
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=${returnDate}&isConnectedFlight=false&discount=0&promoCode=&isReturn=true&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
       return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/${returnDate}/1/0/0`;
+    case "VY":
+      return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&rd=${returnDate}&adt=1&c=it-IT&cur=EUR`;
     default:
       return null;
   }
@@ -199,6 +208,9 @@ function buildAirlineOneWayDeepLink(
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=&isConnectedFlight=false&discount=0&promoCode=&isReturn=false&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
       return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/1/0/0`;
+    case "VY":
+      // Documentazione: "rd" solo per andata/ritorno, va omesso per la sola andata.
+      return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&adt=1&c=it-IT&cur=EUR`;
     default:
       return null;
   }
