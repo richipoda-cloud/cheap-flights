@@ -24,6 +24,7 @@ import { fetchOneWayPrices, fetchRoundTripOffers } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
 import airportCityMap from "../_shared/airportCityMap.json" with { type: "json" };
+import voloteaSlugs from "../_shared/voloteaSlugs.json" with { type: "json" };
 
 // flight.destination può essere un codice CITTÀ Travelpayouts che aggrega più aeroporti
 // fisici (es. BRU = Bruxelles aggrega anche CRL/Charleroi) — interrogando quella città
@@ -186,9 +187,37 @@ function buildAirlineDeepLink(
       return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/${returnDate}/1/0/0`;
     case "VY":
       return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&rd=${returnDate}&adt=1&c=it-IT&cur=EUR`;
+    case "V7":
+      return buildVoloteaLink(origin, destination, departDate);
     default:
       return null;
   }
+}
+
+// Volotea (V7): UNIVERSAL LINK vero (non solo link sito) — il suo apple-app-site-association
+// elenca "/it/offerte-voli/*" tra i path associati all'app, verificato il 20/09/2026. L'URL
+// usa però SLUG ITALIANI di città ("verona", "milano-bergamo"), non codici IATA, e solo il
+// MESE (nessuna data esatta, verificato: senza mese mostra un mese/prezzo arbitrario). Mappa
+// aeroporto→slug in voloteaSlugs.json, popolata SOLO con coppie testate dal vivo una per una
+// (mai per intuito: es. "bergamo" da solo è sbagliato, il vero slug è "milano-bergamo",
+// scoperto solo provando) — per qualunque aeroporto non ancora in quella mappa si torna al
+// link Aviasales, niente slug indovinati.
+const VOLOTEA_SLUGS: Record<string, string> = voloteaSlugs as Record<string, string>;
+const ITALIAN_MONTHS = [
+  "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+  "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
+];
+function buildVoloteaLink(
+  origin: string | null | undefined,
+  destination: string | null | undefined,
+  departDate: string | null | undefined
+): string | null {
+  if (!origin || !destination || !departDate) return null;
+  const originSlug = VOLOTEA_SLUGS[origin];
+  const destinationSlug = VOLOTEA_SLUGS[destination];
+  if (!originSlug || !destinationSlug) return null;
+  const month = ITALIAN_MONTHS[new Date(departDate).getUTCMonth()];
+  return `https://www.volotea.com/it/offerte-voli/${originSlug}/${destinationSlug}/${month}/`;
 }
 
 // Stessa idea ma per una SINGOLA tratta (biglietti separati: "Aeroporto di ritorno
@@ -211,6 +240,9 @@ function buildAirlineOneWayDeepLink(
     case "VY":
       // Documentazione: "rd" solo per andata/ritorno, va omesso per la sola andata.
       return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&adt=1&c=it-IT&cur=EUR`;
+    case "V7":
+      // Stesso URL del caso round-trip: Volotea non porta una data di ritorno nel path.
+      return buildVoloteaLink(origin, destination, departDate);
     default:
       return null;
   }
