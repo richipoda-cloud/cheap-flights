@@ -298,18 +298,41 @@ function buildAirlineOneWayDeepLink(
   }
 }
 
+// Compagnie RICONOSCIUTE (presenti in airlines.json) per cui non esiste un deep link
+// diretto verificato — invece del fallback Aviasales generico, si apre la HOME ufficiale
+// della compagnia: non porta alla ricerca già compilata, ma è comunque il posto giusto
+// dove prenotare a mano, invece di un comparatore terzo. Richiesto esplicitamente il
+// 21/09/2026. Ogni dominio qui sotto è stato aperto dal vivo oggi per controllarlo — quello
+// di ITA Airways nella bozza iniziale (itaspa.com) era SBAGLIATO/non raggiungibile, quello
+// vero è ita-airways.com, scoperto solo controllando invece di fidarmi.
+const HOMEPAGE_FALLBACK: Record<string, string> = {
+  AZ: "https://www.ita-airways.com/it_it/", // ITA Airways
+  LH: "https://www.lufthansa.com/it/it/homepage", // Lufthansa
+  LX: "https://www.swiss.com/it/it/homepage", // Swiss
+  OS: "https://www.austrian.com/it/it/homepage", // Austrian Airlines
+  AF: "https://www.airfrance.it/", // Air France
+  KL: "https://www.klm.it/", // KLM
+  TP: "https://www.flytap.com/it-it/", // TAP Air Portugal
+  EK: "https://www.emirates.com/it/italian/", // Emirates
+  TK: "https://www.turkishairlines.com/it-int/", // Turkish Airlines
+  U2: "https://www.easyjet.com/it", // easyJet — nessuno schema URL trovato (vedi 20/09/2026)
+};
+
 // Il bug segnalato dall'utente era qui: nei casi a biglietti separati (returnsElsewhere/
 // hasStop) il client usa leg.deepLink di OGNI singola tratta, MAI passato dal link
 // compagnia-diretta di ieri (che copriva solo il caso "biglietto unico" sopra) — restava
 // sempre il link Aviasales costruito in mapOneWayResult (oneway.ts). Si sovrascrive qui,
-// con fallback al link Aviasales della tratta se la compagnia non è tra quelle note.
+// con la homepage ufficiale se la compagnia è nota ma senza deep link, altrimenti fallback
+// al link Aviasales della tratta.
 function withAirlineDeepLink(leg: any) {
   if (!leg) return leg;
   const airlineLink = buildAirlineOneWayDeepLink(leg.airline, leg.originAirport, leg.destinationAirport, leg.date);
-  return airlineLink ? { ...leg, deepLink: airlineLink } : leg;
+  if (airlineLink) return { ...leg, deepLink: airlineLink };
+  const homepage = leg.airline ? HOMEPAGE_FALLBACK[leg.airline] : null;
+  return homepage ? { ...leg, deepLink: homepage } : leg;
 }
 
-async function buildSingleTicketDeepLink(flight: any, outboundLeg: any) {
+async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundLeg: any) {
   // Aeroporti FISICI reali (es. CRL, non il codice città BRU) e compagnia dal volo one-way
   // già trovato sopra — è esattamente il dato che serve al link diretto della compagnia,
   // niente chiamata aggiuntiva.
@@ -321,6 +344,14 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any) {
     flight.returnDate
   );
   if (airlineLink) return airlineLink;
+
+  // La homepage serve solo a indicare "prenota qui", non un link di ricerca — va bene
+  // anche se conosciamo la compagnia solo dal ritorno (es. andata senza match in cache ma
+  // ritorno trovato): segnalato dall'utente proprio su un caso così (Milano-Salonicco,
+  // andata non confermata, ritorno easyJet).
+  const homepageAirline = outboundLeg?.airline ?? inboundLeg?.airline;
+  const homepage = homepageAirline ? HOMEPAGE_FALLBACK[homepageAirline] : null;
+  if (homepage) return homepage;
 
   const roundTripOffers = await fetchRoundTripOffers({
     origin: flight.origin,
@@ -453,7 +484,7 @@ Deno.serve(async (req) => {
     // il prezzo è rimasto quello originale non ri-controllato (flight.price), il client non
     // deve mostrare "✓ verificato" in quel caso (era fuorviante prima di questo campo).
     const confirmed = allLegs.length > 0 || Boolean(match);
-    const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg) : null;
+    const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg, inboundLeg) : null;
 
     return new Response(
       JSON.stringify({
