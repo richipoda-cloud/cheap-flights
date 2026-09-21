@@ -402,6 +402,13 @@ const HOMEPAGE_FALLBACK: Record<string, string> = {
   EK: "https://www.emirates.com/it/italian/", // Emirates
   TK: "https://www.turkishairlines.com/it-int/", // Turkish Airlines
   U2: "https://www.easyjet.com/it", // easyJet — nessuno schema URL trovato (vedi 20/09/2026)
+  // Iberia (IB): ha uno schema round-trip verificato (buildAirlineDeepLink sopra), ma
+  // NON uno one-way — "Sola andata" dà errore sul sito stesso (vedi TODO.md, 21/09/2026).
+  // Senza questa riga, un leg one-way operato da Iberia (biglietti separati: aeroporto di
+  // ritorno diverso/ripartenza flessibile/scalo) ricadeva su Aviasales invece che sulla
+  // homepage ufficiale — segnalato esplicitamente dall'utente ("non voglio che apra
+  // aviasales"). URL verificato dal vivo oggi stesso durante i test one-way.
+  IB: "https://www.iberia.com/it/",
 };
 
 // Il bug segnalato dall'utente era qui: nei casi a biglietti separati (returnsElsewhere/
