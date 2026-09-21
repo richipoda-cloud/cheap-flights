@@ -20,9 +20,11 @@ import { formatRelativeTime } from "../lib/formatters";
 const HERO_IMAGE_URL =
   "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
 
-// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46 su
-// richiesta esplicita dell'utente ("più lunga in altezza").
-const HERO_HEIGHT_VH = 46;
+// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46 e ora
+// a 58 su richiesta esplicita dell'utente ("più lunga", poi "niente spazio vuoto sotto"):
+// con la card di ricerca ora dentro la foto (vetro smerigliato) e solo 3 card sotto, una
+// foto più alta lascia meno spazio vuoto nella sezione sotto su schermi comuni.
+const HERO_HEIGHT_VH = 58;
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
@@ -186,7 +188,7 @@ export function Home() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Hero con foto Islanda: taglio netto verso il pannello sotto (niente angoli
           stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
           valore in px fisso, per sfruttare meglio lo schermo. position:relative per
@@ -236,16 +238,20 @@ export function Home() {
           </div>
         </div>
       </div>
-      {/* Non più flex:1: quello forzava questo blocco a riempire SEMPRE tutto lo spazio
-          rimasto fino a fondo schermo (minHeight:100vh sul contenitore sopra), lasciando
-          un vuoto verde sotto le 3 card quando il contenuto era più corto del viewport —
-          segnalato dall'utente. Ora la pagina è alta quanto hero+contenuto reale, niente
-          riempimento forzato. */}
+      {/* flex:1 + alignItems:"center": il vuoto sotto le 3 card non era un riempimento
+          "in più" da togliere (l'involucro di App.jsx forza comunque minHeight:100vh su
+          ogni pagina, identico a prima) — era semplicemente che foto+contenuto erano più
+          corti del viewport. Foto allungata (HERO_HEIGHT_VH) su richiesta esplicita, e qui
+          si centra il contenuto invece di tenerlo ancorato in alto: se resta comunque
+          dello spazio su schermi molto alti, si distribuisce sopra/sotto invece di
+          ammassarsi tutto in fondo. */}
       <div
         style={{
+          flex: 1,
           background: COLORS.bg,
           padding: "24px 20px 20px",
           display: "flex",
+          alignItems: "center",
           justifyContent: "center",
         }}
       >
