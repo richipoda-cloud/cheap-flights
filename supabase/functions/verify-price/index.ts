@@ -324,6 +324,15 @@ function buildVoloteaLink(
 // hasStop) — schema one-way dedotto il 20/09/2026 osservando "Sola andata" sui due siti:
 // Ryanair usa lo stesso URL round-trip con isReturn=false e dateIn vuoto; Wizz Air usa un
 // path più corto (senza il segmento data di ritorno). Verificato dal vivo su entrambi.
+//
+// Sotto (EW/BT/DE/QR/EY/PC/BA): aggiunte il 21/09/2026, stesso principio — mai indovinato,
+// ogni schema verificato dal vivo impostando "Sola andata"/"One way" sul sito reale e
+// guardando l'URL/i risultati effettivi (Milano-Dusseldorf, Verona-Riga, Milano-Francoforte,
+// Milano-Doha, Roma-Abu Dhabi, Venezia-Istanbul Sabiha Gökçen, Milano-Londra). Iberia (IB)
+// esclusa qui: "Sola andata" Roma-Barcellona dà un errore generico sul sito stesso ("Si è
+// verificato un errore generale"), riprodotto due volte (anche costruendo l'URL a mano con
+// TRIP_TYPE=1) — non un caso di schema indovinato male, il sito proprio non completa quella
+// ricerca in questo momento. Resta senza uno schema one-way verificato, fallback Aviasales.
 function buildAirlineOneWayDeepLink(
   airlineCode: string | null | undefined,
   origin: string | null | undefined,
@@ -344,6 +353,32 @@ function buildAirlineOneWayDeepLink(
     case "V7":
       // Stesso URL del caso round-trip: Volotea non porta una data di ritorno nel path.
       return buildVoloteaLink(origin, destination, departDate);
+    case "EW":
+      // Verificato dal vivo (MXP-DUS, 30/09): triptype=oneway al posto di "r", niente todate.
+      return `https://www.eurowings.com/en/booking/flights/flight-search.html?origin=${origin}&destination=${destination}&fromdate=${departDate}&adults=1&triptype=oneway&origins=${origin}&lng=en-GB&isReward=false&source=web#/shopping/select`;
+    case "BT":
+      // Verificato dal vivo (VRN-RIX, 12/12): tripType=oneway, niente parametro return.
+      return `https://fly.airbaltic.com/en/fb/availability?originCode=${origin}&destinCode=${destination}&tripType=oneway&departure=${departDate}&numAdt=1&numChd=0&numInf=0&numYth=0&originType=A&destinType=A&p=bti&l=en&pos=ZZ`;
+    case "DE":
+      // Verificato dal vivo (MXP-FRA, 30/09): journeyType=ONE_WAY, niente campi di ritorno.
+      return `https://www.condor.com/it-it/prenota/risultati-ricerca-voli/?adults=1&adolescents=0&children=0&infants=0&journeyType=ONE_WAY&departureAirport=${origin}&destinationAirport=${destination}&departureDay=${departDate}`;
+    case "QR":
+      // Verificato dal vivo (MXP-DOH, 05/10): tripType=O al posto di R, niente "returning".
+      return `https://www.qatarairways.com/app/booking/flight-selection?widget=QR&searchType=F&addTaxToFare=Y&minPurTime=0&selLang=it&tripType=O&fromStation=${origin}&toStation=${destination}&departing=${departDate}&bookingClass=E&adults=1&children=0&infants=0&ofw=0&teenager=0&flexibleDate=off&allowRedemption=N`;
+    case "EY":
+      // Verificato dal vivo (FCO-AUH, 30/09): TRIP_TYPE=O, solo DATE_1 (niente DATE_2).
+      return `https://digital.etihad.com/book/search?LANGUAGE=IT&CHANNEL=DESKTOP&B_LOCATION=${origin}&E_LOCATION=${destination}&TRIP_TYPE=O&CABIN=E&TRAVELERS=ADT&TRIP_FLOW_TYPE=AVAILABILITY&SITE_EDITION=IT-IT&DATE_1=${compactDate(departDate)}0000&FLOW=REVENUE`;
+    case "PC":
+      // Verificato dal vivo (VCE-SAW, 05/10): stesso URL del round-trip, "returnDate" va
+      // semplicemente omesso (nessun altro parametro cambia).
+      return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}`;
+    case "BA": {
+      // Verificato dal vivo (MIL-LON, 05/10): "onds" con un solo segmento (niente virgola
+      // + tratta di ritorno), stessi codici città di buildAirlineDeepLink sopra.
+      const o = cityOf(origin);
+      const d = cityOf(destination);
+      return `https://www.britishairways.com/travel/book/public/it_it/flightList?onds=${o}-${d}_${departDate}&ad=1&yad=0&ch=0&inf=0&cabin=M&flex=LOWEST&ond=1`;
+    }
     default:
       return null;
   }

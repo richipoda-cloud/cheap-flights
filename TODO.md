@@ -2,25 +2,23 @@
 
 Idee non ancora implementate, raccolte qui invece che perse in chat.
 
-## Link diretti one-way per le 8 compagnie aggiunte dopo (IN CORSO, interrotto)
+## Link diretti one-way per le 8 compagnie aggiunte dopo (FATTO 21/09/2026, tranne IB)
 
-In `supabase/functions/verify-price/index.ts`, `buildAirlineDeepLink` (round-trip) copre
-FR/W6/W4/VY/V7/EW/BT/DE/QR/EY/PC/BA/IB, ma `buildAirlineOneWayDeepLink` (usato per i
-biglietti separati: "Aeroporto di ritorno diverso"/"Ripartenza flessibile"/scalo) copre
-SOLO FR/W6/W4/VY/V7 — le 8 aggiunte il 20/09 (EW/BT/DE/QR/EY/PC/BA/IB) non hanno la
-versione one-way, quindi quei casi ricadono ancora su Aviasales. Serve verificare dal
-vivo (mai indovinare) lo schema one-way di ciascuna, una alla volta:
+`buildAirlineOneWayDeepLink` in `supabase/functions/verify-price/index.ts` ora copre anche
+EW/BT/DE/QR/EY/PC/BA (oltre a FR/W6/W4/VY/V7 già presenti), ognuno verificato dal vivo
+impostando "Sola andata"/"One way" sul sito reale e guardando l'URL/i risultati:
 
-- [ ] Eurowings (EW) — verifica iniziata su eurowings.com, interrotta prima di completarla
-- [ ] Air Baltic (BT)
-- [ ] Condor (DE)
-- [ ] Qatar Airways (QR)
-- [ ] Etihad (EY)
-- [ ] Pegasus (PC)
-- [ ] British Airways (BA)
-- [ ] Iberia (IB)
-
-Riprendere da qui quando richiesto.
+- [x] Eurowings (EW) — MXP-DUS
+- [x] Air Baltic (BT) — VRN-RIX
+- [x] Condor (DE) — MXP-FRA
+- [x] Qatar Airways (QR) — MXP-DOH
+- [x] Etihad (EY) — FCO-AUH
+- [x] Pegasus (PC) — VCE-SAW
+- [x] British Airways (BA) — MIL-LON
+- [ ] Iberia (IB) — NON fatto: "Sola andata" Roma-Barcellona dà un errore generico sul
+      sito Iberia stesso ("Si è verificato un errore generale"), riprodotto due volte
+      (anche con URL costruito a mano). Non uno schema indovinato male — il sito proprio
+      non completa quella ricerca al momento. Da riprovare in futuro, magari è transitorio.
 
 ## Home: immagine di sfondo hero dinamica
 
