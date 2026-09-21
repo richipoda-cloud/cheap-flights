@@ -202,7 +202,13 @@ export function Home() {
     // bloccata a height:100vh + overflow:hidden (niente scroll possibile) e la foto è uno
     // sfondo assoluto che riempie ESATTAMENTE quello spazio — le card sono ancorate in
     // fondo dentro lo stesso contenitore, quindi non possono mai uscire dallo schermo.
-    <div style={{ height: "100vh", overflow: "hidden", position: "relative" }}>
+    // 100dvh, non 100vh: in Safari mobile "100vh" e' calcolato come se la barra
+    // indirizzi fosse sempre nascosta, quindi con la barra visibile il contenuto
+    // (bloccato con overflow:hidden) finiva SOTTO il bordo reale visibile, tagliando
+    // "Suggeriti per te" senza modo di scrollare per vederlo — visto SOLO sul simulatore
+    // reale, non nel browser interno di sviluppo che non riproduce la barra dinamica.
+    // dvh riflette l'altezza visibile vera in ogni momento.
+    <div style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
       <div
         ref={heroRef}
         style={{
