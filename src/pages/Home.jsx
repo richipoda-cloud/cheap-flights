@@ -9,6 +9,14 @@ import { useSuggestions } from "../hooks/useSuggestions";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
+// Foto Islanda (altopiano di Landmannalaugar) via Unsplash CDN con resize on-the-fly
+// (params auto/fit/w/q), niente file da bundlare — verificata dal vivo (200, image/jpeg,
+// contenuto reale coerente coi colori verde/bianco della palette) prima di usarla. Solo
+// nella fascia hero in alto, non a tutto schermo: il resto della pagina resta sul solido
+// COLORS.bg per non intaccare la leggibilità delle card sotto.
+const HERO_IMAGE_URL =
+  "https://images.unsplash.com/photo-1499649373041-41bd006e06bd?auto=format&fit=crop&w=1000&q=70";
+
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
 // Cerca voli al posto del testo generico, solo se l'utente ha già cercato qualcosa.
@@ -130,39 +138,61 @@ export function Home() {
       : "In base alle tue ricerche passate";
 
   return (
-    <div style={{ padding: 20, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ fontWeight: 600, fontSize: 28, color: COLORS.ink }}>Ciao 👋</div>
-          <div style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
-        </div>
-        <SearchCard
-          onClick={() => navigate("/search")}
-          subtitle={lastSearchSubtitle}
-          lastSearchAt={lastSearch?.created_at}
-          onRepeat={repeatLastSearch}
-        />
-
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <SmallCard
-              icon="⭐"
-              title="Preferiti"
-              subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
-              onClick={() => navigate("/favorites")}
-            />
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* Hero con foto Islanda: altezza fissa, taglio netto senza angoli stondati nella
+          transizione — sotto riprende subito il solido COLORS.bg, così il resto della
+          pagina (card, testo scuro) resta completamente leggibile. */}
+      <div
+        style={{
+          height: 210,
+          flexShrink: 0,
+          backgroundImage: `url(${HERO_IMAGE_URL})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 60%",
+        }}
+      />
+      <div
+        style={{
+          flex: 1,
+          background: COLORS.bg,
+          padding: "24px 20px 20px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, fontSize: 28, color: COLORS.ink }}>Ciao 👋</div>
+            <div style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <SmallCard
-              icon="🕐"
-              title="Storico"
-              subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
-              onClick={() => navigate("/history")}
-            />
-          </div>
-        </div>
+          <SearchCard
+            onClick={() => navigate("/search")}
+            subtitle={lastSearchSubtitle}
+            lastSearchAt={lastSearch?.created_at}
+            onRepeat={repeatLastSearch}
+          />
 
-        <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <SmallCard
+                icon="⭐"
+                title="Preferiti"
+                subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
+                onClick={() => navigate("/favorites")}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <SmallCard
+                icon="🕐"
+                title="Storico"
+                subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
+                onClick={() => navigate("/history")}
+              />
+            </div>
+          </div>
+
+          <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
+        </div>
       </div>
     </div>
   );
