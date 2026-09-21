@@ -40,15 +40,22 @@ function describeLastSearch(filters) {
   return [dest, nights, dateLabel].filter(Boolean).join(" · ");
 }
 
+// Sfondo "vetro smerigliato" (translucido + blur di quel che c'è dietro) invece del
+// riquadro verde pieno di prima — richiesto esplicitamente dall'utente per poter
+// sovrapporre la card alla foto hero senza coprirla con un pannello opaco. Testo già
+// bianco/bianco trasparente (pensato per leggersi sul verde accent) resta leggibile
+// invariato anche sul vetro, complice la sfumatura scura sotto la foto (vedi Home()).
 function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
   return (
     <Card
       onClick={onClick}
       style={{
         padding: 18,
-        background: COLORS.accent,
-        border: "none",
-        boxShadow: "0 4px 16px rgba(33,30,43,0.22)",
+        background: "rgba(255,255,255,0.16)",
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
+        border: "1px solid rgba(255,255,255,0.35)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
@@ -182,18 +189,53 @@ export function Home() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Hero con foto Islanda: taglio netto verso il pannello sotto (niente angoli
           stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
-          valore in px fisso, per sfruttare meglio lo schermo. */}
-      <div
-        ref={heroRef}
-        style={{
-          height: `calc(${HERO_HEIGHT_VH}vh + env(safe-area-inset-top, 0px))`,
-          marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
-          flexShrink: 0,
-          backgroundImage: `url(${HERO_IMAGE_URL})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center 55%",
-        }}
-      />
+          valore in px fisso, per sfruttare meglio lo schermo. position:relative per
+          sovrapporre saluto + card "Cerca voli" (vetro smerigliato) alla foto stessa,
+          invece di stare sotto in un riquadro separato — richiesto esplicitamente
+          dall'utente. */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <div
+          ref={heroRef}
+          style={{
+            height: `calc(${HERO_HEIGHT_VH}vh + env(safe-area-inset-top, 0px))`,
+            marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
+            backgroundImage: `url(${HERO_IMAGE_URL})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center 55%",
+          }}
+        />
+        {/* Sfumatura scura solo in basso sulla foto: senza, saluto e card in bianco/vetro
+            si leggerebbero male su un cielo chiaro come questo. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "55%",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center" }}>
+          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 28, color: "#FFFFFF", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+                Ciao 👋
+              </div>
+              <div style={{ fontSize: 16, color: "rgba(255,255,255,0.9)", marginTop: 2, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+                Dove ti va di andare?
+              </div>
+            </div>
+            <SearchCard
+              onClick={() => navigate("/search")}
+              subtitle={lastSearchSubtitle}
+              lastSearchAt={lastSearch?.created_at}
+              onRepeat={repeatLastSearch}
+            />
+          </div>
+        </div>
+      </div>
       <div
         style={{
           flex: 1,
@@ -204,17 +246,6 @@ export function Home() {
         }}
       >
         <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontWeight: 600, fontSize: 28, color: COLORS.ink }}>Ciao 👋</div>
-            <div style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 2 }}>Dove ti va di andare?</div>
-          </div>
-          <SearchCard
-            onClick={() => navigate("/search")}
-            subtitle={lastSearchSubtitle}
-            lastSearchAt={lastSearch?.created_at}
-            onRepeat={repeatLastSearch}
-          />
-
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <SmallCard
