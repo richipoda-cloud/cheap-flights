@@ -121,9 +121,23 @@ function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
 // sottotitolo resta su una riga propria a piena larghezza sotto — non condivide la riga con
 // icona/freccia, altrimenti nelle due card strette (Preferiti/Storico) tornerebbe a
 // troncarsi con "…" come nella versione precedente a quella verticale.
+//
+// Sfondo COLORS.accentSoft (verdino tenue, già in palette) invece del bianco pieno: ora
+// anche queste tre card stanno sopra la foto hero (allungata apposta), non più in un
+// pannello separato sotto — confermato esplicitamente dall'utente. Restano OPACHE (niente
+// vetro/blur come SearchCard) così il testo scuro resta leggibile ovunque cadano sulla
+// foto, senza dover oscurare quella porzione di immagine.
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
-    <Card onClick={onClick} style={{ padding: 15 }}>
+    <Card
+      onClick={onClick}
+      style={{
+        padding: 15,
+        background: COLORS.accentSoft,
+        border: "1px solid rgba(110,127,92,0.28)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.16)",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{icon}</div>
         <div style={{ fontWeight: 600, fontSize: 17, color: COLORS.ink, flex: 1, minWidth: 0 }}>{title}</div>
@@ -190,32 +204,35 @@ export function Home() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Hero con foto Islanda: taglio netto verso il pannello sotto (niente angoli
-          stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
-          valore in px fisso, per sfruttare meglio lo schermo. position:relative per
-          sovrapporre saluto + card "Cerca voli" (vetro smerigliato) alla foto stessa,
-          invece di stare sotto in un riquadro separato — richiesto esplicitamente
-          dall'utente. */}
+      {/* Hero con foto Islanda estesa dietro TUTTO il contenuto — non solo saluto+ricerca,
+          ma anche Preferiti/Storico/Suggeriti (confermato esplicitamente dall'utente).
+          HERO_HEIGHT_VH resta la base (stessa cronologia 34→46→58→66) più uno spazio
+          fisso aggiuntivo per le tre card in più: se cambia il testo di una card il resto
+          scorre comunque dentro all'area già allungata a sufficienza, invece di stimare
+          un valore unico che si scombina a ogni modifica. */}
       <div style={{ position: "relative", flexShrink: 0 }}>
         <div
           ref={heroRef}
           style={{
-            height: `calc(${HERO_HEIGHT_VH}vh + env(safe-area-inset-top, 0px))`,
+            height: `calc(${HERO_HEIGHT_VH}vh + 254px + env(safe-area-inset-top, 0px))`,
             marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
             backgroundImage: `url(${HERO_IMAGE_URL})`,
             backgroundSize: "cover",
-            backgroundPosition: "center 55%",
+            backgroundPosition: "center 62%",
           }}
         />
-        {/* Sfumatura scura in alto (per il saluto) e in basso (per la card): senza, testo
-            e card in bianco/vetro si leggerebbero male su un cielo chiaro come questo. */}
+        {/* Sfumatura scura in alto (per il saluto) e su gran parte del resto (per la card
+            Cerca voli, ancora in vetro): senza, testo e card in bianco/vetro si
+            leggerebbero male su un cielo chiaro come questo. Le tre card sotto sono
+            OPACHE (vedi SmallCard) quindi non hanno bisogno di questo scurimento per
+            restare leggibili — l'oscuramento serve solo a Cerca voli/saluto sopra. */}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
             top: 0,
-            height: "35%",
+            height: "22%",
             background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)",
             pointerEvents: "none",
           }}
@@ -225,9 +242,23 @@ export function Home() {
             position: "absolute",
             left: 0,
             right: 0,
+            top: "28%",
             bottom: 0,
-            height: "55%",
-            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 100%)",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.6) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+        {/* Solo nell'ultimo lembo, corto, la foto si dissolve nel colore del pannello
+            sotto (COLORS.bg) invece di finire di netto — una dissolvenza estesa su gran
+            parte della foto verrebbe fuori come una macchia slavata sulle montagne. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 46,
+            background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${COLORS.bg} 100%)`,
             pointerEvents: "none",
           }}
         />
@@ -259,55 +290,43 @@ export function Home() {
             </div>
           </div>
         </div>
+        {/* Card Cerca voli + Preferiti/Storico + Suggeriti, impilate in un unico blocco
+            ancorato in fondo alla foto (non più solo la card di ricerca) — le tre card
+            in più stanno ora sopra la foto invece che in un pannello bianco separato,
+            confermato esplicitamente dall'utente. */}
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
+          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
             <SearchCard
               onClick={() => navigate("/search")}
               subtitle={lastSearchSubtitle}
               lastSearchAt={lastSearch?.created_at}
               onRepeat={repeatLastSearch}
             />
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <SmallCard
+                  icon="⭐"
+                  title="Preferiti"
+                  subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
+                  onClick={() => navigate("/favorites")}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <SmallCard
+                  icon="🕐"
+                  title="Storico"
+                  subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
+                  onClick={() => navigate("/history")}
+                />
+              </div>
+            </div>
+            <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
           </div>
         </div>
       </div>
-      {/* Il centraggio verticale (provato prima) staccava le card dalla foto lasciando
-          un vuoto SOPRA di loro invece che sotto — segnalato dall'utente, era peggio, non
-          meglio. Tornate ancorate in alto (subito sotto la foto, padding-top piccolo);
-          la foto stessa ora è allungata abbastanza (HERO_HEIGHT_VH) da lasciare poco
-          spazio vuoto sotto le card, invece di "nascondere" il problema centrandole. */}
-      <div
-        style={{
-          flex: 1,
-          background: COLORS.bg,
-          padding: "20px 20px 20px",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <SmallCard
-                icon="⭐"
-                title="Preferiti"
-                subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
-                onClick={() => navigate("/favorites")}
-              />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <SmallCard
-                icon="🕐"
-                title="Storico"
-                subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
-                onClick={() => navigate("/history")}
-              />
-            </div>
-          </div>
-
-          <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
-        </div>
-      </div>
+      {/* Riempie l'eventuale spazio restante sotto (schermi molto alti): stesso colore
+          del pannello a cui la foto si dissolve sopra, così non si nota giunzione. */}
+      <div style={{ flex: 1, background: COLORS.bg }} />
     </div>
   );
 }
