@@ -10,21 +10,19 @@ import { useSuggestions } from "../hooks/useSuggestions";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
-// Foto Islanda (altopiano di Landmannalaugar, rioliti verdi/rosse con chiazze di neve) via
-// Unsplash CDN con resize on-the-fly — sostituita il 21/09/2026: la prima scelta (e quella
-// proposta in una patch esterna con richiesta di riordino/theme-color, la cui firma
-// "Claude"/sessione erano false, MAI verificate da me — vedi anche l'episodio simile con
-// la patch fase2 homepage-fallback) risultava, aperta dal vivo, una foto di tutt'altro
-// soggetto (interno di una tenda da campeggio) nonostante la descrizione dicesse Islanda.
-// Questa è stata cercata e aperta dal vivo io stesso su unsplash.com/s/photos/landmannalaugar
-// prima di usarla — Unsplash License, uso libero anche commerciale. w=1200/q=80/dpr=2 per
-// restare nitida sugli schermi ad alta densità (era sfocata con la risoluzione precedente).
+// Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
+// su richiesta esplicita dell'utente ("più verde"): la versione precedente (rioliti di
+// Landmannalaugar, toni bruno/rossi) era corretta come soggetto ma poco verde. Questa è
+// una valle glaciale muschiosa con fiume, cercata e aperta dal vivo io stesso su
+// unsplash.com/s/photos/iceland-moss-mountains, controllando che fosse gratuita (prefisso
+// "photo-", non "premium_photo-" = Unsplash+, non usabile senza abbonamento) prima di
+// sceglierla. w=1200/q=80/dpr=2 per restare nitida sugli schermi ad alta densità.
 const HERO_IMAGE_URL =
-  "https://images.unsplash.com/photo-1518413380322-fc82a14756f0?auto=format&fit=crop&w=1200&q=80&dpr=2";
+  "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
 
-// Altezza della fascia hero in quota di viewport (non px fisso) per sfruttare meglio lo
-// schermo su dispositivi diversi mantenendo la stessa proporzione.
-const HERO_HEIGHT_VH = 34;
+// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46 su
+// richiesta esplicita dell'utente ("più lunga in altezza").
+const HERO_HEIGHT_VH = 46;
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
