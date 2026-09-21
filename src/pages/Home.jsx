@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Card } from "../components/Card";
@@ -152,12 +152,28 @@ export function Home() {
   // occhio) così la barra sembra continuare la foto invece di tagliarla con una fascia
   // verde. Da installata in Home il fix vero (index.html, status bar black-translucent)
   // fa già disegnare la foto sotto la barra per davvero, questo qui non serve né disturba.
-  // Ripristinato all'uscita per non tingere le altre schermate.
+  //
+  // Segnalato dall'utente: scorrendo oltre la foto (46vh) la barra tornava verde, ma un
+  // verde SBAGLIATO — "#6E7F5C" (l'accento scuro dei bottoni, valore di default in
+  // index.html) invece del vero sfondo pagina COLORS.bg ("#DBE4CC", più chiaro) che a quel
+  // punto è davvero quello che si vede in cima. Prima si tingeva solo una volta al mount,
+  // ora segue lo scroll con IntersectionObserver sull'hero: azzurro finché è visibile,
+  // COLORS.bg appena esce dallo schermo — sempre il colore vero di quel che c'è in cima.
+  const heroRef = useRef(null);
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
     const previous = meta?.getAttribute("content");
-    meta?.setAttribute("content", "#73A8D9");
+    const setColor = (visible) => meta?.setAttribute("content", visible ? "#73A8D9" : COLORS.bg);
+    setColor(true);
+
+    const el = heroRef.current;
+    const observer = el
+      ? new IntersectionObserver(([entry]) => setColor(entry.isIntersecting), { threshold: 0 })
+      : null;
+    if (el && observer) observer.observe(el);
+
     return () => {
+      observer?.disconnect();
       if (previous != null) meta?.setAttribute("content", previous);
     };
   }, []);
@@ -168,6 +184,7 @@ export function Home() {
           stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
           valore in px fisso, per sfruttare meglio lo schermo. */}
       <div
+        ref={heroRef}
         style={{
           height: `calc(${HERO_HEIGHT_VH}vh + env(safe-area-inset-top, 0px))`,
           marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
