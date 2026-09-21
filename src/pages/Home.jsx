@@ -92,19 +92,20 @@ function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
   );
 }
 
-// Verticale (icona+freccia sopra, titolo e sottotitolo sotto su riga propria) invece di
-// tutto affiancato: nelle due card strette (Preferiti/Storico) l'orizzontale troncava il
-// sottotitolo con "…" — qui ha sempre tutta la larghezza della card a disposizione.
+// Icona a sinistra del titolo (non più sopra, richiesto esplicitamente dall'utente) ma il
+// sottotitolo resta su una riga propria a piena larghezza sotto — non condivide la riga con
+// icona/freccia, altrimenti nelle due card strette (Preferiti/Storico) tornerebbe a
+// troncarsi con "…" come nella versione precedente a quella verticale.
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
     <Card onClick={onClick} style={{ padding: 15 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{icon}</div>
+        <div style={{ fontWeight: 600, fontSize: 17, color: COLORS.ink, flex: 1, minWidth: 0 }}>{title}</div>
         <ChevronRight size={21} color={COLORS.inkSoft} style={{ flexShrink: 0 }} />
       </div>
-      <div style={{ fontWeight: 600, fontSize: 17, color: COLORS.ink, marginTop: 8 }}>{title}</div>
       {subtitle && (
-        <div style={{ fontSize: 13.5, color: COLORS.inkSoft, marginTop: 2 }}>{subtitle}</div>
+        <div style={{ fontSize: 13.5, color: COLORS.inkSoft, marginTop: 6 }}>{subtitle}</div>
       )}
     </Card>
   );
