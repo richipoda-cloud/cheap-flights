@@ -106,7 +106,10 @@ export function FlightDetail() {
   };
 
   const handleSaveFavorite = () => {
-    addFavorite({ ...flight, price: verifiedPrice ?? flight.price, searchFilters: filters });
+    addFavorite(
+      { ...flight, price: verifiedPrice ?? flight.price, searchFilters: filters },
+      flight.isStopover ? true : confirmed
+    );
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
   };

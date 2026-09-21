@@ -23,8 +23,14 @@ export function useFavorites(userId) {
     reload();
   }, [reload]);
 
+  // isFresh di default true: per i percorsi creativi (isStopover) non esiste un concetto
+  // di "confermato" (niente singolo endpoint, vedi verifyFavorite sotto) — il prezzo è
+  // comunque quello appena trovato in ricerca, va bene marcarlo fresco. Per un volo diretto
+  // invece FlightDetail passa il vero esito della verifica: se non confermato (fallback sul
+  // prezzo originale) non va marcato "✓ Prezzo aggiornato" fin da subito — stesso bug già
+  // corretto sopra in verifyFavorite, qui era identico al primo salvataggio.
   const addFavorite = useCallback(
-    async (flightSnapshot) => {
+    async (flightSnapshot, isFresh = true) => {
       if (!userId) return;
       await supabase.from("favorites").insert({
         user_id: userId,
@@ -33,7 +39,7 @@ export function useFavorites(userId) {
         original_price: flightSnapshot.price, // immutabile, per calcolare la variazione dopo
         currency: flightSnapshot.currency ?? "EUR",
         saved_at: new Date().toISOString(),
-        is_fresh: true, // appena verificato al momento del salvataggio (nel dettaglio)
+        is_fresh: isFresh,
       });
       reload();
     },
@@ -49,10 +55,10 @@ export function useFavorites(userId) {
   );
 
   const markVerified = useCallback(
-    async (id, price) => {
+    async (id, price, isFresh = true) => {
       await supabase
         .from("favorites")
-        .update({ price, is_fresh: true, last_verified_at: new Date().toISOString() })
+        .update({ price, is_fresh: isFresh, last_verified_at: new Date().toISOString() })
         .eq("id", id);
       reload();
     },
@@ -62,13 +68,17 @@ export function useFavorites(userId) {
   // Riverifica manuale di un preferito già salvato — solo voli diretti: per i percorsi
   // creativi (più biglietti one-way) non esiste un singolo endpoint di verifica sensato,
   // andrebbero riverificati biglietto per biglietto (non fatto qui, fuori scope).
+  //
+  // is_fresh segue data.confirmed, non va messo sempre a true: se verify-price non ha
+  // trovato un match reale (fallback sul prezzo originale non confermato), il badge non
+  // deve dire "✓ Prezzo aggiornato" — stesso principio del fix su verify-price/confirmed.
   const verifyFavorite = useCallback(
     async (fav) => {
       const snapshot = fav.flight_snapshot;
       if (!snapshot || snapshot.isStopover) return null;
       const data = await verifyPrice(snapshot);
       const newPrice = data?.price ?? fav.price;
-      await markVerified(fav.id, newPrice);
+      await markVerified(fav.id, newPrice, Boolean(data?.confirmed));
       return newPrice;
     },
     [markVerified]

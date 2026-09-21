@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
 import { useSearches } from "../hooks/useSearches";
 import { useSuggestions } from "../hooks/useSuggestions";
-import { cityName } from "../lib/cityNames";
+import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
@@ -14,7 +14,7 @@ import { formatRelativeTime } from "../lib/formatters";
 // Cerca voli al posto del testo generico, solo se l'utente ha già cercato qualcosa.
 function describeLastSearch(filters) {
   if (!filters) return null;
-  const dest = filters.destination ? cityName(filters.destination) : "Ovunque";
+  const dest = filters.destination ? destinationName(filters.destination) : "Ovunque";
   const dateLabel = filters.dateMode === "fixed" ? "Date fisse" : "Sempre";
   const nights =
     filters.nightsMin != null || filters.nightsMax != null

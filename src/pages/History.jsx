@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 import { cityName } from "../lib/cityNames";
+import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
 // Icona rotazione piena (arco ~300° + freccia), non il glifo unicode ↻ che risultava
@@ -28,7 +29,7 @@ function RefreshIcon() {
 
 function describeFilters(f) {
   const origin = f.origins?.map(cityName).join(", ") ?? "?";
-  const dest = f.destination ? cityName(f.destination) : "Ovunque";
+  const dest = f.destination ? destinationName(f.destination) : "Ovunque";
   const dates = f.dateMode === "fixed" ? `${f.dateFrom} → ${f.dateTo}` : "Sempre";
   return `${origin} → ${dest} · ${dates}`;
 }

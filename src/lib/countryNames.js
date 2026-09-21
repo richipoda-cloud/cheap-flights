@@ -2,6 +2,9 @@
 // (supporto ampio). countryCodes.json elenca solo i ~237 codici ISO2 con voli reali
 // (derivati da Travelpayouts cities.json), per popolare l'autocomplete.
 import countryCodes from "../data/countryCodes.json";
+import { cityName } from "./cityNames";
+
+const DESTINATION_CODE_SET = new Set(countryCodes.map((c) => c.toLowerCase()));
 
 let displayNames = null;
 try {
@@ -17,6 +20,16 @@ export function countryName(code) {
   } catch {
     return code;
   }
+}
+
+// Un campo "destinazione" può contenere sia un codice città/aeroporto che un codice
+// paese (dopo il supporto a "Destinazione fissa" con paese, 21/09/2026) — senza questo
+// controllo, mostrare un codice paese con cityName lo lascia grezzo ("FR" invece di
+// "Francia") perché non è nell'anagrafica città/aeroporti. Stessa distinzione già usata
+// in Search.jsx, centralizzata qui per riusarla in Home/Storico.
+export function destinationName(code) {
+  if (!code) return code;
+  return DESTINATION_CODE_SET.has(code.toLowerCase()) ? countryName(code) : cityName(code);
 }
 
 export function searchCountries(query) {

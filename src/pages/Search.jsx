@@ -9,7 +9,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { FlagIcon } from "../components/FlagIcon";
 import { useAuth } from "../hooks/useAuth";
 import { useUserPreferences } from "../hooks/useUserPreferences";
-import { countryName } from "../lib/countryNames";
+import { countryName, destinationName } from "../lib/countryNames";
 import { cityName, resolveCityCode } from "../lib/cityNames";
 import countryCodes from "../data/countryCodes.json";
 import airports from "../data/airports.json";
@@ -600,8 +600,7 @@ export function Search() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 20 }}>📍</span>
                 <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>
-                  {CODE_SET.has(destination.toLowerCase()) ? countryName(destination) : cityName(destination)} (
-                  {destination})
+                  {destinationName(destination)} ({destination})
                 </div>
               </div>
               <span onClick={clearDestinationChoice} style={{ color: COLORS.inkSoft, cursor: "pointer" }}>
