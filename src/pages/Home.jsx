@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Card } from "../components/Card";
@@ -9,13 +10,21 @@ import { useSuggestions } from "../hooks/useSuggestions";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
-// Foto Islanda (altopiano di Landmannalaugar) via Unsplash CDN con resize on-the-fly
-// (params auto/fit/w/q), niente file da bundlare — verificata dal vivo (200, image/jpeg,
-// contenuto reale coerente coi colori verde/bianco della palette) prima di usarla. Solo
-// nella fascia hero in alto, non a tutto schermo: il resto della pagina resta sul solido
-// COLORS.bg per non intaccare la leggibilità delle card sotto.
+// Foto Islanda (altopiano di Landmannalaugar, rioliti verdi/rosse con chiazze di neve) via
+// Unsplash CDN con resize on-the-fly — sostituita il 21/09/2026: la prima scelta (e quella
+// proposta in una patch esterna con richiesta di riordino/theme-color, la cui firma
+// "Claude"/sessione erano false, MAI verificate da me — vedi anche l'episodio simile con
+// la patch fase2 homepage-fallback) risultava, aperta dal vivo, una foto di tutt'altro
+// soggetto (interno di una tenda da campeggio) nonostante la descrizione dicesse Islanda.
+// Questa è stata cercata e aperta dal vivo io stesso su unsplash.com/s/photos/landmannalaugar
+// prima di usarla — Unsplash License, uso libero anche commerciale. w=1200/q=80/dpr=2 per
+// restare nitida sugli schermi ad alta densità (era sfocata con la risoluzione precedente).
 const HERO_IMAGE_URL =
-  "https://images.unsplash.com/photo-1499649373041-41bd006e06bd?auto=format&fit=crop&w=1000&q=70";
+  "https://images.unsplash.com/photo-1518413380322-fc82a14756f0?auto=format&fit=crop&w=1200&q=80&dpr=2";
+
+// Altezza della fascia hero in quota di viewport (non px fisso) per sfruttare meglio lo
+// schermo su dispositivi diversi mantenendo la stessa proporzione.
+const HERO_HEIGHT_VH = 34;
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
@@ -137,18 +146,33 @@ export function Home() {
       ? `${suggestions.topOrigins[0]} · ${suggestions.topNights ? `viaggi di ${suggestions.topNights} notti` : "weekend brevi"} · in base alle tue ricerche`
       : "In base alle tue ricerche passate";
 
+  // La fascia hero arriva fin sotto la status bar (env(safe-area-inset-top), niente
+  // fascia dello sfondo pagina visibile sopra su iOS) — per non stonare col cielo chiaro
+  // della foto, il theme-color della PWA (colore della status bar di sistema su Android)
+  // viene schiarito solo per la durata di questa schermata, e ripristinato all'uscita per
+  // non toccare le altre.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const previous = meta?.getAttribute("content");
+    meta?.setAttribute("content", "#C9CCC0");
+    return () => {
+      if (previous != null) meta?.setAttribute("content", previous);
+    };
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Hero con foto Islanda: altezza fissa, taglio netto senza angoli stondati nella
-          transizione — sotto riprende subito il solido COLORS.bg, così il resto della
-          pagina (card, testo scuro) resta completamente leggibile. */}
+      {/* Hero con foto Islanda: taglio netto verso il pannello sotto (niente angoli
+          stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
+          valore in px fisso, per sfruttare meglio lo schermo. */}
       <div
         style={{
-          height: 210,
+          height: `calc(${HERO_HEIGHT_VH}vh + env(safe-area-inset-top, 0px))`,
+          marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
           flexShrink: 0,
           backgroundImage: `url(${HERO_IMAGE_URL})`,
           backgroundSize: "cover",
-          backgroundPosition: "center 60%",
+          backgroundPosition: "center 55%",
         }}
       />
       <div
