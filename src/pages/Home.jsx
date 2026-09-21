@@ -20,11 +20,12 @@ import { formatRelativeTime } from "../lib/formatters";
 const HERO_IMAGE_URL =
   "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
 
-// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46 e ora
-// a 58 su richiesta esplicita dell'utente ("più lunga", poi "niente spazio vuoto sotto"):
-// con la card di ricerca ora dentro la foto (vetro smerigliato) e solo 3 card sotto, una
-// foto più alta lascia meno spazio vuoto nella sezione sotto su schermi comuni.
-const HERO_HEIGHT_VH = 58;
+// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46, poi
+// 58 e ora 66 su richiesta esplicita dell'utente ("allunga la foto", non "sposta le
+// card"): con la card di ricerca dentro la foto (vetro smerigliato) e solo 3 card sotto
+// (ancorate subito sotto, niente centraggio), una foto più alta lascia meno spazio vuoto
+// reale nella sezione sotto su schermi comuni, invece di limitarsi a ridistribuirlo.
+const HERO_HEIGHT_VH = 66;
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
@@ -238,20 +239,18 @@ export function Home() {
           </div>
         </div>
       </div>
-      {/* flex:1 + alignItems:"center": il vuoto sotto le 3 card non era un riempimento
-          "in più" da togliere (l'involucro di App.jsx forza comunque minHeight:100vh su
-          ogni pagina, identico a prima) — era semplicemente che foto+contenuto erano più
-          corti del viewport. Foto allungata (HERO_HEIGHT_VH) su richiesta esplicita, e qui
-          si centra il contenuto invece di tenerlo ancorato in alto: se resta comunque
-          dello spazio su schermi molto alti, si distribuisce sopra/sotto invece di
-          ammassarsi tutto in fondo. */}
+      {/* Il centraggio verticale (provato prima) staccava le card dalla foto lasciando
+          un vuoto SOPRA di loro invece che sotto — segnalato dall'utente, era peggio, non
+          meglio. Tornate ancorate in alto (subito sotto la foto, padding-top piccolo);
+          la foto stessa ora è allungata abbastanza (HERO_HEIGHT_VH) da lasciare poco
+          spazio vuoto sotto le card, invece di "nascondere" il problema centrandole. */}
       <div
         style={{
           flex: 1,
           background: COLORS.bg,
-          padding: "24px 20px 20px",
+          padding: "20px 20px 20px",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "center",
         }}
       >
