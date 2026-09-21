@@ -2,6 +2,26 @@
 
 Idee non ancora implementate, raccolte qui invece che perse in chat.
 
+## Link diretti one-way per le 8 compagnie aggiunte dopo (IN CORSO, interrotto)
+
+In `supabase/functions/verify-price/index.ts`, `buildAirlineDeepLink` (round-trip) copre
+FR/W6/W4/VY/V7/EW/BT/DE/QR/EY/PC/BA/IB, ma `buildAirlineOneWayDeepLink` (usato per i
+biglietti separati: "Aeroporto di ritorno diverso"/"Ripartenza flessibile"/scalo) copre
+SOLO FR/W6/W4/VY/V7 — le 8 aggiunte il 20/09 (EW/BT/DE/QR/EY/PC/BA/IB) non hanno la
+versione one-way, quindi quei casi ricadono ancora su Aviasales. Serve verificare dal
+vivo (mai indovinare) lo schema one-way di ciascuna, una alla volta:
+
+- [ ] Eurowings (EW) — verifica iniziata su eurowings.com, interrotta prima di completarla
+- [ ] Air Baltic (BT)
+- [ ] Condor (DE)
+- [ ] Qatar Airways (QR)
+- [ ] Etihad (EY)
+- [ ] Pegasus (PC)
+- [ ] British Airways (BA)
+- [ ] Iberia (IB)
+
+Riprendere da qui quando richiesto.
+
 ## Home: immagine di sfondo hero dinamica
 
 Oggi (21/09/2026) la foto hero di Home è fissa (Islanda, Landmannalaugar/valle glaciale).
