@@ -519,8 +519,16 @@ Deno.serve(async (req) => {
     // riferirsi a una combinazione voli diversa da quella effettivamente mostrata in pagina
     // (fonti scorrelate: prima si vedevano orari di un volo e il prezzo di un altro). Il v2
     // aggregato resta solo un fallback quando mancano entrambe le tratte one-way.
+    //
+    // Bug trovato dall'utente (Milano-Amburgo, 17€ "✓ verificato" ma in realtà cifra
+    // dell'andata da sola): se l'andata aveva un match esatto ma il RITORNO no,
+    // allLegs.length>0 restava vero (bastava una tratta sola) e il prezzo sommava/mostrava
+    // solo quella metà — spacciata per prezzo A/R confermato. Serve un match esatto su
+    // ENTRAMBE le direzioni prima di fidarsi della somma; altrimenti si ricade sull'aggregato
+    // v2 (o sul prezzo originale non confermato), mai su un totale parziale.
+    const bothDirectionsMatched = outboundLegs.length > 0 && inboundLegs.length > 0;
     const allLegs = [...outboundLegs, ...inboundLegs];
-    const price = allLegs.length > 0 ? allLegs.reduce((sum, l) => sum + l.price, 0) : match?.price ?? flight.price;
+    const price = bothDirectionsMatched ? allLegs.reduce((sum, l) => sum + l.price, 0) : match?.price ?? flight.price;
     // Un unico deep link round-trip ha senso solo per il caso semplice (1 tratta per
     // direzione, stessi aeroporti di andata/ritorno) — con uno scalo o un aeroporto
     // diverso sono biglietti separati, ognuno col proprio deepLink già su ogni leg.
@@ -529,7 +537,7 @@ Deno.serve(async (req) => {
     // fresca (somma tratte one-way o match v2 filtrati per età sopra) — se entrambi mancano
     // il prezzo è rimasto quello originale non ri-controllato (flight.price), il client non
     // deve mostrare "✓ verificato" in quel caso (era fuorviante prima di questo campo).
-    const confirmed = allLegs.length > 0 || Boolean(match);
+    const confirmed = bothDirectionsMatched || Boolean(match);
     const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg, inboundLeg) : null;
 
     // Solo per il box informativo (mai per prezzo/conferma/link, calcolati sopra e già
