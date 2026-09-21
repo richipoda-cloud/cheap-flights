@@ -43,6 +43,24 @@ function pickCheapestOnDate(options: any[], date: string) {
   return matches.sort((a, b) => a.price - b.price)[0] ?? null;
 }
 
+// Segnalato dall'utente: quando non c'è un match ESATTO per la data richiesta, il box
+// Andata/Ritorno mostrava solo "Orari e compagnia disponibili al passo di prenotazione" —
+// niente, anche se la stessa v3/prices_for_dates aveva risultati per un giorno vicino sulla
+// stessa rotta. Qui si sceglie il più vicino (a parità di scarto, il più economico) SOLO per
+// mostrarlo nel box informativo — mai per calcolare prezzo/conferma/link di prenotazione
+// (quelli restano legati alla data esatta richiesta, altrimenti si prenoterebbe un giorno
+// sbagliato senza saperlo). Il flag approxDate dice al client di segnalarlo onestamente.
+function pickClosestDate(options: any[], date: string) {
+  if (!options.length) return null;
+  const target = new Date(date).getTime();
+  const [best] = [...options].sort((a, b) => {
+    const diffA = Math.abs(new Date(a.date).getTime() - target);
+    const diffB = Math.abs(new Date(b.date).getTime() - target);
+    return diffA - diffB || a.price - b.price;
+  });
+  return { ...best, approxDate: true };
+}
+
 // "Aeroporto di ritorno diverso dalla partenza" deve restare un'alternativa comoda, non
 // un altro viaggio: 150km ≈ max 2 ore di auto/treno (Bergamo-Malpensa 77km entra,
 // Milano/Bergamo-Bologna 180-240km resta fuori, coerente con l'esempio esplicito
@@ -486,15 +504,56 @@ Deno.serve(async (req) => {
     const confirmed = allLegs.length > 0 || Boolean(match);
     const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg, inboundLeg) : null;
 
+    // Solo per il box informativo (mai per prezzo/conferma/link, calcolati sopra e già
+    // finiti): se manca un match esatto, si mostra il volo reale più vicino trovato in cache
+    // invece del placeholder "disponibile al passo di prenotazione". outboundOptions/
+    // inboundOptionsPerPair sopra sono già filtrati dalla API sulla data ESATTA (departureAt
+    // passato come YYYY-MM-DD) — se quel giorno preciso non ha nulla in cache l'array arriva
+    // vuoto, senza alternative "vicine" tra cui scegliere. Serve quindi una richiesta IN PIÙ,
+    // sullo stesso mese (YYYY-MM) invece del giorno esatto, e SOLO come fallback quando serve
+    // davvero (mai per i risultati che hanno già un match, per non moltiplicare le chiamate).
+    const outboundLegsForDisplay =
+      outboundLegsWithLinks.length > 0
+        ? outboundLegsWithLinks
+        : await (async () => {
+            const broader = await fetchOneWayPrices({
+              origin: flight.origin,
+              destination: flight.destination,
+              limit: 100,
+              departureAt: flight.departDate.slice(0, 7),
+            });
+            const p = pickClosestDate(broader, flight.departDate);
+            return p ? [p] : [];
+          })();
+    const inboundLegsForDisplay =
+      inboundLegsWithLinks.length > 0
+        ? inboundLegsWithLinks
+        : await (async () => {
+            const broaderPerPair = await Promise.all(
+              returnOrigins.flatMap((returnOrigin) =>
+                homeAirports.map((airport) =>
+                  fetchOneWayPrices({
+                    origin: returnOrigin,
+                    destination: airport,
+                    limit: 100,
+                    departureAt: flight.returnDate.slice(0, 7),
+                  })
+                )
+              )
+            );
+            const p = pickClosestDate(broaderPerPair.flat(), flight.returnDate);
+            return p ? [p] : [];
+          })();
+
     return new Response(
       JSON.stringify({
         price,
         confirmed,
         deepLink,
-        outboundLeg: outboundLegsWithLinks[0] ?? null,
-        inboundLeg: inboundLegsWithLinks[0] ?? null,
-        outboundLegs: outboundLegsWithLinks,
-        inboundLegs: inboundLegsWithLinks,
+        outboundLeg: outboundLegsForDisplay[0] ?? null,
+        inboundLeg: inboundLegsForDisplay[0] ?? null,
+        outboundLegs: outboundLegsForDisplay,
+        inboundLegs: inboundLegsForDisplay,
         returnsElsewhere,
         hasStop,
       }),

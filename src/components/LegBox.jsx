@@ -12,6 +12,9 @@ export function LegBox({ title, leg, route, date }) {
       <Card style={{ padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 8 }}>
           {title} · {leg.date}
+          {leg.approxDate && (
+            <span style={{ fontWeight: 400, fontStyle: "italic" }}> · data più vicina trovata, da confermare</span>
+          )}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ textAlign: "left" }}>
