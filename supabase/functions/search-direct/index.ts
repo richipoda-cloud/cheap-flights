@@ -38,9 +38,13 @@ Deno.serve(async (req) => {
     const filters = await req.json();
     const origins: string[] = filters.origins ?? [];
     const destination: string | null = filters.destination ?? null; // null = "Ovunque"
-    // Finestra sempre allargata oltre la richiesta utente, per non perdere il vero minimo
-    // (qui delegato alla cache Travelpayouts che copre già mesi futuri per "Sempre").
+    // "Date fisse" è un INTERVALLO di partenza (dateFrom..dateTo), non una singola data
+    // esatta — bug segnalato dall'utente: con "Dal" 2 novembre "Al" 30 novembre restavano
+    // zero risultati perché prima si controllava solo "Dal" (vedi dateFiltered sotto),
+    // ignorando "Al" del tutto: bastava che il 2 novembre esatto non avesse nulla in
+    // cache anche se il resto di novembre sì.
     const dateFrom = filters.dateMode === "fixed" ? filters.dateFrom : null;
+    const dateTo = filters.dateMode === "fixed" ? filters.dateTo : null;
 
     const perOrigin = await Promise.all(
       origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom, limit: FETCH_LIMIT }))
@@ -51,13 +55,13 @@ Deno.serve(async (req) => {
     const fresh = filterByFreshness(merged);
     const withoutExcluded = filterByExcludedCountries(fresh, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
-    // Bug segnalato dall'utente ("con date fisse non funziona"): dateFrom veniva passato
-    // solo come "beginning_of_period" (period_type=month) per restringere la CACHE da
-    // scaricare, ma il risultato finale non veniva mai ricontrollato contro la data esatta
-    // scelta — passavano voli di un giorno qualunque dello stesso mese, purché con la
-    // durata del soggiorno giusta. Con "Date fisse" attivo si tiene solo chi parte esattamente
-    // il giorno scelto (il ritorno resta filtrato dalla durata soggiorno, come sempre).
-    const dateFiltered = dateFrom ? filtered.filter((r) => r.departDate === dateFrom) : filtered;
+    // Con "Date fisse" attivo si tiene chi parte in QUALUNQUE giorno tra dateFrom e
+    // dateTo inclusi (il ritorno resta filtrato dalla durata soggiorno, come sempre) —
+    // non solo chi parte esattamente il primo giorno (vedi commento sopra).
+    const dateFiltered =
+      dateFrom && dateTo
+        ? filtered.filter((r) => r.departDate >= dateFrom && r.departDate <= dateTo)
+        : filtered;
     const results = dateFiltered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
 
     return new Response(JSON.stringify({ results }), {

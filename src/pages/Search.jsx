@@ -344,26 +344,24 @@ export function Search() {
 
   const [originError, setOriginError] = useState(null);
 
-  // Passando a "Date fisse" il campo "da" non deve apparire vuoto: default oggi.
-  // Il campo "a" resta derivato dalla durata soggiorno (vedi effect sotto) — così
-  // segue lo slider anche se lo si cambia DOPO aver già scelto le date fisse.
+  // "Date fisse" = intervallo di partenza in cui cercare (non una singola data esatta:
+  // bug segnalato dall'utente — con "Dal" 2 novembre e "Al" 30 novembre restavano zero
+  // risultati perché il server controllava solo "Dal", ignorando "Al" del tutto, quindi
+  // bastava che il 2 novembre esatto non avesse nulla in cache). "Dal" default a oggi,
+  // "Al" default a +30 giorni: un mese di finestra ragionevole, l'utente può restringerlo
+  // o allargarlo. Prima "Al" veniva ricalcolato automaticamente come "Dal" + durata minima
+  // del soggiorno — sembrava un intervallo di ricerca ma era solo la data di ritorno di
+  // UN singolo viaggio, fuorviante con due campi data senza etichetta.
   const handleDateModeChange = (mode) => {
     setDateMode(mode);
     if (mode === "fixed" && !dateFrom) {
-      setDateFrom(new Date().toISOString().slice(0, 10));
+      const today = new Date();
+      const plus30 = new Date();
+      plus30.setDate(plus30.getDate() + 30);
+      setDateFrom(today.toISOString().slice(0, 10));
+      setDateTo(plus30.toISOString().slice(0, 10));
     }
   };
-
-  // Tiene "a" sempre allineato a "da" + durata soggiorno minima corrente, invece di
-  // calcolarlo una sola volta al momento dello switch (bug: restava fisso anche
-  // spostando poi lo slider della durata).
-  useEffect(() => {
-    if (dateMode !== "fixed" || !dateFrom) return;
-    const to = new Date(dateFrom + "T00:00:00");
-    to.setDate(to.getDate() + daysMin);
-    setDateTo(to.toISOString().slice(0, 10));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateMode, dateFrom, daysMin]);
 
   const addOrigin = () => {
     const code = resolveCityCode(originInput);
@@ -635,8 +633,14 @@ export function Search() {
         />
         {dateMode === "fixed" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 4 }}>Dal</div>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 4 }}>Al</div>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
+            </div>
           </div>
         )}
       </Section>
