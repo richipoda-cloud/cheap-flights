@@ -20,13 +20,6 @@ import { formatRelativeTime } from "../lib/formatters";
 const HERO_IMAGE_URL =
   "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
 
-// Altezza della fascia hero in quota di viewport (non px fisso) — alzata da 34 a 46, poi
-// 58 e ora 66 su richiesta esplicita dell'utente ("allunga la foto", non "sposta le
-// card"): con la card di ricerca dentro la foto (vetro smerigliato) e solo 3 card sotto
-// (ancorate subito sotto, niente centraggio), una foto più alta lascia meno spazio vuoto
-// reale nella sezione sotto su schermi comuni, invece di limitarsi a ridistribuirlo.
-const HERO_HEIGHT_VH = 66;
-
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
 // Cerca voli al posto del testo generico, solo se l'utente ha già cercato qualcosa.
@@ -203,24 +196,23 @@ export function Home() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Hero con foto Islanda estesa dietro TUTTO il contenuto — non solo saluto+ricerca,
-          ma anche Preferiti/Storico/Suggeriti (confermato esplicitamente dall'utente).
-          HERO_HEIGHT_VH resta la base (stessa cronologia 34→46→58→66) più uno spazio
-          fisso aggiuntivo per le tre card in più: se cambia il testo di una card il resto
-          scorre comunque dentro all'area già allungata a sufficienza, invece di stimare
-          un valore unico che si scombina a ogni modifica. */}
-      <div style={{ position: "relative", flexShrink: 0 }}>
-        <div
-          ref={heroRef}
-          style={{
-            height: `calc(${HERO_HEIGHT_VH}vh + 254px + env(safe-area-inset-top, 0px))`,
-            marginTop: "calc(-1 * env(safe-area-inset-top, 0px))",
-            backgroundImage: `url(${HERO_IMAGE_URL})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center 62%",
-          }}
-        />
+    // Segnalato dall'utente: "Suggeriti per te" restava tagliato in fondo, voleva tutto
+    // in una schermata sola senza scorrere. Prima l'altezza dell'hero era stimata (vh +
+    // px fissi) e poteva superare lo schermo reale su telefoni più bassi. Ora la pagina è
+    // bloccata a height:100vh + overflow:hidden (niente scroll possibile) e la foto è uno
+    // sfondo assoluto che riempie ESATTAMENTE quello spazio — le card sono ancorate in
+    // fondo dentro lo stesso contenitore, quindi non possono mai uscire dallo schermo.
+    <div style={{ height: "100vh", overflow: "hidden", position: "relative" }}>
+      <div
+        ref={heroRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: `url(${HERO_IMAGE_URL})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 62%",
+        }}
+      />
         {/* Sfumatura scura in alto (per il saluto) e su gran parte del resto (per la card
             Cerca voli, ancora in vetro): senza, testo e card in bianco/vetro si
             leggerebbero male su un cielo chiaro come questo. Le tre card sotto sono
@@ -294,7 +286,16 @@ export function Home() {
             ancorato in fondo alla foto (non più solo la card di ricerca) — le tre card
             in più stanno ora sopra la foto invece che in un pannello bianco separato,
             confermato esplicitamente dall'utente. */}
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
           <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
             <SearchCard
               onClick={() => navigate("/search")}
@@ -323,10 +324,6 @@ export function Home() {
             <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
           </div>
         </div>
-      </div>
-      {/* Riempie l'eventuale spazio restante sotto (schermi molto alti): stesso colore
-          del pannello a cui la foto si dissolve sopra, così non si nota giunzione. */}
-      <div style={{ flex: 1, background: COLORS.bg }} />
     </div>
   );
 }
