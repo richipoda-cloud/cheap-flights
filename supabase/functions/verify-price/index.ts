@@ -20,7 +20,7 @@
 // due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_shared/travelpayouts.ts";
-import { fetchOneWayPrices, fetchRoundTripOffers } from "../_shared/oneway.ts";
+import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
 import airportCityMap from "../_shared/airportCityMap.json" with { type: "json" };
@@ -174,30 +174,25 @@ async function cheapestConnection(origin: string, destination: string, date: str
   return valid.sort((a, b) => a.total - b.total)[0] ?? null;
 }
 
-const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
-
-function buildDeepLink(flight: any) {
-  const fmt = (d: string) => {
-    const date = new Date(d);
-    return `${String(date.getDate()).padStart(2, "0")}${String(date.getMonth() + 1).padStart(2, "0")}`;
-  };
-  const origin = flight.origin ?? "";
-  const destination = flight.destination ?? "";
-  if (!origin || !destination || !flight.departDate || !flight.returnDate) return null;
-  const path = `${origin}${fmt(flight.departDate)}${destination}${fmt(flight.returnDate)}1`;
-  return `https://www.aviasales.com/search/${path}?marker=${MARKER}`;
-}
-
-// ESPERIMENTO (esito incerto, richiesto esplicitamente dall'utente dopo aver verificato
-// che nessun link Travelpayouts salta la pagina di confronto Aviasales): il link "ricco"
-// di v3 one_way=false porta una firma del volo (t=) ed expected_price_uuid/currency che
-// la documentazione descrive come pensati per evidenziare quella specifica offerta — MAI
-// verificato se Aviasales lo usa davvero. Se non troviamo un match esatto per quelle date
-// si ricade sul link generico di sempre (comportamento identico a prima, nessun regresso).
-function buildRichDeepLink(link: string | null) {
-  if (!link) return null;
-  const sep = link.includes("?") ? "&" : "?";
-  return `https://www.aviasales.com${link}${sep}marker=${MARKER}`;
+// Aviasales tolto del tutto come fallback finale — richiesto esplicitamente e ripetutamente
+// dall'utente ("non voglio che apra aviasales", segnalato di nuovo il 21/09/2026 su SAS e
+// FLYONE Armenia, compagnie che ovviamente non possiamo coprire una per una a mano: centinaia
+// di codici in airlines.json). Al posto del link Aviasales generico/ricco di prima, quando
+// non conosciamo uno schema diretto NÉ una homepage per la compagnia, si usa Google Flights —
+// verificato dal vivo il 21/09/2026 (MXP-OSL andata/ritorno E sola andata, risultati reali,
+// prezzi reali, include anche le stesse compagnie che Aviasales avrebbe mostrato) — non è il
+// sito della compagnia ma è un comparatore reale e verificato, mai Aviasales.
+function buildGoogleFlightsLink(
+  origin: string | null | undefined,
+  destination: string | null | undefined,
+  departDate: string | null | undefined,
+  returnDate: string | null | undefined
+): string | null {
+  if (!origin || !destination || !departDate) return null;
+  const query = returnDate
+    ? `Flights from ${origin} to ${destination} on ${departDate} through ${returnDate}`
+    : `One way flights from ${origin} to ${destination} on ${departDate}`;
+  return `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}`;
 }
 
 // Link diretti al sito/app della compagnia aerea (non più Aviasales). Verificati dal vivo:
@@ -409,20 +404,27 @@ const HOMEPAGE_FALLBACK: Record<string, string> = {
   // homepage ufficiale — segnalato esplicitamente dall'utente ("non voglio che apra
   // aviasales"). URL verificato dal vivo oggi stesso durante i test one-way.
   IB: "https://www.iberia.com/it/",
+  // Aggiunte il 21/09/2026 dopo essere comparse in una ricerca reale (Oslo/Yerevan) ancora
+  // su Aviasales — dominio confermato dal vivo (flysas.com mostra una verifica anti-bot
+  // Cloudflare, MAI completata da me, solo confermato che il dominio è quello giusto).
+  SK: "https://www.flysas.com/it/", // SAS Scandinavian Airlines
+  "3F": "https://www.flyone.eu/am/", // FLYONE Armenia
 };
 
 // Il bug segnalato dall'utente era qui: nei casi a biglietti separati (returnsElsewhere/
 // hasStop) il client usa leg.deepLink di OGNI singola tratta, MAI passato dal link
 // compagnia-diretta di ieri (che copriva solo il caso "biglietto unico" sopra) — restava
 // sempre il link Aviasales costruito in mapOneWayResult (oneway.ts). Si sovrascrive qui,
-// con la homepage ufficiale se la compagnia è nota ma senza deep link, altrimenti fallback
-// al link Aviasales della tratta.
+// con la homepage ufficiale se la compagnia è nota ma senza deep link, altrimenti Google
+// Flights per quella singola tratta (mai più Aviasales, vedi buildGoogleFlightsLink sopra).
 function withAirlineDeepLink(leg: any) {
   if (!leg) return leg;
   const airlineLink = buildAirlineOneWayDeepLink(leg.airline, leg.originAirport, leg.destinationAirport, leg.date);
   if (airlineLink) return { ...leg, deepLink: airlineLink };
   const homepage = leg.airline ? HOMEPAGE_FALLBACK[leg.airline] : null;
-  return homepage ? { ...leg, deepLink: homepage } : leg;
+  if (homepage) return { ...leg, deepLink: homepage };
+  const googleLink = buildGoogleFlightsLink(leg.originAirport, leg.destinationAirport, leg.date, null);
+  return googleLink ? { ...leg, deepLink: googleLink } : leg;
 }
 
 async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundLeg: any) {
@@ -452,17 +454,10 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundL
   const homepage = HOMEPAGE_FALLBACK[outboundLeg?.airline] ?? HOMEPAGE_FALLBACK[inboundLeg?.airline] ?? null;
   if (homepage) return homepage;
 
-  const roundTripOffers = await fetchRoundTripOffers({
-    origin: flight.origin,
-    destination: flight.destination,
-    departureAt: flight.departDate,
-    returnAt: flight.returnDate,
-    limit: 30,
-  });
-  const exactMatch = roundTripOffers
-    .filter((o) => o.departDate === flight.departDate && o.returnDate === flight.returnDate && o.link)
-    .sort((a, b) => a.price - b.price)[0];
-  return exactMatch ? buildRichDeepLink(exactMatch.link) : buildDeepLink(flight);
+  // Ultima spiaggia: Google Flights, mai più Aviasales (vedi buildGoogleFlightsLink sopra).
+  // Prima qui si tentava un link "ricco" Aviasales via fetchRoundTripOffers — rimosso insieme
+  // ad Aviasales stesso, non serve più cercare un'offerta specifica da un sito che non usiamo.
+  return buildGoogleFlightsLink(flight.origin, flight.destination, flight.departDate, flight.returnDate);
 }
 
 Deno.serve(async (req) => {
@@ -601,12 +596,16 @@ Deno.serve(async (req) => {
     // tra cui scegliere. fetchBroaderOneWayLeg riprova sul mese e, se ancora vuoto, sul mese
     // successivo (scoperto dal vivo: alcune rotte hanno cache solo in una direzione/mese) —
     // SOLO come fallback quando serve davvero, mai sui risultati che hanno già un match.
+    // withAirlineDeepLink applicato anche qui (non solo alle tratte con match esatto sopra):
+    // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
+    // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
+    // direttamente — segnalato dall'utente, incoerente col resto.
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
         ? outboundLegsWithLinks
         : await (async () => {
             const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
-            return p ? [p] : [];
+            return p ? [withAirlineDeepLink(p)] : [];
           })();
     const inboundLegsForDisplay =
       inboundLegsWithLinks.length > 0
@@ -619,7 +618,7 @@ Deno.serve(async (req) => {
             );
             const candidates = broaderPerPair.filter((p): p is any => p !== null);
             const p = pickClosestDate(candidates, flight.returnDate);
-            return p ? [p] : [];
+            return p ? [withAirlineDeepLink(p)] : [];
           })();
 
     return new Response(
