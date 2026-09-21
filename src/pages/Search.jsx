@@ -20,12 +20,60 @@ import airports from "../data/airports.json";
 // opzioni distinte, invece di un'unica voce generica per tutta la città. "Bergamo" resta
 // aggiunto a parte perché il nome ufficiale dello scalo ("Orio al Serio International
 // Airport") non contiene affatto la parola "Bergamo".
-const ORIGIN_SUGGESTIONS = [...new Set([...airports.map((a) => a.name), "Bergamo"])];
+//
+// "(CODICE)" alla fine di ogni etichetta — segnalato dall'utente: scrivendo direttamente
+// la sigla (es. "BGY") non usciva alcun suggerimento, perché il filtro cerca solo dentro
+// il testo mostrato e quel testo era solo il nome esteso. cityNames.js riconosce anche
+// questo stesso formato "Nome (CODICE)" per la risoluzione, non solo il nome da solo.
+const ORIGIN_SUGGESTIONS = [
+  ...new Set([...airports.map((a) => `${a.name} (${a.code})`), "Bergamo"]),
+];
 
-// Stessi suggerimenti di Partenza più i 237 nomi paese ufficiali — usati sia da
-// "Destinazione fissa" (città O paese) sia da "Escludi paesi" (solo paesi, ma un elenco
-// unico evita di mantenerne due praticamente identici).
-const COUNTRY_SUGGESTIONS = countryCodes.map((code) => countryName(code));
+// Nomi comuni/informali che non sono il nome ufficiale ISO restituito da Intl.DisplayNames
+// (es. "Regno Unito" non "Inghilterra") — segnalato dall'utente: il menu a tendina non
+// suggeriva nulla digitando "ingh" perché il suggerimento conteneva solo "Regno Unito",
+// non il sinonimo. Verificati dal vivo i nomi ufficiali italiani restituiti da
+// Intl.DisplayNames per ogni codice sotto (node -e con Intl.DisplayNames(["it"])) prima di
+// scegliere quali sinonimi servissero davvero — es. "Birmania" NON serve come sinonimo a
+// parte, l'ufficiale è già "Myanmar (Birmania)" quindi il sostring "birmania" funziona da
+// solo. Lista curata dei casi più frequenti, non di ogni possibile nickname/regione di
+// ognuno dei 237 paesi ISO (non generalizzabile).
+const COUNTRY_NICKNAMES = {
+  inghilterra: "GB",
+  scozia: "GB",
+  galles: "GB",
+  "gran bretagna": "GB",
+  uk: "GB",
+  olanda: "NL", // ufficiale "Paesi Bassi"
+  "repubblica ceca": "CZ", // ufficiale (attuale) "Cechia"
+  usa: "US",
+  america: "US",
+  "stati uniti d'america": "US",
+  "emirati arabi": "AE",
+  dubai: "AE",
+  uae: "AE",
+  macedonia: "MK", // ufficiale "Macedonia del Nord"
+  swaziland: "SZ", // ufficiale (attuale) "Eswatini"
+  "timor leste": "TL", // ufficiale "Timor Est"
+  vaticano: "VA",
+  "santa sede": "VA",
+  belarus: "BY", // ufficiale "Bielorussia"
+  zaire: "CD",
+  rdc: "CD",
+  "congo kinshasa": "CD",
+  "congo brazzaville": "CG",
+  persia: "IR",
+  ceylon: "LK",
+};
+// Etichette leggibili ("repubblica ceca" -> "Repubblica Ceca") aggiunte ai suggerimenti
+// stessi, non solo alla risoluzione finale — altrimenti il sinonimo funzionava solo se
+// scritto per intero e confermato, mai mentre si digita (il bug segnalato).
+const COUNTRY_NICKNAME_LABELS = Object.keys(COUNTRY_NICKNAMES).map((k) => k.replace(/\b\w/g, (c) => c.toUpperCase()));
+
+// Stessi suggerimenti di Partenza più i 237 nomi paese ufficiali (+ sinonimi sopra) — usati
+// sia da "Destinazione fissa" (città O paese) sia da "Escludi paesi" (solo paesi, ma un
+// elenco unico evita di mantenerne due praticamente identici).
+const COUNTRY_SUGGESTIONS = [...new Set([...countryCodes.map((code) => countryName(code)), ...COUNTRY_NICKNAME_LABELS])];
 const DESTINATION_SUGGESTIONS = [...new Set([...ORIGIN_SUGGESTIONS, ...COUNTRY_SUGGESTIONS])];
 
 function Section({ label, action, children }) {
@@ -219,23 +267,6 @@ const CODE_SET = new Set(countryCodes.map((c) => c.toLowerCase()));
 // Nomi comuni/informali che non sono il nome ufficiale ISO restituito da Intl.DisplayNames
 // (es. "Regno Unito" non "Inghilterra") — lista curata dei casi più frequenti, non di
 // ogni possibile nickname/regione di ogni paese (non generalizzabile ai 237 paesi ISO).
-const COUNTRY_NICKNAMES = {
-  inghilterra: "GB",
-  scozia: "GB",
-  galles: "GB",
-  "gran bretagna": "GB",
-  olanda: "NL",
-  "repubblica ceca": "CZ",
-  "stati uniti d'america": "US",
-  usa: "US",
-  america: "US",
-  "emirati arabi": "AE",
-  dubai: "AE",
-  "corea del sud": "KR",
-  "corea del nord": "KP",
-  birmania: "MM",
-};
-
 function resolveCountryCode(input) {
   const q = input.trim().toLowerCase();
   if (!q) return null;

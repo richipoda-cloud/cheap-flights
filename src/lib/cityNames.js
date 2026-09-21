@@ -36,8 +36,24 @@ export function cityName(code) {
 // risultati. Costruita sui nomi ufficiali di TUTTI i 9269 aeroporti (non solo una manciata
 // curata): scrivendo il nome esatto suggerito dall'autocomplete ("Milano Malpensa
 // Airport") si risolve sempre al codice giusto, per qualunque aeroporto del dataset.
-const CODE_BY_AIRPORT_NAME = Object.fromEntries(airports.map((a) => [a.name.toLowerCase(), a.code]));
-const CODE_BY_CITY_NAME = Object.fromEntries(cities.map((c) => [c.name.toLowerCase(), c.code]));
+//
+// Ogni voce anche nel formato "Nome (CODICE)" — segnalato dall'utente: scrivendo
+// direttamente la sigla (es. "BGY") l'autocomplete non suggeriva nulla, perché il testo
+// del suggerimento era solo il nome esteso, mai la sigla. I suggerimenti in Search.jsx
+// ora mostrano "Nome (CODICE)" per farla comparire/cercare, quindi la risoluzione deve
+// riconoscere anche quel formato esatto, non solo il nome da solo.
+const CODE_BY_AIRPORT_NAME = Object.fromEntries(
+  airports.flatMap((a) => [
+    [a.name.toLowerCase(), a.code],
+    [`${a.name} (${a.code})`.toLowerCase(), a.code],
+  ])
+);
+const CODE_BY_CITY_NAME = Object.fromEntries(
+  cities.flatMap((c) => [
+    [c.name.toLowerCase(), c.code],
+    [`${c.name} (${c.code})`.toLowerCase(), c.code],
+  ])
+);
 
 // Alias informali per chi digita un nome corto invece del nome ufficiale completo
 // dell'aeroporto (es. "Malpensa" invece di "Milano Malpensa Airport") o un nome comune

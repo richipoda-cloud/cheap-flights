@@ -53,6 +53,18 @@ export function TabBar() {
           // elemento SVG produce un ritaglio errato del contenuto (bug noto), causa
           // sospetta del cerchio Home tagliato in alto segnalato su dispositivo reale.
           filter: "drop-shadow(0 4px 18px rgba(33,30,43,0.16))",
+          // Segnalato dall'utente: col bottone "Trova il più economico" fisso (Altri
+          // filtri aperto), diventava impossibile cliccarlo — bastava riaprire la
+          // schermata per farlo funzionare di nuovo. Causa reale: questo div è alto 96px
+          // per contenere il cerchio Home che sporge, ma un <div> normale intercetta i
+          // click su TUTTO il suo rettangolo, anche dove non c'è nulla disegnato — quei
+          // 96px si sovrapponevano per gran parte all'area del bottone sopra (verificato
+          // dal vivo con elementFromPoint: il centro del bottone risultava DENTRO l'SVG
+          // decorativo della tab bar). pointerEvents:none qui, riattivato sui singoli
+          // bottoni sotto: solo le icone/il cerchio restano cliccabili, il resto del
+          // rettangolo (compresa la parte che ora si sovrappone al bottone sopra) lascia
+          // passare il click a quello che c'è davvero sotto.
+          pointerEvents: "none",
         }}
     >
       <svg
@@ -116,6 +128,7 @@ export function TabBar() {
               padding: 0,
               WebkitTapHighlightColor: "transparent",
               outline: "none",
+              pointerEvents: "auto",
             }}
           >
             <item.icon size={17} color={isActive ? COLORS.accent : COLORS.inkSoft} strokeWidth={isActive ? 2.4 : 2} />
@@ -155,6 +168,7 @@ export function TabBar() {
           padding: 0,
           WebkitTapHighlightColor: "transparent",
           outline: "none",
+          pointerEvents: "auto",
         }}
       >
         <House size={19} color="#fff" strokeWidth={2.4} />
