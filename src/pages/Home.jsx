@@ -207,8 +207,19 @@ export function Home() {
             backgroundPosition: "center 55%",
           }}
         />
-        {/* Sfumatura scura solo in basso sulla foto: senza, saluto e card in bianco/vetro
-            si leggerebbero male su un cielo chiaro come questo. */}
+        {/* Sfumatura scura in alto (per il saluto) e in basso (per la card): senza, testo
+            e card in bianco/vetro si leggerebbero male su un cielo chiaro come questo. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: "35%",
+            background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)",
+            pointerEvents: "none",
+          }}
+        />
         <div
           style={{
             position: "absolute",
@@ -220,16 +231,31 @@ export function Home() {
             pointerEvents: "none",
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 28, color: "#FFFFFF", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
-                Ciao 👋
-              </div>
-              <div style={{ fontSize: 16, color: "rgba(255,255,255,0.9)", marginTop: 2, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
-                Dove ti va di andare?
-              </div>
+        {/* Saluto portato in cima alla foto (non più sopra la card in fondo), richiesto
+            esplicitamente dall'utente — padding-top con la safe-area cosicché non finisca
+            sotto la status bar/dynamic island quando l'app è installata in Home. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 28px)",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
+            <div style={{ fontWeight: 600, fontSize: 28, color: "#FFFFFF", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+              Ciao 👋
             </div>
+            <div style={{ fontSize: 16, color: "rgba(255,255,255,0.9)", marginTop: 2, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+              Dove ti va di andare?
+            </div>
+          </div>
+        </div>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center" }}>
+          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
             <SearchCard
               onClick={() => navigate("/search")}
               subtitle={lastSearchSubtitle}
