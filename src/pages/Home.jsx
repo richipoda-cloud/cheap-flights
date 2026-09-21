@@ -20,6 +20,16 @@ import { formatRelativeTime } from "../lib/formatters";
 const HERO_IMAGE_URL =
   "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
 
+// Colore reale del bordo inferiore della foto (campionato via canvas sul crop effettivo
+// "cover" a proporzioni da telefono, non a occhio — stesso metodo già usato per il
+// #73A8D9 del cielo in cima). Segnalato dall'utente: la foto finiva in una sfumatura
+// scura poi dissolta in COLORS.bg (verdino chiaro, "#DBE4CC") — un verde estraneo alla
+// foto che la faceva sembrare tagliata di netto invece di "completa". Questo è invece il
+// tono muschioso vero del fondo dell'immagine: usato sia per la dissolvenza qui sotto sia
+// come background_color del manifest (vedi public/manifest.json), cosi' la foto prosegue
+// visivamente anche nella schermata di avvio dell'app installata, non solo nel browser.
+const HERO_BOTTOM_COLOR = "#4E5541";
+
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
 // Cerca voli al posto del testo generico, solo se l'utente ha già cercato qualcosa.
@@ -219,19 +229,18 @@ export function Home() {
           backgroundPosition: "center 62%",
         }}
       />
-        {/* Sfumatura scura in alto (per il saluto) e su gran parte del resto (per la card
-            Cerca voli, ancora in vetro): senza, testo e card in bianco/vetro si
-            leggerebbero male su un cielo chiaro come questo. Le tre card sotto sono
-            OPACHE (vedi SmallCard) quindi non hanno bisogno di questo scurimento per
-            restare leggibili — l'oscuramento serve solo a Cerca voli/saluto sopra. */}
+        {/* Sfumature scure alleggerite — segnalato dall'utente: coprivano troppo la
+            foto ("non troppo coperta"). Restano solo dove serve davvero leggibilità
+            (saluto in cima, card Cerca voli in vetro in fondo), molto più strette e
+            meno opache di prima: gran parte della foto ora resta scoperta e visibile. */}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
             top: 0,
-            height: "22%",
-            background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)",
+            height: "16%",
+            background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 100%)",
             pointerEvents: "none",
           }}
         />
@@ -240,23 +249,25 @@ export function Home() {
             position: "absolute",
             left: 0,
             right: 0,
-            top: "28%",
+            top: "52%",
             bottom: 0,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.6) 100%)",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.42) 60%, rgba(0,0,0,0.46) 100%)",
             pointerEvents: "none",
           }}
         />
-        {/* Solo nell'ultimo lembo, corto, la foto si dissolve nel colore del pannello
-            sotto (COLORS.bg) invece di finire di netto — una dissolvenza estesa su gran
-            parte della foto verrebbe fuori come una macchia slavata sulle montagne. */}
+        {/* La foto si dissolve nel suo stesso tono di fondo reale (HERO_BOTTOM_COLOR),
+            non più nel verdino della pagina (COLORS.bg) — stesso principio del trucco
+            del colore in cima (theme-color sul cielo campionato): un colore preso dalla
+            foto stessa, cosi' il taglio in fondo sembra una continuazione naturale
+            invece che un bordo estraneo. */}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
             bottom: 0,
-            height: 46,
-            background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${COLORS.bg} 100%)`,
+            height: 64,
+            background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${HERO_BOTTOM_COLOR} 100%)`,
             pointerEvents: "none",
           }}
         />
