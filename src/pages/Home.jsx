@@ -255,7 +255,7 @@ export function Home() {
                 whiteSpace: "nowrap",
               }}
             >
-              Ciao 👋 Dove ti va di andare?
+              ✈️ Dove ti va di andare?
             </div>
           </div>
         </div>
