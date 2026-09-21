@@ -22,6 +22,12 @@ import airports from "../data/airports.json";
 // Airport") non contiene affatto la parola "Bergamo".
 const ORIGIN_SUGGESTIONS = [...new Set([...airports.map((a) => a.name), "Bergamo"])];
 
+// Stessi suggerimenti di Partenza più i 237 nomi paese ufficiali — usati sia da
+// "Destinazione fissa" (città O paese) sia da "Escludi paesi" (solo paesi, ma un elenco
+// unico evita di mantenerne due praticamente identici).
+const COUNTRY_SUGGESTIONS = countryCodes.map((code) => countryName(code));
+const DESTINATION_SUGGESTIONS = [...new Set([...ORIGIN_SUGGESTIONS, ...COUNTRY_SUGGESTIONS])];
+
 function Section({ label, action, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -88,7 +94,7 @@ function ChoicePills({ options, value, onChange }) {
 // Suggerimenti custom invece del <datalist> nativo: con ~9600 opzioni il datalist di
 // sistema è inaffidabile (non compare affatto su alcuni browser mobile, altrove tronca
 // silenziosamente la lista) — qui filtriamo e mostriamo noi il menu, sotto controllo.
-function Autocomplete({ value, onChange, onPick, onKeyDown, suggestions, placeholder, style, autoFocus }) {
+function Autocomplete({ value, onChange, onPick, onKeyDown, suggestions, placeholder, style, autoFocus, disabled }) {
   const [open, setOpen] = useState(false);
   const query = value.trim().toLowerCase();
   const matches = query.length > 0 ? suggestions.filter((s) => s.toLowerCase().includes(query)).slice(0, 8) : [];
@@ -107,6 +113,7 @@ function Autocomplete({ value, onChange, onPick, onKeyDown, suggestions, placeho
         placeholder={placeholder}
         style={{ ...style, width: "100%" }}
         autoFocus={autoFocus}
+        disabled={disabled}
       />
       {open && matches.length > 0 && (
         <div
@@ -237,6 +244,15 @@ function resolveCountryCode(input) {
   return NAME_TO_CODE[q] ?? null;
 }
 
+// Destinazione fissa accetta sia una città (per rotta esatta) sia un paese intero (l'API
+// accetta entrambi come "destination") — prova PRIMA il paese: resolveCityCode ha un
+// fallback "qualunque testo di 3 lettere è già un codice aeroporto valido" che altrimenti
+// scambierebbe per errore un codice paese di 3 lettere (es. "USA") per un aeroporto
+// inesistente, prima ancora di provare a riconoscerlo come paese.
+function resolveDestinationCode(input) {
+  return resolveCountryCode(input) ?? resolveCityCode(input);
+}
+
 // Filtri "sticky" nel browser: restano quelli dell'ultima ricerca finché non si preme
 // "Azzera filtri", anche navigando via e tornando su Cerca voli (a differenza di
 // Escludi paesi, che è legato all'account su Supabase, questo è solo locale).
@@ -280,6 +296,8 @@ export function Search() {
   const [originInput, setOriginInput] = useState("");
   const [addingOrigin, setAddingOrigin] = useState(false); // mostra il campo per aggiungerne altre dopo la prima
   const [destination, setDestination] = useState(() => loadPersistedFilters().destination);
+  const [destinationInput, setDestinationInput] = useState("");
+  const [destinationError, setDestinationError] = useState(null);
   const [dateMode, setDateMode] = useState(() => loadPersistedFilters().dateMode);
   const [dateFrom, setDateFrom] = useState(() => loadPersistedFilters().dateFrom);
   const [dateTo, setDateTo] = useState(() => loadPersistedFilters().dateTo);
@@ -361,6 +379,26 @@ export function Search() {
 
   const removeOrigin = (code) => setOrigins(origins.filter((o) => o !== code));
 
+  // "Destinazione fissa" usa "" come sentinella per "modalità scelta, codice non ancora
+  // confermato" (distinto da undefined = nessuna modalità scelta e null = Ovunque) — stessa
+  // idea di origins/addOrigin, ma con un solo valore invece di una lista.
+  const confirmDestination = () => {
+    const code = resolveDestinationCode(destinationInput);
+    if (!code) {
+      setDestinationError(`"${destinationInput}" non riconosciuto — scrivi una città, un codice IATA o un paese`);
+      return;
+    }
+    setDestination(code);
+    setDestinationInput("");
+    setDestinationError(null);
+  };
+
+  const clearDestinationChoice = () => {
+    setDestination("");
+    setDestinationInput("");
+    setDestinationError(null);
+  };
+
   // Guardia anti-race: se l'elenco paesi esclusi non ha ancora finito di caricare dal
   // server, aggiungerne uno adesso scriverebbe [nuovo] sopra il valore vero non ancora
   // arrivato, cancellando di fatto quelli salvati in precedenza (bug: "spariscono").
@@ -383,6 +421,8 @@ export function Search() {
     setOriginInput("");
     setAddingOrigin(false);
     setDestination(undefined);
+    setDestinationInput("");
+    setDestinationError(null);
     setDateMode(undefined);
     setDateFrom("");
     setDateTo("");
@@ -523,19 +563,52 @@ export function Search() {
           value={destination}
           onChange={(value) => {
             setDestination(value);
+            setDestinationInput("");
+            setDestinationError(null);
             // "Ripartenza flessibile" ha senso solo con una destinazione precisa (serve
             // per trovare aeroporti vicini a QUELLA destinazione) — passando a Ovunque
             // il toggle sparisce dall'interfaccia, e va anche spento qui sotto.
             if (value === null) setFlexDeparture(false);
           }}
         />
-        {destination !== undefined && destination !== null && (
-          <input
-            value={destination}
-            onChange={(e) => setDestination(e.target.value.toUpperCase())}
-            placeholder="Codice IATA città o paese"
-            style={{ ...inputStyle, width: "100%", marginTop: 8 }}
-          />
+        {destination === "" && (
+          <>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <Autocomplete
+                value={destinationInput}
+                onChange={(v) => {
+                  setDestinationInput(v);
+                  setDestinationError(null);
+                }}
+                onPick={(name) => setDestinationInput(name)}
+                onKeyDown={(e) => e.key === "Enter" && confirmDestination()}
+                suggestions={DESTINATION_SUGGESTIONS}
+                placeholder="Città, codice IATA o paese (es. Barcellona, Francia)"
+                style={inputStyle}
+                autoFocus
+              />
+              <PrimaryButton onClick={confirmDestination}>Aggiungi</PrimaryButton>
+            </div>
+            {destinationError && (
+              <div style={{ fontSize: 11.5, color: COLORS.warn, marginTop: 6 }}>{destinationError}</div>
+            )}
+          </>
+        )}
+        {destination !== undefined && destination !== null && destination !== "" && (
+          <Card style={{ padding: 14, marginTop: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>📍</span>
+                <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>
+                  {CODE_SET.has(destination.toLowerCase()) ? countryName(destination) : cityName(destination)} (
+                  {destination})
+                </div>
+              </div>
+              <span onClick={clearDestinationChoice} style={{ color: COLORS.inkSoft, cursor: "pointer" }}>
+                ✕
+              </span>
+            </div>
+          </Card>
         )}
       </Section>
 
@@ -601,20 +674,16 @@ export function Search() {
           Escludi paesi
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input
-            list="country-options"
+          <Autocomplete
             value={countryInput}
-            onChange={(e) => setCountryInput(e.target.value)}
+            onChange={(v) => setCountryInput(v)}
+            onPick={(name) => setCountryInput(name)}
             onKeyDown={(e) => e.key === "Enter" && addExcludedCountry()}
+            suggestions={COUNTRY_SUGGESTIONS}
             placeholder={prefsLoading ? "Caricamento…" : "Nome paese (es. Francia)"}
-            disabled={prefsLoading}
             style={inputStyle}
+            disabled={prefsLoading}
           />
-          <datalist id="country-options">
-            {countryCodes.map((code) => (
-              <option key={code} value={countryName(code)} />
-            ))}
-          </datalist>
           <PrimaryButton onClick={addExcludedCountry} disabled={prefsLoading}>
             Escludi
           </PrimaryButton>

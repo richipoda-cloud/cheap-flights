@@ -51,7 +51,14 @@ Deno.serve(async (req) => {
     const fresh = filterByFreshness(merged);
     const withoutExcluded = filterByExcludedCountries(fresh, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
-    const results = filtered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
+    // Bug segnalato dall'utente ("con date fisse non funziona"): dateFrom veniva passato
+    // solo come "beginning_of_period" (period_type=month) per restringere la CACHE da
+    // scaricare, ma il risultato finale non veniva mai ricontrollato contro la data esatta
+    // scelta — passavano voli di un giorno qualunque dello stesso mese, purché con la
+    // durata del soggiorno giusta. Con "Date fisse" attivo si tiene solo chi parte esattamente
+    // il giorno scelto (il ritorno resta filtrato dalla durata soggiorno, come sempre).
+    const dateFiltered = dateFrom ? filtered.filter((r) => r.departDate === dateFrom) : filtered;
+    const results = dateFiltered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
