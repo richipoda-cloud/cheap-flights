@@ -186,7 +186,7 @@ export function Home() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column" }}>
       {/* Hero con foto Islanda: taglio netto verso il pannello sotto (niente angoli
           stondati), estesa fin sotto la status bar e alta HERO_HEIGHT_VH invece di un
           valore in px fisso, per sfruttare meglio lo schermo. position:relative per
@@ -236,9 +236,13 @@ export function Home() {
           </div>
         </div>
       </div>
+      {/* Non più flex:1: quello forzava questo blocco a riempire SEMPRE tutto lo spazio
+          rimasto fino a fondo schermo (minHeight:100vh sul contenitore sopra), lasciando
+          un vuoto verde sotto le 3 card quando il contenuto era più corto del viewport —
+          segnalato dall'utente. Ora la pagina è alta quanto hero+contenuto reale, niente
+          riempimento forzato. */}
       <div
         style={{
-          flex: 1,
           background: COLORS.bg,
           padding: "24px 20px 20px",
           display: "flex",
