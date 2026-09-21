@@ -56,10 +56,21 @@ export function filterByFreshness<T extends { foundAt?: string | null }>(
 
 // origin/destination accettano sia codice città che codice paese (v2) — questo è ciò
 // che rende possibile lo "scalo libero": si passa un paese invece di un singolo aeroporto.
+//
+// dateFrom accettato ma NON PIÙ inviato all'API (bug trovato il 21/09/2026, segnalato
+// dall'utente come "con Date fisse non funziona"): period_type=month/beginning_of_period
+// sono parametri documentati per aviasales/v3/get_latest_prices, un endpoint DIVERSO —
+// v2/prices/latest (questo, ancora usato qui) non li supporta. Passarli non dava un errore
+// esplicito ma faceva tornare SEMPRE zero risultati (verificato dal vivo: stessa origine,
+// stesso mese, con beginning_of_period=[qualunque data] → [], senza → risultati normali).
+// Restano quindi come no-op qui: chi vuole una data esatta filtra lato client sul risultato
+// (search-direct già lo fa su departDate, verify-price già cercava il match esatto dopo il
+// fetch) — meno "efficiente" (niente scoping server-side) ma l'unico modo verificato che
+// funzioni davvero con questo endpoint.
 export async function fetchLatestPrices({
   origin,
   destination,
-  dateFrom,
+  dateFrom: _dateFrom,
   limit = 30,
 }: {
   origin: string;
@@ -76,9 +87,7 @@ export async function fetchLatestPrices({
     limit: String(limit),
     sorting: "price",
     one_way: "false",
-    period_type: "month",
     ...(destination ? { destination } : {}),
-    ...(dateFrom ? { beginning_of_period: dateFrom } : {}),
   });
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
