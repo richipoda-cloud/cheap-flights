@@ -246,6 +246,10 @@ function buildAirlineDeepLink(
   if (!airlineCode || !origin || !destination || !departDate || !returnDate) return null;
   switch (airlineCode) {
     case "FR":
+    case "MW": // Malta Air, marchio del gruppo Ryanair — verificato dal vivo il 21/09/2026
+      // (BGY-NRN, volo "FR 484 operato da Malta Air"): stesso motore ryanair.com, stesso
+      // link, il numero di volo resta "FR" anche se Travelpayouts riporta la compagnia
+      // operante come "MW" invece del marchio di vendita.
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=${returnDate}&isConnectedFlight=false&discount=0&promoCode=&isReturn=true&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
     case "W4": // Wizz Air Malta, stesso sito/motore di prenotazione di Wizz Air (W6) — verificato dal vivo il 21/09/2026
@@ -329,6 +333,7 @@ function buildAirlineOneWayDeepLink(
   if (!airlineCode || !origin || !destination || !departDate) return null;
   switch (airlineCode) {
     case "FR":
+    case "MW": // Malta Air, marchio Ryanair — vedi buildAirlineDeepLink sopra
       return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=&isConnectedFlight=false&discount=0&promoCode=&isReturn=false&originIata=${origin}&destinationIata=${destination}`;
     case "W6":
     case "W4": // Wizz Air Malta, stesso sito di Wizz Air (W6)
@@ -395,8 +400,14 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundL
   // anche se conosciamo la compagnia solo dal ritorno (es. andata senza match in cache ma
   // ritorno trovato): segnalato dall'utente proprio su un caso così (Milano-Salonicco,
   // andata non confermata, ritorno easyJet).
-  const homepageAirline = outboundLeg?.airline ?? inboundLeg?.airline;
-  const homepage = homepageAirline ? HOMEPAGE_FALLBACK[homepageAirline] : null;
+  //
+  // Bug trovato leggendo il codice (non serve verifica dal vivo, è solo logica JS): usare
+  // "??" tra i due codici compagnia sbaglia quando l'andata HA un codice ma è una
+  // compagnia sconosciuta (es. "EC") — "??" scatta solo su null/undefined, quindi con un
+  // codice valorizzato ma ignoto restava per sempre "EC" e non si provava mai il ritorno,
+  // anche se quello era una compagnia nota con homepage (es. easyJet). Va cercata la
+  // homepage per ENTRAMBI i codici, non scelto un codice solo e poi cercata la sua homepage.
+  const homepage = HOMEPAGE_FALLBACK[outboundLeg?.airline] ?? HOMEPAGE_FALLBACK[inboundLeg?.airline] ?? null;
   if (homepage) return homepage;
 
   const roundTripOffers = await fetchRoundTripOffers({
