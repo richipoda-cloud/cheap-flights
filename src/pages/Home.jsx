@@ -206,80 +206,88 @@ export function Home() {
   }, []);
 
   return (
-    // Segnalato dall'utente: "Suggeriti per te" restava tagliato in fondo, voleva tutto
-    // in una schermata sola senza scorrere. Prima l'altezza dell'hero era stimata (vh +
-    // px fissi) e poteva superare lo schermo reale su telefoni più bassi. Ora la pagina è
-    // bloccata a height:100vh + overflow:hidden (niente scroll possibile) e la foto è uno
-    // sfondo assoluto che riempie ESATTAMENTE quello spazio — le card sono ancorate in
-    // fondo dentro lo stesso contenitore, quindi non possono mai uscire dallo schermo.
-    // 100dvh, non 100vh: in Safari mobile "100vh" e' calcolato come se la barra
-    // indirizzi fosse sempre nascosta, quindi con la barra visibile il contenuto
-    // (bloccato con overflow:hidden) finiva SOTTO il bordo reale visibile, tagliando
-    // "Suggeriti per te" senza modo di scrollare per vederlo — visto SOLO sul simulatore
-    // reale, non nel browser interno di sviluppo che non riproduce la barra dinamica.
-    // dvh riflette l'altezza visibile vera in ogni momento.
-    <div style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
+    // Segnalato PIÙ VOLTE dall'utente: "Suggeriti per te" restava tagliato in fondo.
+    // Due tentativi precedenti (height:100vh, poi 100dvh) presumevano di poter CALCOLARE
+    // esattamente quanto spazio serve e bloccare la pagina a quella misura con
+    // overflow:hidden — ma qualunque stima (altezza reale del testo su un dato telefono,
+    // wrapping del sottotitolo Suggeriti su più righe, dimensione testo di sistema
+    // dell'utente) può sbagliare, e con overflow:hidden un errore di stima non dà un
+    // bordo brutto: NASCONDE del tutto il contenuto, senza modo di raggiungerlo — questo
+    // è il difetto strutturale dietro tutti i tentativi precedenti, non un singolo bug.
+    //
+    // Ora: la foto è uno sfondo FISSO (position:fixed, non scrolla mai), il contenuto
+    // (saluto + card) è in flusso normale dentro una colonna flex con un divisore
+    // elastico (flex:1) che assorbe lo spazio vuoto — quando tutto ci sta (caso comune,
+    // verificato dal vivo), le card restano ancorate in fondo esattamente come prima,
+    // NESSUNA differenza visiva. Quando non ci sta (telefono più basso, testo più lungo,
+    // dimensione carattere di sistema più grande), la colonna cresce oltre lo schermo e
+    // la pagina scorre normalmente invece di tagliare via "Suggeriti" senza lasciare
+    // traccia — una rete di sicurezza, non il comportamento normale atteso.
+    <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div
         ref={heroRef}
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: 0,
           backgroundImage: `url(${HERO_IMAGE_URL})`,
           backgroundSize: "cover",
           backgroundPosition: "center 62%",
+          zIndex: 0,
         }}
       />
-        {/* Sfumature scure alleggerite — segnalato dall'utente: coprivano troppo la
-            foto ("non troppo coperta"). Restano solo dove serve davvero leggibilità
-            (saluto in cima, card Cerca voli in vetro in fondo), molto più strette e
-            meno opache di prima: gran parte della foto ora resta scoperta e visibile. */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            height: "16%",
-            background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 100%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "52%",
-            bottom: 0,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.42) 60%, rgba(0,0,0,0.46) 100%)",
-            pointerEvents: "none",
-          }}
-        />
-        {/* La foto si dissolve nel suo stesso tono di fondo reale (HERO_BOTTOM_COLOR),
-            non più nel verdino della pagina (COLORS.bg) — stesso principio del trucco
-            del colore in cima (theme-color sul cielo campionato): un colore preso dalla
-            foto stessa, cosi' il taglio in fondo sembra una continuazione naturale
-            invece che un bordo estraneo. */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 64,
-            background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${HERO_BOTTOM_COLOR} 100%)`,
-            pointerEvents: "none",
-          }}
-        />
-        {/* Saluto portato in cima alla foto (non più sopra la card in fondo), richiesto
-            esplicitamente dall'utente — padding-top con la safe-area cosicché non finisca
+      {/* Sfumature scure alleggerite — segnalato dall'utente: coprivano troppo la
+          foto ("non troppo coperta"). Restano solo dove serve davvero leggibilità
+          (saluto in cima, card Cerca voli in vetro in fondo), molto più strette e
+          meno opache di prima: gran parte della foto ora resta scoperta e visibile. */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: "16%",
+          background: "linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 100%)",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          top: "52%",
+          bottom: 0,
+          background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.42) 60%, rgba(0,0,0,0.46) 100%)",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
+      {/* La foto si dissolve nel suo stesso tono di fondo reale (HERO_BOTTOM_COLOR),
+          non più nel verdino della pagina (COLORS.bg) — stesso principio del trucco
+          del colore in cima (theme-color sul cielo campionato): un colore preso dalla
+          foto stessa, cosi' il taglio in fondo sembra una continuazione naturale
+          invece che un bordo estraneo. */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 64,
+          background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${HERO_BOTTOM_COLOR} 100%)`,
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
+      {/* Colonna di contenuto in flusso normale (non più assoluta) — vedi commento sopra:
+          il divisore elastico tiene le card in fondo quando tutto ci sta, ma lascia la
+          colonna crescere (e la pagina scorrere) quando non ci sta. */}
+      <div style={{ position: "relative", zIndex: 1, minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+        {/* Saluto in cima alla foto — padding-top con la safe-area cosicché non finisca
             sotto la status bar/dynamic island quando l'app è installata in Home. */}
         <div
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
             paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)",
             display: "flex",
             justifyContent: "center",
@@ -299,18 +307,21 @@ export function Home() {
             </div>
           </div>
         </div>
+
+        {/* Divisore elastico: assorbe tutto lo spazio libero, spingendo le card in fondo
+            quando c'è margine — si comprime a 0 (mai sotto, min-height:0 implicito su un
+            flex item senza contenuto) quando lo spazio non basta, lasciando che la
+            colonna cresca invece di sovrapporre o tagliare le card. */}
+        <div style={{ flex: 1, minHeight: 24 }} />
+
         {/* Card Cerca voli + Preferiti/Storico + Suggeriti, impilate in un unico blocco
-            ancorato in fondo alla foto (non più solo la card di ricerca) — le tre card
-            in più stanno ora sopra la foto invece che in un pannello bianco separato,
-            confermato esplicitamente dall'utente. */}
+            in fondo alla foto — le tre card in più stanno sopra la foto invece che in un
+            pannello bianco separato, confermato esplicitamente dall'utente. */}
         <div
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
             display: "flex",
             justifyContent: "center",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
           }}
         >
           <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -341,6 +352,7 @@ export function Home() {
             <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
           </div>
         </div>
+      </div>
     </div>
   );
 }

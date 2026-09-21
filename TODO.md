@@ -2,6 +2,21 @@
 
 Idee non ancora implementate, raccolte qui invece che perse in chat.
 
+## Ampliare il più possibile le compagnie con link diretto/homepage
+
+Richiesto esplicitamente il 21/09/2026, dopo la rimozione di Google Flights come ultima
+spiaggia (vedi commit "Via Google Flights..."): ora quando una compagnia non è né in
+`buildAirlineDeepLink`/`buildAirlineOneWayDeepLink` né in `HOMEPAGE_FALLBACK`
+(`supabase/functions/_shared/airlineLinks.ts`), l'utente vede solo il messaggio "prenota
+da solo" — corretto rispetto a un link verso un sito terzo mai richiesto, ma ovviamente
+meno comodo di un link diretto o anche solo della homepage. `airlines.json` ha centinaia
+di codici: coprirli TUTTI uno per uno non è realistico, ma vale la pena allargare
+`HOMEPAGE_FALLBACK` (bastano pochi minuti a compagnia: aprire il sito ufficiale dal vivo e
+controllare il dominio, stesso identico metodo già usato per quelle attuali) alle
+compagnie che compaiono più spesso nei risultati reali, invece di aspettare che l'utente
+le segnali una per una infastidito. Stesso principio di sempre: mai un dominio indovinato,
+sempre aperto e controllato dal vivo prima di aggiungerlo.
+
 ## Link diretti one-way per le 8 compagnie aggiunte dopo (FATTO 21/09/2026, tranne IB)
 
 `buildAirlineOneWayDeepLink` in `supabase/functions/verify-price/index.ts` ora copre anche
