@@ -5,7 +5,6 @@ import citiesData from "./cities.json" with { type: "json" };
 import airlinesData from "./airlines.json" with { type: "json" };
 
 export const TRAVELPAYOUTS_TOKEN = Deno.env.get("TRAVELPAYOUTS_TOKEN");
-const MARKER = Deno.env.get("TRAVELPAYOUTS_MARKER") ?? "";
 const BASE_URL = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates";
 
 const CITY_BY_CODE: Record<string, { name: string; country_code: string }> = Object.fromEntries(
@@ -15,7 +14,6 @@ const AIRLINE_NAME_BY_CODE: Record<string, string> = airlinesData as Record<stri
 
 export function mapOneWayResult(r: any) {
   const city = CITY_BY_CODE[r.destination];
-  const sep = r.link?.includes("?") ? "&" : "?";
   const arrivalAt =
     r.departure_at && r.duration != null
       ? new Date(new Date(r.departure_at).getTime() + r.duration * 60000).toISOString()
@@ -36,7 +34,11 @@ export function mapOneWayResult(r: any) {
     duration: r.duration,
     price: r.price,
     currency: "EUR",
-    deepLink: r.link ? `https://www.aviasales.com${r.link}${sep}marker=${MARKER}` : null,
+    // Mai più Aviasales (era `https://www.aviasales.com${r.link}...`) — placeholder,
+    // ogni chiamante (verify-price, search-stopover) sovrascrive con withAirlineDeepLink
+    // (_shared/airlineLinks.ts): schema diretto della compagnia, poi homepage, altrimenti
+    // resta null e il client mostra "prenota da solo" invece di un link a un sito terzo.
+    deepLink: null,
     foundAt: r.found_at ?? null,
   };
 }

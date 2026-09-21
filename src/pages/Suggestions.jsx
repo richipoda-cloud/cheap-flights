@@ -3,7 +3,7 @@ import { COLORS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { FlagIcon } from "../components/FlagIcon";
 import { LegBox } from "../components/LegBox";
-import { PrimaryButton } from "../components/PrimaryButton";
+import { BookingAction } from "../components/BookingAction";
 import { searchDirect, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSuggestions } from "../hooks/useSuggestions";
@@ -141,14 +141,11 @@ export function Suggestions() {
                       route={`${r.destination ?? "?"} → ${r.origin ?? "?"}`}
                       date={r.returnDate}
                     />
-                    <PrimaryButton
-                      variant="solid"
-                      onClick={() => window.open(verify.deepLink ?? r.deepLink, "_blank", "noopener,noreferrer")}
-                      disabled={!(verify.deepLink ?? r.deepLink)}
+                    <BookingAction
+                      deepLink={verify.deepLink ?? r.deepLink}
+                      airlineName={verify.outboundLeg?.airlineName ?? verify.outboundLeg?.airline ?? verify.inboundLeg?.airlineName ?? verify.inboundLeg?.airline}
                       style={{ width: "100%", justifyContent: "center" }}
-                    >
-                      Vai alla prenotazione →
-                    </PrimaryButton>
+                    />
                   </>
                 ) : (
                   <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>

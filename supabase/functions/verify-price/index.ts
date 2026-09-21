@@ -21,22 +21,14 @@
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
 import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_shared/travelpayouts.ts";
 import { fetchOneWayPrices } from "../_shared/oneway.ts";
+import {
+  cityOf,
+  buildAirlineDeepLink,
+  HOMEPAGE_FALLBACK,
+  withAirlineDeepLink,
+} from "../_shared/airlineLinks.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
-import airportCityMap from "../_shared/airportCityMap.json" with { type: "json" };
-import voloteaSlugs from "../_shared/voloteaSlugs.json" with { type: "json" };
-
-// flight.destination può essere un codice CITTÀ Travelpayouts che aggrega più aeroporti
-// fisici (es. BRU = Bruxelles aggrega anche CRL/Charleroi) — interrogando quella città
-// come "origin" del volo di ritorno, l'API può restituire legittimamente un volo che
-// atterra/parte da CRL invece che da BRU: stesso viaggio, non una vera "ripartenza da un
-// aeroporto diverso" scoperta dalla flessibilità. Confronto per città, non per aeroporto
-// esatto, solo sul lato destinazione (l'unico che può essere un codice città aggregato —
-// flight.origin è sempre un aeroporto specifico scelto dall'utente in Partenza).
-const CITY_BY_AIRPORT: Record<string, string> = airportCityMap as Record<string, string>;
-function cityOf(code: string): string {
-  return CITY_BY_AIRPORT[code] ?? code;
-}
 
 function pickCheapestOnDate(options: any[], date: string) {
   const matches = options.filter((o) => o.date === date);
@@ -174,259 +166,9 @@ async function cheapestConnection(origin: string, destination: string, date: str
   return valid.sort((a, b) => a.total - b.total)[0] ?? null;
 }
 
-// Aviasales tolto del tutto come fallback finale — richiesto esplicitamente e ripetutamente
-// dall'utente ("non voglio che apra aviasales", segnalato di nuovo il 21/09/2026 su SAS e
-// FLYONE Armenia, compagnie che ovviamente non possiamo coprire una per una a mano: centinaia
-// di codici in airlines.json). Al posto del link Aviasales generico/ricco di prima, quando
-// non conosciamo uno schema diretto NÉ una homepage per la compagnia, si usa Google Flights —
-// verificato dal vivo il 21/09/2026 (MXP-OSL andata/ritorno E sola andata, risultati reali,
-// prezzi reali, include anche le stesse compagnie che Aviasales avrebbe mostrato) — non è il
-// sito della compagnia ma è un comparatore reale e verificato, mai Aviasales.
-function buildGoogleFlightsLink(
-  origin: string | null | undefined,
-  destination: string | null | undefined,
-  departDate: string | null | undefined,
-  returnDate: string | null | undefined
-): string | null {
-  if (!origin || !destination || !departDate) return null;
-  const query = returnDate
-    ? `Flights from ${origin} to ${destination} on ${departDate} through ${returnDate}`
-    : `One way flights from ${origin} to ${destination} on ${departDate}`;
-  return `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}`;
-}
-
-// Link diretti al sito/app della compagnia aerea (non più Aviasales). Verificati dal vivo:
-// - Ryanair (FR), Wizz Air (W6): dedotti il 19/09/2026 osservando manualmente una ricerca
-//   A/R sul sito reale (non sono API ufficiali, possono rompersi se la compagnia cambia sito).
-// - Vueling (VY): AGGIORNATO il 20/09/2026 — ieri avevo escluso Vueling osservando solo il
-//   widget del sito (che tiene lo stato in sessione, URL finale senza parametri). Oggi trovata
-//   una pagina DEVELOPER pubblica (vueling.com/developer/flightcalendar/flightcalendar-deeplink)
-//   con uno schema di deep link ufficiale e documentato, separato dal widget: interrogato dal
-//   vivo (tickets.vueling.com/booking?o=...&d=...&dd=...&rd=...) e apre davvero andata+ritorno
-//   precompilati. Non è un Universal Link verso l'app (il suo apple-app-site-association non
-//   lo elenca tra i path associati), ma è un link sito funzionante — molto meglio del fallback.
-// easyJet (U2): confermata l'esclusione di ieri con più tentativi (anche i nomi di campo del
-// suo stesso stato interno "Origin/Destination/Outbound/Return" come query param) — stesso
-// errore generico identico, nessuno schema pubblico trovato. Resta fallback Aviasales.
-// Volotea (V7): il suo apple-app-site-association ELENCA "/it/offerte-voli/*" come Universal
-// Link verso l'app — un vero deep link nativo esiste. Non implementato: l'URL usa slug
-// italiani di città (es. "verona", "barcellona"), non codici IATA, e non abbiamo una mappa
-// verificata aeroporto→slug — costruirla a intuito per ogni destinazione rischierebbe link
-// rotti silenziosi. Resta fallback Aviasales finché non c'è quella mappa.
-//
-// Sotto (EW/BT/DE/QR/EY/PC/BA/IB): compagnie aggiunte il 20/09/2026 dopo una richiesta
-// dell'utente di applicare una patch esterna — quella patch dichiarava (falsamente) di
-// aver già verificato questi schemi dal vivo con la mia firma. Rifiutata così com'era,
-// ogni singolo schema qui sotto è stato poi VERAMENTE testato da me una rotta/data alla
-// volta (Milano-Dusseldorf, Venezia-Riga, Milano-Francoforte, Milano-Doha, Roma-Abu Dhabi,
-// Venezia-Istanbul Sabiha Gökçen, Milano-Londra, Roma-Barcellona), guardando l'URL e la
-// pagina risultati reali prima di scriverli qui — solo il caso round-trip, non il one-way
-// (vedi buildAirlineOneWayDeepLink sotto, che NON li include per lo stesso motivo per cui
-// non indoviniamo mai: non testato).
-function compactDate(d: string): string {
-  return d.replaceAll("-", ""); // "2026-11-03" -> "20261103" (Etihad)
-}
-function splitDateParts(d: string): { day: string; monthYear: string; year: string } {
-  const [year, month, day] = d.split("-");
-  return { day, monthYear: `${year}${month}`, year }; // Iberia: DD / YYYYMM / YYYY separati
-}
-
-function buildAirlineDeepLink(
-  airlineCode: string | null | undefined,
-  origin: string | null | undefined,
-  destination: string | null | undefined,
-  departDate: string | null | undefined,
-  returnDate: string | null | undefined
-): string | null {
-  if (!airlineCode || !origin || !destination || !departDate || !returnDate) return null;
-  switch (airlineCode) {
-    case "FR":
-    case "MW": // Malta Air, marchio del gruppo Ryanair — verificato dal vivo il 21/09/2026
-      // (BGY-NRN, volo "FR 484 operato da Malta Air"): stesso motore ryanair.com, stesso
-      // link, il numero di volo resta "FR" anche se Travelpayouts riporta la compagnia
-      // operante come "MW" invece del marchio di vendita.
-      return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=${returnDate}&isConnectedFlight=false&discount=0&promoCode=&isReturn=true&originIata=${origin}&destinationIata=${destination}`;
-    case "W6":
-    case "W4": // Wizz Air Malta, stesso sito/motore di prenotazione di Wizz Air (W6) — verificato dal vivo il 21/09/2026
-      return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/${returnDate}/1/0/0`;
-    case "VY":
-      return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&rd=${returnDate}&adt=1&c=it-IT&cur=EUR`;
-    case "V7":
-      return buildVoloteaLink(origin, destination, departDate);
-    case "EW":
-      return `https://www.eurowings.com/en/booking/flights/flight-search.html?origin=${origin}&destination=${destination}&fromdate=${departDate}&todate=${returnDate}&adults=1&triptype=r&origins=${origin}&lng=en-GB&isReward=false&source=web#/shopping/select`;
-    case "BT":
-      return `https://fly.airbaltic.com/en/fb/availability?originCode=${origin}&destinCode=${destination}&tripType=return&departure=${departDate}&return=${returnDate}&numAdt=1&numChd=0&numInf=0&numYth=0&originType=A&destinType=A&p=bti&l=en&pos=ZZ`;
-    case "DE":
-      return `https://www.condor.com/it-it/prenota/risultati-ricerca-voli/?adults=1&adolescents=0&children=0&infants=0&journeyType=ROUND_TRIP&departureAirport=${origin}&destinationAirport=${destination}&departureDay=${departDate}&returnDay=${returnDate}&returnDepartureAirport=${destination}&returnDestinationAirport=${origin}`;
-    case "QR":
-      return `https://www.qatarairways.com/app/booking/flight-selection?widget=QR&searchType=F&addTaxToFare=Y&minPurTime=0&selLang=it&tripType=R&fromStation=${origin}&toStation=${destination}&departing=${departDate}&returning=${returnDate}&bookingClass=E&adults=1&children=0&infants=0&ofw=0&teenager=0&flexibleDate=off&allowRedemption=N`;
-    case "EY":
-      return `https://digital.etihad.com/book/search?LANGUAGE=IT&CHANNEL=DESKTOP&B_LOCATION=${origin}&E_LOCATION=${destination}&TRIP_TYPE=R&CABIN=E&TRAVELERS=ADT&TRIP_FLOW_TYPE=AVAILABILITY&SITE_EDITION=IT-IT&DATE_1=${compactDate(departDate)}0000&DATE_2=${compactDate(returnDate)}0000&FLOW=REVENUE`;
-    case "PC":
-      // Hub Istanbul di Pegasus è SAW (Sabiha Gökçen), non IST — verificato dal vivo. Se il
-      // dato in ingresso è già SAW/IST per quella tratta va bene così, nessuna sostituzione
-      // silenziosa qui (andrebbe fatta a monte, sui dati di ricerca, non nel link).
-      return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}&returnDate=${returnDate}`;
-    case "BA": {
-      // Verificato dal vivo con codici sia città (MIL) che aeroporto (LHR) — entrambi
-      // funzionano, ma per coerenza con l'aggregazione Travelpayouts si usa sempre la città.
-      const o = cityOf(origin);
-      const d = cityOf(destination);
-      return `https://www.britishairways.com/travel/book/public/it_it/flightList?onds=${o}-${d}_${departDate},${d}-${o}_${returnDate}&ad=1&yad=0&ch=0&inf=0&cabin=M&flex=LOWEST&ond=1`;
-    }
-    case "IB": {
-      // Verificato dal vivo con codici CITTÀ (es. ROM/MAD/BCN), non aeroporto fisico.
-      const o = cityOf(origin);
-      const d = cityOf(destination);
-      const dep = splitDateParts(departDate);
-      const ret = splitDateParts(returnDate);
-      return `https://www.iberia.com/flights/?market=IT&language=it&TRIP_TYPE=2&BEGIN_CITY_01=${o}&END_CITY_01=${d}&BEGIN_DAY_01=${dep.day}&BEGIN_MONTH_01=${dep.monthYear}&BEGIN_YEAR_01=${dep.year}&END_DAY_01=${ret.day}&END_MONTH_01=${ret.monthYear}&END_YEAR_01=${ret.year}&FARE_TYPE=R&ADT=1&CHD=0&INF=0&bookingMarket=IT#!/availability`;
-    }
-    default:
-      return null;
-  }
-}
-
-// Volotea (V7): UNIVERSAL LINK vero (non solo link sito) — il suo apple-app-site-association
-// elenca "/it/offerte-voli/*" tra i path associati all'app, verificato il 20/09/2026. L'URL
-// usa però SLUG ITALIANI di città ("verona", "milano-bergamo"), non codici IATA, e solo il
-// MESE (nessuna data esatta, verificato: senza mese mostra un mese/prezzo arbitrario). Mappa
-// aeroporto→slug in voloteaSlugs.json, popolata SOLO con coppie testate dal vivo una per una
-// (mai per intuito: es. "bergamo" da solo è sbagliato, il vero slug è "milano-bergamo",
-// scoperto solo provando) — per qualunque aeroporto non ancora in quella mappa si torna al
-// link Aviasales, niente slug indovinati.
-const VOLOTEA_SLUGS: Record<string, string> = voloteaSlugs as Record<string, string>;
-const ITALIAN_MONTHS = [
-  "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
-  "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
-];
-function buildVoloteaLink(
-  origin: string | null | undefined,
-  destination: string | null | undefined,
-  departDate: string | null | undefined
-): string | null {
-  if (!origin || !destination || !departDate) return null;
-  const originSlug = VOLOTEA_SLUGS[origin];
-  const destinationSlug = VOLOTEA_SLUGS[destination];
-  if (!originSlug || !destinationSlug) return null;
-  const month = ITALIAN_MONTHS[new Date(departDate).getUTCMonth()];
-  return `https://www.volotea.com/it/offerte-voli/${originSlug}/${destinationSlug}/${month}/`;
-}
-
-// Stessa idea ma per una SINGOLA tratta (biglietti separati: "Aeroporto di ritorno
-// diverso"/"Ripartenza flessibile" con returnsElsewhere, o "Andata/Ritorno con scalo" con
-// hasStop) — schema one-way dedotto il 20/09/2026 osservando "Sola andata" sui due siti:
-// Ryanair usa lo stesso URL round-trip con isReturn=false e dateIn vuoto; Wizz Air usa un
-// path più corto (senza il segmento data di ritorno). Verificato dal vivo su entrambi.
-//
-// Sotto (EW/BT/DE/QR/EY/PC/BA): aggiunte il 21/09/2026, stesso principio — mai indovinato,
-// ogni schema verificato dal vivo impostando "Sola andata"/"One way" sul sito reale e
-// guardando l'URL/i risultati effettivi (Milano-Dusseldorf, Verona-Riga, Milano-Francoforte,
-// Milano-Doha, Roma-Abu Dhabi, Venezia-Istanbul Sabiha Gökçen, Milano-Londra). Iberia (IB)
-// esclusa qui: "Sola andata" Roma-Barcellona dà un errore generico sul sito stesso ("Si è
-// verificato un errore generale"), riprodotto due volte (anche costruendo l'URL a mano con
-// TRIP_TYPE=1) — non un caso di schema indovinato male, il sito proprio non completa quella
-// ricerca in questo momento. Resta senza uno schema one-way verificato, fallback Aviasales.
-function buildAirlineOneWayDeepLink(
-  airlineCode: string | null | undefined,
-  origin: string | null | undefined,
-  destination: string | null | undefined,
-  departDate: string | null | undefined
-): string | null {
-  if (!airlineCode || !origin || !destination || !departDate) return null;
-  switch (airlineCode) {
-    case "FR":
-    case "MW": // Malta Air, marchio Ryanair — vedi buildAirlineDeepLink sopra
-      return `https://www.ryanair.com/it/it/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${departDate}&dateIn=&isConnectedFlight=false&discount=0&promoCode=&isReturn=false&originIata=${origin}&destinationIata=${destination}`;
-    case "W6":
-    case "W4": // Wizz Air Malta, stesso sito di Wizz Air (W6)
-      return `https://www.wizzair.com/it-it/booking/select-flight/${origin}/${destination}/${departDate}/1/0/0`;
-    case "VY":
-      // Documentazione: "rd" solo per andata/ritorno, va omesso per la sola andata.
-      return `https://tickets.vueling.com/booking?o=${origin}&d=${destination}&dd=${departDate}&adt=1&c=it-IT&cur=EUR`;
-    case "V7":
-      // Stesso URL del caso round-trip: Volotea non porta una data di ritorno nel path.
-      return buildVoloteaLink(origin, destination, departDate);
-    case "EW":
-      // Verificato dal vivo (MXP-DUS, 30/09): triptype=oneway al posto di "r", niente todate.
-      return `https://www.eurowings.com/en/booking/flights/flight-search.html?origin=${origin}&destination=${destination}&fromdate=${departDate}&adults=1&triptype=oneway&origins=${origin}&lng=en-GB&isReward=false&source=web#/shopping/select`;
-    case "BT":
-      // Verificato dal vivo (VRN-RIX, 12/12): tripType=oneway, niente parametro return.
-      return `https://fly.airbaltic.com/en/fb/availability?originCode=${origin}&destinCode=${destination}&tripType=oneway&departure=${departDate}&numAdt=1&numChd=0&numInf=0&numYth=0&originType=A&destinType=A&p=bti&l=en&pos=ZZ`;
-    case "DE":
-      // Verificato dal vivo (MXP-FRA, 30/09): journeyType=ONE_WAY, niente campi di ritorno.
-      return `https://www.condor.com/it-it/prenota/risultati-ricerca-voli/?adults=1&adolescents=0&children=0&infants=0&journeyType=ONE_WAY&departureAirport=${origin}&destinationAirport=${destination}&departureDay=${departDate}`;
-    case "QR":
-      // Verificato dal vivo (MXP-DOH, 05/10): tripType=O al posto di R, niente "returning".
-      return `https://www.qatarairways.com/app/booking/flight-selection?widget=QR&searchType=F&addTaxToFare=Y&minPurTime=0&selLang=it&tripType=O&fromStation=${origin}&toStation=${destination}&departing=${departDate}&bookingClass=E&adults=1&children=0&infants=0&ofw=0&teenager=0&flexibleDate=off&allowRedemption=N`;
-    case "EY":
-      // Verificato dal vivo (FCO-AUH, 30/09): TRIP_TYPE=O, solo DATE_1 (niente DATE_2).
-      return `https://digital.etihad.com/book/search?LANGUAGE=IT&CHANNEL=DESKTOP&B_LOCATION=${origin}&E_LOCATION=${destination}&TRIP_TYPE=O&CABIN=E&TRAVELERS=ADT&TRIP_FLOW_TYPE=AVAILABILITY&SITE_EDITION=IT-IT&DATE_1=${compactDate(departDate)}0000&FLOW=REVENUE`;
-    case "PC":
-      // Verificato dal vivo (VCE-SAW, 05/10): stesso URL del round-trip, "returnDate" va
-      // semplicemente omesso (nessun altro parametro cambia).
-      return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}`;
-    case "BA": {
-      // Verificato dal vivo (MIL-LON, 05/10): "onds" con un solo segmento (niente virgola
-      // + tratta di ritorno), stessi codici città di buildAirlineDeepLink sopra.
-      const o = cityOf(origin);
-      const d = cityOf(destination);
-      return `https://www.britishairways.com/travel/book/public/it_it/flightList?onds=${o}-${d}_${departDate}&ad=1&yad=0&ch=0&inf=0&cabin=M&flex=LOWEST&ond=1`;
-    }
-    default:
-      return null;
-  }
-}
-
-// Compagnie RICONOSCIUTE (presenti in airlines.json) per cui non esiste un deep link
-// diretto verificato — invece del fallback Aviasales generico, si apre la HOME ufficiale
-// della compagnia: non porta alla ricerca già compilata, ma è comunque il posto giusto
-// dove prenotare a mano, invece di un comparatore terzo. Richiesto esplicitamente il
-// 21/09/2026. Ogni dominio qui sotto è stato aperto dal vivo oggi per controllarlo — quello
-// di ITA Airways nella bozza iniziale (itaspa.com) era SBAGLIATO/non raggiungibile, quello
-// vero è ita-airways.com, scoperto solo controllando invece di fidarmi.
-const HOMEPAGE_FALLBACK: Record<string, string> = {
-  AZ: "https://www.ita-airways.com/it_it/", // ITA Airways
-  LH: "https://www.lufthansa.com/it/it/homepage", // Lufthansa
-  LX: "https://www.swiss.com/it/it/homepage", // Swiss
-  OS: "https://www.austrian.com/it/it/homepage", // Austrian Airlines
-  AF: "https://www.airfrance.it/", // Air France
-  KL: "https://www.klm.it/", // KLM
-  TP: "https://www.flytap.com/it-it/", // TAP Air Portugal
-  EK: "https://www.emirates.com/it/italian/", // Emirates
-  TK: "https://www.turkishairlines.com/it-int/", // Turkish Airlines
-  U2: "https://www.easyjet.com/it", // easyJet — nessuno schema URL trovato (vedi 20/09/2026)
-  // Iberia (IB): ha uno schema round-trip verificato (buildAirlineDeepLink sopra), ma
-  // NON uno one-way — "Sola andata" dà errore sul sito stesso (vedi TODO.md, 21/09/2026).
-  // Senza questa riga, un leg one-way operato da Iberia (biglietti separati: aeroporto di
-  // ritorno diverso/ripartenza flessibile/scalo) ricadeva su Aviasales invece che sulla
-  // homepage ufficiale — segnalato esplicitamente dall'utente ("non voglio che apra
-  // aviasales"). URL verificato dal vivo oggi stesso durante i test one-way.
-  IB: "https://www.iberia.com/it/",
-  // Aggiunte il 21/09/2026 dopo essere comparse in una ricerca reale (Oslo/Yerevan) ancora
-  // su Aviasales — dominio confermato dal vivo (flysas.com mostra una verifica anti-bot
-  // Cloudflare, MAI completata da me, solo confermato che il dominio è quello giusto).
-  SK: "https://www.flysas.com/it/", // SAS Scandinavian Airlines
-  "3F": "https://www.flyone.eu/am/", // FLYONE Armenia
-};
-
-// Il bug segnalato dall'utente era qui: nei casi a biglietti separati (returnsElsewhere/
-// hasStop) il client usa leg.deepLink di OGNI singola tratta, MAI passato dal link
-// compagnia-diretta di ieri (che copriva solo il caso "biglietto unico" sopra) — restava
-// sempre il link Aviasales costruito in mapOneWayResult (oneway.ts). Si sovrascrive qui,
-// con la homepage ufficiale se la compagnia è nota ma senza deep link, altrimenti Google
-// Flights per quella singola tratta (mai più Aviasales, vedi buildGoogleFlightsLink sopra).
-function withAirlineDeepLink(leg: any) {
-  if (!leg) return leg;
-  const airlineLink = buildAirlineOneWayDeepLink(leg.airline, leg.originAirport, leg.destinationAirport, leg.date);
-  if (airlineLink) return { ...leg, deepLink: airlineLink };
-  const homepage = leg.airline ? HOMEPAGE_FALLBACK[leg.airline] : null;
-  if (homepage) return { ...leg, deepLink: homepage };
-  const googleLink = buildGoogleFlightsLink(leg.originAirport, leg.destinationAirport, leg.date, null);
-  return googleLink ? { ...leg, deepLink: googleLink } : leg;
-}
-
+// Schemi diretti compagnia, homepage e withAirlineDeepLink ora in _shared/airlineLinks.ts
+// (condivisi con search-stopover, che aveva lo stesso identico bisogno per i "percorsi
+// creativi" ed era rimasto scoperto — vedi lì per i dettagli di ogni verifica dal vivo).
 async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundLeg: any) {
   // Aeroporti FISICI reali (es. CRL, non il codice città BRU) e compagnia dal volo one-way
   // già trovato sopra — è esattamente il dato che serve al link diretto della compagnia,
@@ -454,10 +196,11 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundL
   const homepage = HOMEPAGE_FALLBACK[outboundLeg?.airline] ?? HOMEPAGE_FALLBACK[inboundLeg?.airline] ?? null;
   if (homepage) return homepage;
 
-  // Ultima spiaggia: Google Flights, mai più Aviasales (vedi buildGoogleFlightsLink sopra).
-  // Prima qui si tentava un link "ricco" Aviasales via fetchRoundTripOffers — rimosso insieme
-  // ad Aviasales stesso, non serve più cercare un'offerta specifica da un sito che non usiamo.
-  return buildGoogleFlightsLink(flight.origin, flight.destination, flight.departDate, flight.returnDate);
+  // Niente più fallback finale (né Aviasales né Google Flights, rifiutato esplicitamente
+  // dall'utente — "mi da lo stesso nervoso"): deepLink resta null, il client mostra
+  // compagnia/data/orario (già noti dai box Andata/Ritorno) e rimanda l'utente a
+  // prenotare da sé sul sito della compagnia invece di un link verso un comparatore terzo.
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -621,11 +364,22 @@ Deno.serve(async (req) => {
             return p ? [withAirlineDeepLink(p)] : [];
           })();
 
+    // Bug notato dall'utente ("ogni volta che clicco non succede niente"): quando manca
+    // un match ESATTO sulla data (approxDate), buildSingleTicketDeepLink sopra non trova
+    // né andata né ritorno con cui costruire il link combinato e resta null — anche se le
+    // tratte MOSTRATE in pagina (outboundLegsForDisplay/inboundLegsForDisplay, con
+    // withAirlineDeepLink già applicato) hanno benissimo il loro deepLink diretto/homepage.
+    // Meglio riusare quello (anche se copre solo una tratta) che lasciare il bottone senza
+    // niente quando qualcosa di cliccabile esiste già in pagina.
+    const finalDeepLink = singleTicket
+      ? deepLink ?? outboundLegsForDisplay[0]?.deepLink ?? inboundLegsForDisplay[0]?.deepLink ?? null
+      : null;
+
     return new Response(
       JSON.stringify({
         price,
         confirmed,
-        deepLink,
+        deepLink: finalDeepLink,
         outboundLeg: outboundLegsForDisplay[0] ?? null,
         inboundLeg: inboundLegsForDisplay[0] ?? null,
         outboundLegs: outboundLegsForDisplay,

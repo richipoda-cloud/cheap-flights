@@ -12,6 +12,7 @@
 // dest→hub, hub→origine) = 1+3N. Vedi README per il confronto col modello precedente.
 import { fetchLatestPrices, filterByNights, filterByExcludedCountries } from "../_shared/travelpayouts.ts";
 import { TRAVELPAYOUTS_TOKEN, fetchOneWayPrices } from "../_shared/oneway.ts";
+import { withAirlineDeepLink } from "../_shared/airlineLinks.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 // Ampliato da 5+10: con piu' partenze combinate e/o parecchi paesi esclusi attivi, il
@@ -189,7 +190,12 @@ async function buildResults(
 }
 
 function buildResultFromChain(chain: { legs: any[]; total: number }, hub: string, finalDestination: string) {
-  const legs = chain.legs;
+  // Ogni tratta arriva da mapOneWayResult con deepLink:null (vedi oneway.ts) — qui si
+  // applica lo schema diretto della compagnia o la sua homepage, la stessa logica di
+  // verify-price. Prima mancava del tutto: queste tratte (biglietti separati, mostrate
+  // da LegRow) restavano silenziosamente col vecchio link Aviasales grezzo anche dopo
+  // averlo tolto ovunque altrove — segnalato dall'utente.
+  const legs = chain.legs.map(withAirlineDeepLink);
   const last = legs[legs.length - 1];
   const arrivalLeg = legs.length === 4 ? legs[1] : legs[0]; // tratta che arriva alla destinazione finale
   const departureLeg = legs.length === 4 ? legs[2] : last; // tratta che riparte dalla destinazione finale

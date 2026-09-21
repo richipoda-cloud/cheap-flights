@@ -4,7 +4,7 @@ import { COLORS, RADIUS } from "../theme/colors";
 import { FlagIcon } from "../components/FlagIcon";
 import { LegBox } from "../components/LegBox";
 import { LegRow } from "../components/LegRow";
-import { PrimaryButton } from "../components/PrimaryButton";
+import { BookingAction } from "../components/BookingAction";
 import { searchDirect, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
@@ -125,32 +125,25 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                   )}
                   {verifyData.returnsElsewhere ? (
                     <div style={{ display: "flex", gap: 8 }}>
-                      <PrimaryButton
-                        variant="solid"
-                        onClick={() => window.open(outboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
-                        disabled={!outboundLeg?.deepLink}
+                      <BookingAction
+                        deepLink={outboundLeg?.deepLink}
+                        airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline}
+                        label="Prenota andata →"
                         style={{ flex: 1, justifyContent: "center" }}
-                      >
-                        Prenota andata →
-                      </PrimaryButton>
-                      <PrimaryButton
-                        variant="solid"
-                        onClick={() => window.open(inboundLeg?.deepLink, "_blank", "noopener,noreferrer")}
-                        disabled={!inboundLeg?.deepLink}
+                      />
+                      <BookingAction
+                        deepLink={inboundLeg?.deepLink}
+                        airlineName={inboundLeg?.airlineName ?? inboundLeg?.airline}
+                        label="Prenota ritorno →"
                         style={{ flex: 1, justifyContent: "center" }}
-                      >
-                        Prenota ritorno →
-                      </PrimaryButton>
+                      />
                     </div>
                   ) : (
-                    <PrimaryButton
-                      variant="solid"
-                      onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
-                      disabled={!deepLink}
+                    <BookingAction
+                      deepLink={deepLink}
+                      airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
                       style={{ width: "100%", justifyContent: "center" }}
-                    >
-                      Vai alla prenotazione →
-                    </PrimaryButton>
+                    />
                   )}
                 </>
               );

@@ -5,6 +5,7 @@ import { Card } from "../components/Card";
 import { Pill } from "../components/Pill";
 import { FlagIcon } from "../components/FlagIcon";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { BookingAction } from "../components/BookingAction";
 import { LegBox, formatTime } from "../components/LegBox";
 import { verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
@@ -16,10 +17,6 @@ import { cityName } from "../lib/cityNames";
 // Orario/compagnia/deep link arrivano già pronti da search-stopover (v3/prices_for_dates,
 // one-way) — niente fetch di verifica extra, il prezzo è già quello trovato in ricerca.
 function MultiLegTicket({ index, total, leg }) {
-  const handleBooking = () => {
-    if (leg.deepLink) window.open(leg.deepLink, "_blank", "noopener,noreferrer");
-  };
-
   return (
     <Card style={{ padding: 16, marginBottom: 16, border: `1px solid ${COLORS.plum}` }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.plum, marginBottom: 8 }}>
@@ -36,14 +33,17 @@ function MultiLegTicket({ index, total, leg }) {
       <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
         {leg.date} · {formatTime(leg.departureAt)} · {leg.airlineName ?? leg.airline}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ flexShrink: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink }}>{leg.price} €</div>
           <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Prezzo dalla ricerca</div>
         </div>
-        <PrimaryButton variant="solid" onClick={handleBooking} disabled={!leg.deepLink}>
-          Prenota biglietto {index} →
-        </PrimaryButton>
+        <BookingAction
+          deepLink={leg.deepLink}
+          airlineName={leg.airlineName ?? leg.airline}
+          label={`Prenota biglietto ${index} →`}
+          style={{ flex: leg.deepLink ? undefined : 1 }}
+        />
       </div>
     </Card>
   );
@@ -100,10 +100,6 @@ export function FlightDetail() {
   const isLegacySchema = Boolean(flight.viaHub) && !Array.isArray(flight.legs);
 
   const nights = flight.nights ?? "?";
-
-  const handleBooking = () => {
-    if (deepLink) window.open(deepLink, "_blank", "noopener,noreferrer");
-  };
 
   const handleSaveFavorite = () => {
     addFavorite(
@@ -258,9 +254,17 @@ export function FlightDetail() {
               {verifying ? "Verifica in corso…" : confirmed ? "Prezzo verificato ora" : "Prezzo da confermare al link"}
             </div>
           </div>
-          <PrimaryButton variant="solid" onClick={handleBooking} disabled={verifying || !deepLink}>
-            Vai alla prenotazione →
-          </PrimaryButton>
+          {verifying ? (
+            <PrimaryButton variant="solid" disabled>
+              …
+            </PrimaryButton>
+          ) : (
+            <BookingAction
+              deepLink={deepLink}
+              airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
+              style={{ maxWidth: 220 }}
+            />
+          )}
         </div>
       )}
     </div>

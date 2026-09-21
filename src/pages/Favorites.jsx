@@ -6,7 +6,7 @@ import { FreshnessBadge } from "../components/FreshnessBadge";
 import { SwipeToDelete } from "../components/SwipeToDelete";
 import { LegBox } from "../components/LegBox";
 import { LegRow } from "../components/LegRow";
-import { PrimaryButton } from "../components/PrimaryButton";
+import { BookingAction } from "../components/BookingAction";
 import { verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFavorites } from "../hooks/useFavorites";
@@ -67,14 +67,11 @@ function FavoriteDetails({ flight }) {
         route={`${flight.destination ?? "?"} → ${flight.origin ?? "?"}`}
         date={flight.returnDate}
       />
-      <PrimaryButton
-        variant="solid"
-        onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
-        disabled={!deepLink}
+      <BookingAction
+        deepLink={deepLink}
+        airlineName={data?.outboundLeg?.airlineName ?? data?.outboundLeg?.airline ?? data?.inboundLeg?.airlineName ?? data?.inboundLeg?.airline}
         style={{ width: "100%", justifyContent: "center" }}
-      >
-        Vai alla prenotazione →
-      </PrimaryButton>
+      />
     </div>
   );
 }
