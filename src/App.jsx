@@ -49,7 +49,14 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div style={{ minHeight: "100vh", background: COLORS.bg }}>
+      {/* paddingTop di sicurezza: da index.html la status bar è "black-translucent" (per
+          far arrivare l'hero di Home fin sotto barra di stato/dynamic island, richiesto
+          esplicitamente), quindi su iOS TUTTE le pagine ora disegnano fin sotto quella
+          barra — senza questo padding qui, titoli/contenuti di Cerca/Risultati/ecc.
+          finirebbero nascosti sotto barra di stato e dynamic island. Home compensa questo
+          stesso valore con un margin-top negativo sul proprio hero (vedi Home.jsx), così
+          resta l'unica pagina che arriva davvero in cima. */}
+      <div style={{ minHeight: "100vh", background: COLORS.bg, paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <AppRoutes />
       </div>
     </BrowserRouter>

@@ -9,6 +9,15 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#6E7F5C" />
+    <!-- Senza questi due, l'app installata in Home (manifest.json ha già display:standalone)
+         su iOS mostra comunque una barra di stato opaca sopra il contenuto — status bar
+         "black-translucent" fa disegnare la pagina fin sotto barra di stato e dynamic
+         island, così l'hero foto può arrivare davvero in cima come richiesto. In Safari
+         col link digitato (non icona Home) questo non ha alcun effetto: la barra del
+         browser resta sempre sopra, nessun sito può disegnarci sotto — serve provarlo
+         dall'icona installata. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body>
     <div id="root"></div>
