@@ -144,15 +144,19 @@ export function Home() {
       ? `${suggestions.topOrigins[0]} · ${suggestions.topNights ? `viaggi di ${suggestions.topNights} notti` : "weekend brevi"} · in base alle tue ricerche`
       : "In base alle tue ricerche passate";
 
-  // La fascia hero arriva fin sotto la status bar (env(safe-area-inset-top), niente
-  // fascia dello sfondo pagina visibile sopra su iOS) — per non stonare col cielo chiaro
-  // della foto, il theme-color della PWA (colore della status bar di sistema su Android)
-  // viene schiarito solo per la durata di questa schermata, e ripristinato all'uscita per
-  // non toccare le altre.
+  // In Safari con l'indirizzo digitato (non installata in Home) la barra di stato/URL
+  // resta sempre opaca sopra la pagina — nessun sito può davvero disegnarci sotto, quindi
+  // qui è solo un trucco visivo: si tinge quella barra (theme-color, che Safari iOS legge
+  // anche in tab normale, non solo da installata) con lo stesso azzurro del cielo in cima
+  // alla foto, campionato dal pixel reale dell'immagine (rgb 115,168,217 = #73A8D9, non a
+  // occhio) così la barra sembra continuare la foto invece di tagliarla con una fascia
+  // verde. Da installata in Home il fix vero (index.html, status bar black-translucent)
+  // fa già disegnare la foto sotto la barra per davvero, questo qui non serve né disturba.
+  // Ripristinato all'uscita per non tingere le altre schermate.
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
     const previous = meta?.getAttribute("content");
-    meta?.setAttribute("content", "#C9CCC0");
+    meta?.setAttribute("content", "#73A8D9");
     return () => {
       if (previous != null) meta?.setAttribute("content", previous);
     };
