@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { COLORS, RADIUS } from "../theme/colors";
 import { FlagIcon } from "../components/FlagIcon";
@@ -229,6 +229,19 @@ export function Results() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // search-direct ordina già per prezzo, ma quello è il prezzo AGGREGATO non ancora
+  // verificato — man mano che verify-price conferma i prezzi reali (somma tratte one-way,
+  // vedi fix del 21/09/2026) l'ordine vero può cambiare, anche di parecchio, e la lista
+  // restava ferma nell'ordine iniziale invece di riflettere il prezzo verificato più basso.
+  // Riordina lato client usando il prezzo verificato quando c'è, altrimenti quello originale.
+  const sortedResults = useMemo(() => {
+    return [...directResults].sort((a, b) => {
+      const priceA = verifiedData[a.id]?.price ?? a.price;
+      const priceB = verifiedData[b.id]?.price ?? b.price;
+      return priceA - priceB;
+    });
+  }, [directResults, verifiedData]);
+
   if (!filters) return null;
 
   const toggleExpand = (id) => {
@@ -271,13 +284,13 @@ export function Results() {
       {!loadingDirect && directResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>Nessun risultato diretto trovato.</div>
       )}
-      {directResults.length > 0 && (
+      {sortedResults.length > 0 && (
         <FlatList>
-          {directResults.map((r, i) => (
+          {sortedResults.map((r, i) => (
             <ResultRow
               key={r.id}
               result={r}
-              isLast={i === directResults.length - 1}
+              isLast={i === sortedResults.length - 1}
               expanded={expandedId === r.id}
               onToggle={() => toggleExpand(r.id)}
               verifiedPrice={verifiedData[r.id]?.price}

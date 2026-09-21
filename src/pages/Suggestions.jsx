@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { COLORS } from "../theme/colors";
 import { Card } from "../components/Card";
 import { FlagIcon } from "../components/FlagIcon";
@@ -52,6 +52,16 @@ export function Suggestions() {
 
   const toggleExpand = (id) => setExpandedId((current) => (current === id ? null : id));
 
+  // Stesso fix di Results.jsx: il prezzo verificato può differire da quello aggregato
+  // usato per l'ordinamento iniziale — riordina col prezzo più affidabile disponibile.
+  const sortedResults = useMemo(() => {
+    return [...results].sort((a, b) => {
+      const priceA = verifiedData[a.id]?.price ?? a.price;
+      const priceB = verifiedData[b.id]?.price ?? b.price;
+      return priceA - priceB;
+    });
+  }, [results, verifiedData]);
+
   const reasonFor = () => {
     const origin = suggestions.topOrigins[0];
     const nights = suggestions.topNights;
@@ -80,7 +90,7 @@ export function Suggestions() {
         </div>
       )}
 
-      {results.map((r) => {
+      {sortedResults.map((r) => {
         const verify = verifiedData[r.id];
         const price = verify?.price ?? r.price;
         const confirmed = Boolean(verify?.confirmed);
