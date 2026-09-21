@@ -61,6 +61,34 @@ function pickClosestDate(options: any[], date: string) {
   return { ...best, approxDate: true };
 }
 
+function nextMonth(yyyyMm: string): string {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, 1)); // m già 1-based = mese successivo
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// Scoperto testando dal vivo (MXP->GOT settembre): certe rotte hanno cache one-way solo in
+// UNA direzione/mese, non nell'altra — il fallback sul solo mese richiesto restava vuoto
+// anche se la STESSA rotta aveva dati un mese dopo. Prova anche il mese successivo prima di
+// arrendersi, sempre solo per il box informativo (vedi pickClosestDate).
+async function fetchBroaderOneWayLeg(
+  origin: string,
+  destination: string,
+  date: string
+): Promise<any | null> {
+  const thisMonth = date.slice(0, 7);
+  const options = await fetchOneWayPrices({ origin, destination, limit: 100, departureAt: thisMonth });
+  if (options.length > 0) return pickClosestDate(options, date);
+
+  const following = await fetchOneWayPrices({
+    origin,
+    destination,
+    limit: 100,
+    departureAt: nextMonth(thisMonth),
+  });
+  return pickClosestDate(following, date);
+}
+
 // "Aeroporto di ritorno diverso dalla partenza" deve restare un'alternativa comoda, non
 // un altro viaggio: 150km ≈ max 2 ore di auto/treno (Bergamo-Malpensa 77km entra,
 // Milano/Bergamo-Bologna 180-240km resta fuori, coerente con l'esempio esplicito
@@ -507,22 +535,16 @@ Deno.serve(async (req) => {
     // Solo per il box informativo (mai per prezzo/conferma/link, calcolati sopra e già
     // finiti): se manca un match esatto, si mostra il volo reale più vicino trovato in cache
     // invece del placeholder "disponibile al passo di prenotazione". outboundOptions/
-    // inboundOptionsPerPair sopra sono già filtrati dalla API sulla data ESATTA (departureAt
-    // passato come YYYY-MM-DD) — se quel giorno preciso non ha nulla in cache l'array arriva
-    // vuoto, senza alternative "vicine" tra cui scegliere. Serve quindi una richiesta IN PIÙ,
-    // sullo stesso mese (YYYY-MM) invece del giorno esatto, e SOLO come fallback quando serve
-    // davvero (mai per i risultati che hanno già un match, per non moltiplicare le chiamate).
+    // inboundOptionsPerPair sopra sono già filtrati dalla API sulla data ESATTA — se quel
+    // giorno preciso non ha nulla in cache l'array arriva vuoto, senza alternative "vicine"
+    // tra cui scegliere. fetchBroaderOneWayLeg riprova sul mese e, se ancora vuoto, sul mese
+    // successivo (scoperto dal vivo: alcune rotte hanno cache solo in una direzione/mese) —
+    // SOLO come fallback quando serve davvero, mai sui risultati che hanno già un match.
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
         ? outboundLegsWithLinks
         : await (async () => {
-            const broader = await fetchOneWayPrices({
-              origin: flight.origin,
-              destination: flight.destination,
-              limit: 100,
-              departureAt: flight.departDate.slice(0, 7),
-            });
-            const p = pickClosestDate(broader, flight.departDate);
+            const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
             return p ? [p] : [];
           })();
     const inboundLegsForDisplay =
@@ -531,17 +553,11 @@ Deno.serve(async (req) => {
         : await (async () => {
             const broaderPerPair = await Promise.all(
               returnOrigins.flatMap((returnOrigin) =>
-                homeAirports.map((airport) =>
-                  fetchOneWayPrices({
-                    origin: returnOrigin,
-                    destination: airport,
-                    limit: 100,
-                    departureAt: flight.returnDate.slice(0, 7),
-                  })
-                )
+                homeAirports.map((airport) => fetchBroaderOneWayLeg(returnOrigin, airport, flight.returnDate))
               )
             );
-            const p = pickClosestDate(broaderPerPair.flat(), flight.returnDate);
+            const candidates = broaderPerPair.filter((p): p is any => p !== null);
+            const p = pickClosestDate(candidates, flight.returnDate);
             return p ? [p] : [];
           })();
 
