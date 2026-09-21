@@ -240,17 +240,22 @@ export function Home() {
             left: 0,
             right: 0,
             top: 0,
-            paddingTop: "calc(env(safe-area-inset-top, 0px) + 28px)",
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)",
             display: "flex",
             justifyContent: "center",
           }}
         >
           <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
-            <div style={{ fontWeight: 600, fontSize: 28, color: "#FFFFFF", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
-              Ciao 👋
-            </div>
-            <div style={{ fontSize: 16, color: "rgba(255,255,255,0.9)", marginTop: 2, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
-              Dove ti va di andare?
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 22,
+                color: "#FFFFFF",
+                textShadow: "0 1px 6px rgba(0,0,0,0.35)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Ciao 👋 Dove ti va di andare?
             </div>
           </div>
         </div>
