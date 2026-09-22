@@ -26,6 +26,21 @@ function splitDateParts(d: string): { day: string; monthYear: string; year: stri
   const [year, month, day] = d.split("-");
   return { day, monthYear: `${year}${month}`, year }; // Iberia: DD / YYYYMM / YYYY separati
 }
+function dottedDate(d: string): string {
+  const [year, month, day] = d.split("-");
+  return `${day}.${month}.${year}`; // "2026-09-22" -> "22.09.2026" (TAP)
+}
+const MONTH_ABBR = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+function monthAbbrAndDay(d: string): { month: string; day: string } {
+  const [, month, day] = d.split("-");
+  return { month: MONTH_ABBR[Number(month) - 1], day: String(Number(day)) }; // Air New Zealand
+}
+function formatSlashDate(d: string): string {
+  const [year, month, day] = d.split("-");
+  return `${day}/${month}/${year}`; // "2026-09-22" -> "22/09/2026" (Air Canada)
+}
 
 const VOLOTEA_SLUGS: Record<string, string> = voloteaSlugs as Record<string, string>;
 const ITALIAN_MONTHS = [
@@ -79,6 +94,31 @@ export function buildAirlineDeepLink(
     case "PC":
       // Hub Istanbul di Pegasus e' SAW (Sabiha Gokcen), non IST.
       return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}&returnDate=${returnDate}`;
+    case "TP":
+      // Verificato dal vivo il 22/09/2026 (MXP-LIS): URL con "deeplink" esplicito nel
+      // path, date in formato DD.MM.YYYY. Trovato intercettando window.open dal bottone
+      // "Cerca" del sito (il link non è visibile come href statico in pagina).
+      return `https://booking.flytap.com/booking/flights/deeplink?market=IT&language=it&origin=${origin}&destination=${destination}&flexibleDates=false&flightType=return&adt=1&chd=0&inf=0&yth=0&depDate=${dottedDate(departDate)}&retDate=${dottedDate(returnDate)}`;
+    case "UA":
+      // Verificato dal vivo il 22/09/2026 (MXP-EWR): stesso principio, URL trovato
+      // sulla barra indirizzi dopo submit del form (niente window.open qui).
+      return `https://www.united.com/en/it/fsr/choose-flights?f=${origin}&t=${destination}&d=${departDate}&r=${returnDate}&sc=7,7&px=1&taxng=1&newHP=True&clm=7&st=bestmatches&tqp=R`;
+    case "AC":
+      // Verificato dal vivo il 22/09/2026 (MXP-YYZ): intercettato da window.open del
+      // bottone "Ricerca".
+      return `https://www.aircanada.com/booking/it/it/aco/search?org0=${origin}&dest0=${destination}&orgType0=A&destType0=A&org1=${destination}&dest1=${origin}&orgType1=A&destType1=A&departureDate0=${formatSlashDate(departDate)}&departureDate1=${formatSlashDate(returnDate)}&adt=1&yth=0&chd=0&inf=0&ins=0&marketCode=INT&tripType=RoundTrip&isFlexible=false`;
+    case "CX":
+      // Verificato dal vivo il 22/09/2026 (MXP-HKG): intercettato da window.open del
+      // bottone "Cerca voli".
+      return `https://book.cathaypacific.com/tsp/it_IT/flight-selection?ca=Y&o=${origin}&d=${destination}&a=1&ya=0&ch=0&i=0&ddb1=${departDate}&ddb2=${returnDate}&viewport=desktop`;
+    case "NZ": {
+      // Verificato dal vivo il 22/09/2026 (MXP-AKL): trovato nell'href statico del
+      // bottone "Search" (non serve intercettare window.open). Formato data:
+      // mese abbreviato maiuscolo + giorno senza zero iniziale, separati.
+      const dep = monthAbbrAndDay(departDate);
+      const ret = monthAbbrAndDay(returnDate);
+      return `https://flightbookings.airnewzealand.eu/vbook/actions/ext-search?searchLegs%5B0%5D.originPoint=${origin}&searchLegs%5B0%5D.destinationPoint=${destination}&searchLegs%5B0%5D.tripStartMonth=${dep.month}&searchLegs%5B0%5D.tripStartDate=${dep.day}&searchLegs%5B1%5D.originPoint=${destination}&searchLegs%5B1%5D.destinationPoint=${origin}&searchLegs%5B1%5D.tripStartMonth=${ret.month}&searchLegs%5B1%5D.tripStartDate=${ret.day}&depart-from=${origin}&depart-to=${destination}&tripType=return&adults=1&children=0&infants=0&bookingClass=ECONOMY&promoCode=&searchType=flexible&doSearch=search`;
+    }
     case "BA": {
       const o = cityOf(origin);
       const d = cityOf(destination);
@@ -129,6 +169,21 @@ export function buildAirlineOneWayDeepLink(
       return `https://digital.etihad.com/book/search?LANGUAGE=IT&CHANNEL=DESKTOP&B_LOCATION=${origin}&E_LOCATION=${destination}&TRIP_TYPE=O&CABIN=E&TRAVELERS=ADT&TRIP_FLOW_TYPE=AVAILABILITY&SITE_EDITION=IT-IT&DATE_1=${compactDate(departDate)}0000&FLOW=REVENUE`;
     case "PC":
       return `https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=${destination}&departurePort=${origin}&currency=EUR&dateOption=1&departureDate=${departDate}`;
+    case "TP":
+      // Verificato dal vivo il 22/09/2026 (MXP-LIS): stesso URL del round-trip con
+      // flightType=oneway e niente retDate.
+      return `https://booking.flytap.com/booking/flights/deeplink?market=IT&language=it&origin=${origin}&destination=${destination}&flexibleDates=false&flightType=oneway&adt=1&chd=0&inf=0&yth=0&depDate=${dottedDate(departDate)}`;
+    case "UA":
+      // Verificato dal vivo il 22/09/2026 (MXP-EWR): parametro tqp=O al posto di R,
+      // niente "r" (data di ritorno).
+      return `https://www.united.com/en/it/fsr/choose-flights?f=${origin}&t=${destination}&d=${departDate}&sc=7&px=1&taxng=1&newHP=True&clm=7&st=bestmatches&tqp=O`;
+    case "AC":
+      // Verificato dal vivo il 22/09/2026 (MXP-YYZ): un solo leg (org0/dest0), tripType=OneWay.
+      return `https://www.aircanada.com/booking/it/it/aco/search?org0=${origin}&dest0=${destination}&orgType0=A&destType0=A&departureDate0=${formatSlashDate(departDate)}&adt=1&yth=0&chd=0&inf=0&ins=0&marketCode=INT&tripType=OneWay&isFlexible=false`;
+    case "CX":
+      // Verificato dal vivo il 22/09/2026 (MXP-HKG): niente ddb2 (data di ritorno) attiva
+      // automaticamente la tariffa "solo andata".
+      return `https://book.cathaypacific.com/tsp/it_IT/flight-selection?ca=Y&o=${origin}&d=${destination}&a=1&ya=0&ch=0&i=0&ddb1=${departDate}&viewport=desktop`;
     case "BA": {
       const o = cityOf(origin);
       const d = cityOf(destination);
@@ -156,6 +211,17 @@ export const HOMEPAGE_FALLBACK: Record<string, string> = {
   IB: "https://www.iberia.com/it/", // Iberia — round-trip ha schema, one-way no
   SK: "https://www.flysas.com/it/", // SAS Scandinavian Airlines
   "3F": "https://www.flyone.eu/am/", // FLYONE Armenia
+  // Aggiunte il 22/09/2026, giro esaustivo su richiesta esplicita dell'utente — ognuna
+  // bloccata da qualcosa di concreto e verificato dal vivo (mai per pigrizia): verifica
+  // anti-bot (Cloudflare/Akamai) sull'motore di prenotazione vero, o motore a stato di
+  // sessione senza URL condivisibile (vedi commenti puntuali sotto).
+  DL: "https://www.delta.com", // Delta — stato di sessione (cacheKeySuffix), niente URL
+  AA: "https://www.aa.com", // American Airlines — stato di sessione, niente URL
+  JL: "https://www.jal.co.jp/it/it/", // Japan Airlines — stato di sessione (JAL_SESSION_ID)
+  NH: "https://www.ana.co.jp/en/it/", // ANA — stato di sessione (POST, nessun URL)
+  QF: "https://www.qantas.com", // Qantas — bloccato da Akamai ("Access Denied") sul motore vero
+  SQ: "https://www.singaporeair.com/en_UK/it/home", // Singapore Airlines — hash SPA, stato di sessione
+  KE: "https://www.koreanair.com/it/it", // Korean Air — calendario non automatizzabile, da riprovare
 };
 
 // Applica lo schema one-way diretto o, altrimenti, la homepage — su una singola tratta
