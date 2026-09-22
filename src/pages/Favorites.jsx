@@ -70,6 +70,9 @@ function FavoriteDetails({ flight }) {
       <BookingAction
         deepLink={deepLink}
         airlineName={data?.outboundLeg?.airlineName ?? data?.outboundLeg?.airline ?? data?.inboundLeg?.airlineName ?? data?.inboundLeg?.airline}
+        route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
+        departDate={flight.departDate}
+        returnDate={flight.returnDate}
         style={{ width: "100%", justifyContent: "center" }}
       />
     </div>

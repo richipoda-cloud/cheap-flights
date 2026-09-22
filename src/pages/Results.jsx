@@ -128,12 +128,16 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                       <BookingAction
                         deepLink={outboundLeg?.deepLink}
                         airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline}
+                        route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
+                        departDate={result.departDate}
                         label="Prenota andata →"
                         style={{ flex: 1, justifyContent: "center" }}
                       />
                       <BookingAction
                         deepLink={inboundLeg?.deepLink}
                         airlineName={inboundLeg?.airlineName ?? inboundLeg?.airline}
+                        route={`${result.destination ?? "?"} → ${result.origin ?? "?"}`}
+                        departDate={result.returnDate}
                         label="Prenota ritorno →"
                         style={{ flex: 1, justifyContent: "center" }}
                       />
@@ -142,6 +146,9 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                     <BookingAction
                       deepLink={deepLink}
                       airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
+                      route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
+                      departDate={result.departDate}
+                      returnDate={result.returnDate}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   )}

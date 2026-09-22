@@ -8,7 +8,24 @@ import { PrimaryButton } from "./PrimaryButton";
 // [di Aviasales]"). Niente più bottone-fantasma: compagnia/data/orario sono già mostrati
 // sopra (LegBox/LegRow) — questo messaggio rimanda esplicitamente l'utente a prenotare da
 // sé sul sito della compagnia, invece di un link che non porta da nessuna parte di utile.
-export function BookingAction({ deepLink, airlineName, label = "Vai alla prenotazione →", style, disabled }) {
+//
+// Segnalato dall'utente su rotte intercontinentali (es. Milano-Los Angeles): la Data API
+// gratuita di Travelpayouts spesso non ha PROPRIO cache one-way per queste tratte — non
+// solo la compagnia è sconosciuta, TUTTO il leg è null (vedi verify-price/index.ts), quindi
+// il messaggio restava vago ("prenota con la data mostrata sopra" quando sopra non c'era
+// nessuna data). route/departDate/returnDate (sempre noti dal risultato di ricerca, anche
+// senza alcun match one-way) coprono questo buco: mostra almeno la rotta e le date, cosi'
+// l'utente sa ESATTAMENTE cosa cercare anche nel caso più povero di dati.
+export function BookingAction({
+  deepLink,
+  airlineName,
+  route,
+  departDate,
+  returnDate,
+  label = "Vai alla prenotazione →",
+  style,
+  disabled,
+}) {
   if (deepLink) {
     return (
       <PrimaryButton
@@ -21,6 +38,7 @@ export function BookingAction({ deepLink, airlineName, label = "Vai alla prenota
       </PrimaryButton>
     );
   }
+  const dates = [departDate, returnDate].filter(Boolean).join(" → ");
   return (
     <div
       style={{
@@ -34,7 +52,15 @@ export function BookingAction({ deepLink, airlineName, label = "Vai alla prenota
       }}
     >
       ✈️ Nessun link diretto{airlineName ? ` per ${airlineName}` : ""} — prenota da qui in
-      autonomia sul sito della compagnia, con la data e l'orario mostrati sopra.
+      autonomia sul sito della compagnia
+      {airlineName ? ", con la data e l'orario mostrati sopra." : route || dates ? (
+        <>
+          {" "}per <strong>{route}</strong>
+          {dates ? `, ${dates}` : ""}.
+        </>
+      ) : (
+        "."
+      )}
     </div>
   );
 }

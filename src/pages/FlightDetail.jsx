@@ -262,6 +262,9 @@ export function FlightDetail() {
             <BookingAction
               deepLink={deepLink}
               airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
+              route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
+              departDate={flight.departDate}
+              returnDate={flight.returnDate}
               style={{ maxWidth: 220 }}
             />
           )}

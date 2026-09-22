@@ -144,6 +144,9 @@ export function Suggestions() {
                     <BookingAction
                       deepLink={verify.deepLink ?? r.deepLink}
                       airlineName={verify.outboundLeg?.airlineName ?? verify.outboundLeg?.airline ?? verify.inboundLeg?.airlineName ?? verify.inboundLeg?.airline}
+                      route={`${r.origin ?? "?"} → ${r.destination ?? "?"}`}
+                      departDate={r.departDate}
+                      returnDate={r.returnDate}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   </>
