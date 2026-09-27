@@ -2,6 +2,31 @@
 
 Idee non ancora implementate, raccolte qui invece che perse in chat.
 
+## Compagnia/orario mai disponibili per USA, Giappone, Cina, Corea, Thailandia, Canada, Brasile
+
+Limite strutturale, non un bug da correggere con più codice — verificato a fondo il
+27-28/09/2026 dopo segnalazione dell'utente. Il volo di RITORNO verso l'Italia per queste
+destinazioni non ha ALCUN dato nonstop in v3/prices_for_dates, controllato in 4 modi
+diversi: aeroporto specifico (JFK/EWR/LGA/HND/NRT/PEK/PVG/CAN/HKG/ICN/PUS/BKK/DMK/YYZ/YUL/
+GRU/GIG), città aggregata (NYC/MIA/TYO/SEL/YTO/SAO), codice paese, e codice città interno
+dell'API (MIL). Zero in tutti i casi (JFK ne aveva 2, troppo pochi per essere reali).
+Andata invece spesso ricca di dati (NYC 83, TYO 30 nonstop) — asimmetria dovuta a come
+Travelpayouts popola la cache (frequenza di ricerca reale su siti partner, non schedule
+voli), non un problema nostro risolvibile lato codice.
+
+Uniche vie oltre questo punto, entrambe scartate per ora:
+- **Scraping di Aviasales** (il motore dietro Travelpayouts, con più campi) — rifiutato:
+  violerebbe i loro termini d'uso e quasi certamente ha protezione anti-bot.
+- **Aviasales Flight Search API (real-time)** — non è a pagamento in euro, è gated da
+  traffico: richiede un progetto con almeno **50.000 utenti attivi al mese (MAU)**
+  (verificato dal vivo sulla doc ufficiale, novembre 2025). Sotto quella soglia non è
+  accessibile a nessun prezzo. Da riconsiderare solo se l'app dovesse mai raggiungere
+  quel traffico.
+
+Per queste destinazioni resta: prezzo vero, conferma che è un volo diretto, data esatta —
+mai compagnia/orario prima della prenotazione (fallback "non confermato" già in LegBox/
+BookingAction).
+
 ## Ampliare COUNTRY_MAJOR_CITIES (search-direct) ad altri paesi
 
 Scoperto il 27/09/2026 (segnalato dall'utente: "0 risultati per USA impossibile, esistono
