@@ -142,8 +142,28 @@ Deno.serve(async (req) => {
       const existing = bestByDeparture.get(key);
       if (!existing || r.price < existing.price) bestByDeparture.set(key, r);
     }
-    const deduped = [...bestByDeparture.values()];
-    const results = deduped.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
+    const deduped = [...bestByDeparture.values()].sort((a, b) => a.price - b.price);
+    // Segnalato dall'utente ("come mai per USA trova solo New York?"): col dedup sopra
+    // ogni data è un volo reale diverso, ma una destinazione con tante date economiche
+    // (New York, 18) può comunque occupare TUTTI i 10 posti finali solo perché in media
+    // costa meno di un'altra destinazione valida (Miami, 3 date) — la seconda spariva
+    // anche se genuina. Primo giro: max MAX_PER_DESTINATION per città, per garantire
+    // varietà; secondo giro: riempie gli slot avanzati (se non bastano destinazioni
+    // diverse) con le prossime più economiche, quindi non si perde mai un posto libero.
+    const MAX_PER_DESTINATION = 3;
+    const perDestinationCount = new Map<string, number>();
+    const diverse: typeof deduped = [];
+    const leftover: typeof deduped = [];
+    for (const r of deduped) {
+      const count = perDestinationCount.get(r.destination) ?? 0;
+      if (count < MAX_PER_DESTINATION && diverse.length < MAX_RESULTS) {
+        diverse.push(r);
+        perDestinationCount.set(r.destination, count + 1);
+      } else {
+        leftover.push(r);
+      }
+    }
+    const results = [...diverse, ...leftover].slice(0, MAX_RESULTS).sort((a, b) => a.price - b.price);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
