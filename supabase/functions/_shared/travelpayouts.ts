@@ -31,6 +31,15 @@ export function mapRawResult(r: any, origin: string) {
     currency: "EUR",
     nights: nightsBetween(r.depart_date, r.return_date),
     foundAt: r.found_at ?? null,
+    // Scoperto indagando "perché un volo diretto non ha compagnia/orario" (segnalato
+    // dall'utente su Milano-New York): v2/prices/latest NON garantisce affatto un volo
+    // nonstop — questo campo (mai letto finora) dice quanti scali ha il prezzo cercato.
+    // La lista "Risultati" mostrava il prezzo come se fosse un volo diretto anche quando
+    // number_of_changes era 1 o 2, poi provava ad arricchirlo con voli one-way SENZA
+    // scalo (v3, transfers=0) — che ovviamente non trova mai nulla su una rotta che un
+    // volo diretto non ce l'ha proprio (es. Linate non vola long-haul). Serve al client
+    // per dire onestamente "con scalo" invece di far sembrare un buco nei dati.
+    numberOfChanges: r.number_of_changes ?? null,
   };
 }
 

@@ -134,12 +134,14 @@ export function Suggestions() {
                       leg={verify.outboundLeg}
                       route={`${r.origin ?? "?"} → ${r.destination ?? "?"}`}
                       date={r.departDate}
+                      numberOfChanges={verify.numberOfChanges}
                     />
                     <LegBox
                       title="Ritorno"
                       leg={verify.inboundLeg}
                       route={`${r.destination ?? "?"} → ${r.origin ?? "?"}`}
                       date={r.returnDate}
+                      numberOfChanges={verify.numberOfChanges}
                     />
                     <BookingAction
                       deepLink={verify.deepLink ?? r.deepLink}
@@ -147,6 +149,7 @@ export function Suggestions() {
                       route={`${r.origin ?? "?"} → ${r.destination ?? "?"}`}
                       departDate={r.departDate}
                       returnDate={r.returnDate}
+                      numberOfChanges={verify.numberOfChanges}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   </>

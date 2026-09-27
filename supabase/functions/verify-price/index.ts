@@ -401,6 +401,10 @@ Deno.serve(async (req) => {
         inboundLegs: inboundLegsForDisplay,
         returnsElsewhere,
         hasStop,
+        // Dalla cache v2 (match), se c'è — vedi commento su numberOfChanges in
+        // _shared/travelpayouts.ts. Serve al client per non far sembrare un buco nei
+        // dati quando in realtà quella rotta un volo diretto non lo ha proprio.
+        numberOfChanges: match?.numberOfChanges ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

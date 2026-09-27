@@ -6,7 +6,14 @@ import { Card } from "./Card";
 // aviasales/v3/prices_for_dates (one-way, stesso endpoint dei Percorsi creativi) sulla
 // data esatta. Se in cache c'è un match, questo box mostra il dato reale; altrimenti
 // resta onesto sul limite invece di inventare o lasciare vuoto.
-export function LegBox({ title, leg, route, date }) {
+//
+// numberOfChanges (da v2, mai letto prima — segnalato dall'utente: "se il volo è diretto
+// perché non ha compagnia/orario?"): v2/prices/latest NON garantisce affatto un volo
+// nonstop, e v3 qui sopra cerca SOLO voli senza scalo (transfers=0) — su una rotta che un
+// diretto non ce l'ha proprio (es. Milano Linate, niente long-haul) quella ricerca non
+// troverà mai nulla, sempre. Senza questo campo il placeholder sembrava un buco nei dati
+// invece che "questa rotta richiede sempre almeno uno scalo".
+export function LegBox({ title, leg, route, date, numberOfChanges }) {
   if (leg) {
     return (
       <Card style={{ padding: 16, marginBottom: 12 }}>
@@ -53,7 +60,9 @@ export function LegBox({ title, leg, route, date }) {
         <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{date}</div>
       </div>
       <div style={{ fontSize: 12, color: COLORS.inkSoft, fontStyle: "italic" }}>
-        Orari e compagnia disponibili al passo di prenotazione
+        {numberOfChanges > 0
+          ? `Volo con almeno ${numberOfChanges === 1 ? "1 scalo" : `${numberOfChanges} scali`} — orari e compagnia disponibili al passo di prenotazione`
+          : "Orari e compagnia disponibili al passo di prenotazione"}
       </div>
     </Card>
   );

@@ -16,12 +16,19 @@ import { PrimaryButton } from "./PrimaryButton";
 // nessuna data). route/departDate/returnDate (sempre noti dal risultato di ricerca, anche
 // senza alcun match one-way) coprono questo buco: mostra almeno la rotta e le date, cosi'
 // l'utente sa ESATTAMENTE cosa cercare anche nel caso più povero di dati.
+//
+// numberOfChanges (v2, segnalato dall'utente — "se il volo è diretto perché non ha
+// compagnia?"): spesso non è affatto diretto, v2/prices/latest non lo garantisce e la
+// ricerca one-way qui sopra cerca SOLO senza scalo — su una rotta che un diretto non ce
+// l'ha proprio (es. Linate, niente long-haul) il messaggio sembrava un buco nei dati
+// invece che "questa rotta ha sempre almeno uno scalo".
 export function BookingAction({
   deepLink,
   airlineName,
   route,
   departDate,
   returnDate,
+  numberOfChanges,
   label = "Vai alla prenotazione →",
   style,
   disabled,
@@ -51,8 +58,11 @@ export function BookingAction({
         ...style,
       }}
     >
-      ✈️ Nessun link diretto{airlineName ? ` per ${airlineName}` : ""} — prenota da qui in
-      autonomia sul sito della compagnia
+      ✈️ Nessun link diretto{airlineName ? ` per ${airlineName}` : ""}
+      {!airlineName && numberOfChanges > 0
+        ? ` (rotta con almeno ${numberOfChanges === 1 ? "1 scalo" : `${numberOfChanges} scali`})`
+        : ""}
+      {" "}— prenota da qui in autonomia sul sito della compagnia
       {airlineName ? ", con la data e l'orario mostrati sopra." : route || dates ? (
         <>
           {" "}per <strong>{route}</strong>

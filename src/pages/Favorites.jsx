@@ -60,12 +60,14 @@ function FavoriteDetails({ flight }) {
         leg={data?.outboundLeg}
         route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
         date={flight.departDate}
+        numberOfChanges={data?.numberOfChanges}
       />
       <LegBox
         title="Ritorno"
         leg={data?.inboundLeg}
         route={`${flight.destination ?? "?"} → ${flight.origin ?? "?"}`}
         date={flight.returnDate}
+        numberOfChanges={data?.numberOfChanges}
       />
       <BookingAction
         deepLink={deepLink}
@@ -73,6 +75,7 @@ function FavoriteDetails({ flight }) {
         route={`${flight.origin ?? "?"} → ${flight.destination ?? "?"}`}
         departDate={flight.departDate}
         returnDate={flight.returnDate}
+        numberOfChanges={data?.numberOfChanges}
         style={{ width: "100%", justifyContent: "center" }}
       />
     </div>

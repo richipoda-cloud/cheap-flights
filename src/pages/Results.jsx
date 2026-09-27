@@ -110,12 +110,14 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                     leg={outboundLeg}
                     route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
                     date={result.departDate}
+                    numberOfChanges={verifyData.numberOfChanges}
                   />
                   <LegBox
                     title="Ritorno"
                     leg={inboundLeg}
                     route={`${inboundLeg?.originAirport ?? result.destination ?? "?"} → ${inboundLeg?.destinationAirport ?? result.origin ?? "?"}`}
                     date={result.returnDate}
+                    numberOfChanges={verifyData.numberOfChanges}
                   />
                   {verifyData.returnsElsewhere && (
                     <div style={{ fontSize: 11.5, color: COLORS.plum, marginBottom: 8, marginTop: -4 }}>
@@ -149,6 +151,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                       route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
                       departDate={result.departDate}
                       returnDate={result.returnDate}
+                      numberOfChanges={verifyData.numberOfChanges}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   )}
