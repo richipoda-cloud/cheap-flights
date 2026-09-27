@@ -229,6 +229,11 @@ export function Results() {
             ...r,
             ...(filters.flexArrival ? { homeAirports: filters.origins } : {}),
             ...(filters.flexDeparture ? { flexReturnOrigin: true } : {}),
+            // Coerenza col filtro "solo diretti di default" di search-direct (segnalato
+            // dall'utente): senza questo verify-price poteva rifiutare di confermare un
+            // prezzo con scalo che search-direct aveva incluso apposta perché il toggle
+            // "Andata/Ritorno con scalo" è attivo.
+            allowStops: Boolean(filters.flexOutboundStop || filters.flexReturnStop),
           };
           verifyPrice(payload)
             .then((v) => {

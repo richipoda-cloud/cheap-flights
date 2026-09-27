@@ -53,7 +53,17 @@ Deno.serve(async (req) => {
     // Scarta prezzi in cache troppo vecchi PRIMA di scegliere i più economici: un prezzo
     // sballato (magari visto settimane fa) altrimenti vince facilmente il ranking per prezzo.
     const fresh = filterByFreshness(merged);
-    const withoutExcluded = filterByExcludedCountries(fresh, filters.excludedCountries);
+    // Segnalato dall'utente ("non ho attivato il bottone con scalo, perché propone rotte
+    // con scalo?"): "Risultati" prendeva il prezzo più economico in cache per la rotta,
+    // CON O SENZA scalo, a prescindere dal toggle "Andata/Ritorno con scalo" — quel
+    // toggle serve solo per un secondo tentativo (assemblare un itinerario più economico
+    // via hub, calcolato solo aprendo un risultato), non decide cosa entra in lista.
+    // Di default si tengono ora solo i prezzi DAVVERO senza scalo (number_of_changes:0,
+    // campo v2 mai letto finora) — con scalo solo se l'utente ha esplicitamente attivato
+    // quel toggle prima di cercare.
+    const allowStops = Boolean(filters.flexOutboundStop || filters.flexReturnStop);
+    const nonstopOnly = allowStops ? fresh : fresh.filter((r) => r.numberOfChanges === 0);
+    const withoutExcluded = filterByExcludedCountries(nonstopOnly, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
     // Con "Date fisse" attivo si tiene chi parte in QUALUNQUE giorno tra dateFrom e
     // dateTo inclusi (il ritorno resta filtrato dalla durata soggiorno, come sempre) —

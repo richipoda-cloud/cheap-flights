@@ -279,8 +279,15 @@ Deno.serve(async (req) => {
     // Travelpayouts lo popola solo con prezzi trovati nelle ultime 48 ore — filtrarlo per
     // freschezza con un campo che non esiste azzerava SEMPRE i risultati (bug scoperto
     // durante l'esperimento round-trip: 0 match su 6 rotte reali testate dal vivo).
+    // Stesso filtro di search-direct (segnalato dall'utente: "non ho attivato il bottone
+    // con scalo, perché propone rotte con scalo?") — senza flight.allowStops (passato dal
+    // client solo se il toggle "Andata/Ritorno con scalo" è attivo) non va confermato un
+    // prezzo che in realtà è per un itinerario con scalo (number_of_changes>0).
     const match = filterByFreshness(latestPrices).find(
-      (r: any) => r.departDate === flight.departDate && r.returnDate === flight.returnDate
+      (r: any) =>
+        r.departDate === flight.departDate &&
+        r.returnDate === flight.returnDate &&
+        (flight.allowStops || r.numberOfChanges === 0)
     );
     const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
     const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
