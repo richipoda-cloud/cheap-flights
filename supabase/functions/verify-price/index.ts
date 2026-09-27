@@ -81,6 +81,21 @@ async function fetchBroaderOneWayLeg(
   return pickClosestDate(following, date);
 }
 
+// TENTATIVO SCARTATO #2 (dopo v1/prices/cheap sopra): mostrare come ultimo fallback i voli
+// CON scalo di v3/prices_for_dates (allowAllora scartati dal filtro transfers=0), invece
+// del solo placeholder onesto. Scritto, deployato e testato dal vivo il 27/09/2026 su
+// MXP->NYC: il primo risultato (Icelandair via Reykjavik, stesso aeroporto/compagnia sui
+// due segmenti) sembrava genuino, ma il secondo test (MXP->EWR) ha restituito
+// "easyJet, 1 scalo" per un itinerario reale MXP→CDG→ORY→EWR — CDG e ORY sono DUE
+// aeroporti parigini diversi (self-transfer venduto da Kiwi.com/gate "Kiwi.com" nel dato
+// grezzo), con la tratta transatlantica reale su una compagnia diversa non mostrata
+// affatto. "easyJet · 1 scalo" era quindi falso/fuorviante quanto il caso Wizz Air:
+// l'API non distingue in modo affidabile una connessione vera in un solo aeroporto/hub da
+// un self-transfer rischioso tra aeroporti diversi con compagnia nascosta — non c'è un
+// campo strutturato su cui filtrare, solo lo slug del link (fragile, non documentato, da
+// non usare per decidere cosa mostrare). Scartato: resta solo fetchBroaderOneWayLeg
+// (diretti, 2 mesi) prima del placeholder onesto "disponibili al passo di prenotazione".
+
 // "Aeroporto di ritorno diverso dalla partenza" deve restare un'alternativa comoda, non
 // un altro viaggio: 150km ≈ max 2 ore di auto/treno (Bergamo-Malpensa 77km entra,
 // Milano/Bergamo-Bologna 180-240km resta fuori, coerente con l'esempio esplicito

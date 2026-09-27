@@ -80,6 +80,15 @@ export async function fetchOneWayPrices({
   // filtrando per prezzo più basso — mostrarli come "Diretto" con l'orario di arrivo
   // finale dava durate assurde (es. 7h per una tratta di 1h) e un prezzo che poi in
   // fase di prenotazione risultava per un volo diverso da quello indicato.
+  //
+  // TENTATO (27/09/2026) e SCARTATO: includere questi voli con scalo come ultimo
+  // fallback quando manca tutto il resto (rotte intercontinentali senza diretto, es.
+  // MXP-NYC) — un test dal vivo su MXP-EWR ha mostrato "easyJet, 1 scalo" per un
+  // itinerario reale MXP→CDG→ORY→EWR (CDG e ORY sono due aeroporti PARIGINI DIVERSI,
+  // self-transfer venduto da un gate terzo — Kiwi.com nel dato grezzo — con la vera
+  // tratta transatlantica su una compagnia mai mostrata). L'API non espone nessun campo
+  // per distinguere una connessione vera nello stesso aeroporto/hub da un self-transfer
+  // rischioso tra aeroporti diversi: restano quindi sempre esclusi, nessuna eccezione.
   return (json.data ?? []).filter((r: any) => (r.transfers ?? 0) === 0).map(mapOneWayResult);
 }
 
