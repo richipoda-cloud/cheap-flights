@@ -2,6 +2,32 @@
 
 Idee non ancora implementate, raccolte qui invece che perse in chat.
 
+## Ampliare COUNTRY_MAJOR_CITIES (search-direct) ad altri paesi
+
+Scoperto il 27/09/2026 (segnalato dall'utente: "0 risultati per USA impossibile, esistono
+voli diretti da Milano"): v2/prices/latest interrogato con `destination=CODICE PAESE`
+(es. "US") ha una cache molto più povera di quando si passa una città/aeroporto specifico
+— verificato dal vivo: MXP->US (paese) dava 20 risultati totali, ZERO senza scalo;
+MXP->NYC (città) 182, di cui 83 senza scalo. `COUNTRY_MAJOR_CITIES` in
+`supabase/functions/search-direct/index.ts` aggiunge IN PIÙ una query per le città
+principali di un paese (oggi solo US: NYC/MIA, JP: TYO), verificate una per una dal vivo
+per avere davvero voli nonstop in cache — non esaustiva (impossibile per tutti i 237
+paesi, gli USA da soli hanno ~2000 città in `cities.json`).
+
+Da ampliare se altri paesi vengono segnalati con lo stesso sintomo (0 risultati diretti
+pur avendo voli reali) — stesso metodo: testare `destination=CODICE PAESE` vs le città
+principali una per una (query diretta a v2/prices/latest, contare `number_of_changes:0`)
+prima di aggiungere qualunque città alla lista, mai indovinare quali città potrebbero
+avere voli diretti.
+
+## Compromesso "voli con scalo nella lista base" (deciso il 27/09/2026: NO per ora)
+
+Proposto come alternativa al filtro attuale (Risultati = solo davvero diretti, salvo
+toggle "Andata/Ritorno con scalo" esplicito): tenere i voli con scalo in lista ma
+etichettati subito con un badge "N scali" visibile senza aprire il dettaglio, invece di
+nasconderli del tutto. L'utente ha scelto di nasconderli (bottone esplicito) invece di
+questo compromesso — lasciato qui nel caso si voglia riconsiderare in futuro.
+
 ## Ampliare il più possibile le compagnie con link diretto/homepage
 
 Richiesto esplicitamente il 21/09/2026, dopo la rimozione di Google Flights come ultima

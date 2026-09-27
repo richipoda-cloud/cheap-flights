@@ -24,6 +24,21 @@ const MAX_RESULTS = 10;
 // nella lista. Pescando un pool ampio PRIMA del filtro, quelle destinazioni restano visibili.
 const FETCH_LIMIT = 1000;
 
+// Segnalato dall'utente ("0 risultati per USA impossibile, esistono voli diretti da
+// Milano"): v2/prices/latest interrogato con destination=CODICE PAESE (es. "US") ha una
+// cache MOLTO più povera di quando si passa una città/aeroporto specifico — verificato
+// dal vivo il 27/09/2026: MXP->US (paese) dava 20 risultati totali, ZERO senza scalo;
+// MXP->NYC (città) ne dava 182, di cui 83 senza scalo. Iterare su TUTTE le città di un
+// paese non è fattibile (gli USA da soli ne hanno ~2000 in cities.json): lista curata
+// delle sole città verificate con voli nonstop reali in cache da MXP, aggiunta IN PIÙ
+// alla query per paese (mai al posto di) — non esaustiva, da ampliare se segnalato per
+// altri paesi (vedi TODO.md). Le altre città USA testate (LAX/CHI/ATL/BOS/SFO/LAS/WAS)
+// davano zero nonstop, coerente con la vera rete Malpensa-USA (pochi widebody).
+const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
+  US: ["NYC", "MIA"],
+  JP: ["TYO"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -46,8 +61,17 @@ Deno.serve(async (req) => {
     const dateFrom = filters.dateMode === "fixed" ? filters.dateFrom : null;
     const dateTo = filters.dateMode === "fixed" ? filters.dateTo : null;
 
+    // "Destinazione fissa" a un PAESE (2 lettere, es. "US") invece che a una città/
+    // aeroporto (3 lettere, es. "NYC") — vedi COUNTRY_MAJOR_CITIES sopra.
+    const extraCityDestinations =
+      destination && destination.length === 2 ? COUNTRY_MAJOR_CITIES[destination] ?? [] : [];
     const perOrigin = await Promise.all(
-      origins.map((origin) => fetchLatestPrices({ origin, destination, dateFrom, limit: FETCH_LIMIT }))
+      origins.flatMap((origin) => [
+        fetchLatestPrices({ origin, destination, dateFrom, limit: FETCH_LIMIT }),
+        ...extraCityDestinations.map((city) =>
+          fetchLatestPrices({ origin, destination: city, dateFrom, limit: FETCH_LIMIT })
+        ),
+      ])
     );
     const merged = perOrigin.flat();
     // Scarta prezzi in cache troppo vecchi PRIMA di scegliere i più economici: un prezzo
