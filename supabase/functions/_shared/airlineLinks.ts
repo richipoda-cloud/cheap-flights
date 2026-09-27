@@ -119,6 +119,29 @@ export function buildAirlineDeepLink(
       const ret = monthAbbrAndDay(returnDate);
       return `https://flightbookings.airnewzealand.eu/vbook/actions/ext-search?searchLegs%5B0%5D.originPoint=${origin}&searchLegs%5B0%5D.destinationPoint=${destination}&searchLegs%5B0%5D.tripStartMonth=${dep.month}&searchLegs%5B0%5D.tripStartDate=${dep.day}&searchLegs%5B1%5D.originPoint=${destination}&searchLegs%5B1%5D.destinationPoint=${origin}&searchLegs%5B1%5D.tripStartMonth=${ret.month}&searchLegs%5B1%5D.tripStartDate=${ret.day}&depart-from=${origin}&depart-to=${destination}&tripType=return&adults=1&children=0&infants=0&bookingClass=ECONOMY&promoCode=&searchType=flexible&doSearch=search`;
     }
+    case "AV":
+      // Verificato dal vivo il 27/09/2026 (MXP-BOG): URL statico senza token di
+      // sessione, trovato intercettando window.open del bottone "Buscar".
+      return `https://booking.avianca.com/av/booking/avail?departureDate=${departDate}&tripType=round-trip&platform=WEBB2C&from=${origin}&to=${destination}&nbAdults=1&nbYoungs=0&nbChildren=0&nbInfants=0&language=ES&pointOfSale=OT&returnDate=${returnDate}`;
+    case "AY":
+      // Verificato dal vivo il 27/09/2026 (MXP-HEL): URL con JSON codificato nel parametro
+      // "json", nessun token di sessione — funziona anche da navigazione diretta.
+      return `https://www.finnair.com/it-it/booking/flight-selection?json=${encodeURIComponent(
+        JSON.stringify({
+          flights: [
+            { origin, destination, departureDate: departDate },
+            { origin: destination, destination: origin, departureDate: returnDate },
+          ],
+          cabin: "MIXED",
+          adults: 1,
+          c15s: 0,
+          children: 0,
+          infants: 0,
+        })
+      )}`;
+    case "EI":
+      // Verificato dal vivo il 27/09/2026 (FCO-DUB): URL statico senza token di sessione.
+      return `https://www.aerlingus.com/app/make/flight-search-result?fareType=RETURN&fareCategory=ECONOMY&sourceAirportCode_0=${origin}&destinationAirportCode_0=${destination}&departureDate_0=${departDate}&sourceAirportCode_1=${destination}&destinationAirportCode_1=${origin}&departureDate_1=${returnDate}&numAdults=1&numYoungAdults=0&numChildren=0&numInfants=0&promoCode=&groupBooking=false`;
     case "BA": {
       const o = cityOf(origin);
       const d = cityOf(destination);
@@ -184,6 +207,14 @@ export function buildAirlineOneWayDeepLink(
       // Verificato dal vivo il 22/09/2026 (MXP-HKG): niente ddb2 (data di ritorno) attiva
       // automaticamente la tariffa "solo andata".
       return `https://book.cathaypacific.com/tsp/it_IT/flight-selection?ca=Y&o=${origin}&d=${destination}&a=1&ya=0&ch=0&i=0&ddb1=${departDate}&viewport=desktop`;
+    case "AV":
+      // Verificato dal vivo il 27/09/2026 (MXP-BOG): tripType=one-way, niente returnDate.
+      return `https://booking.avianca.com/av/booking/avail?departureDate=${departDate}&tripType=one-way&platform=WEBB2C&from=${origin}&to=${destination}&nbAdults=1&nbYoungs=0&nbChildren=0&nbInfants=0&language=ES&pointOfSale=OT`;
+    case "EI":
+      // Verificato dal vivo il 27/09/2026 (FCO-DUB): fareType=ONEWAY (il sito stesso
+      // corregge "SINGLE" in "ONEWAY" via redirect, usato direttamente qui), niente
+      // parametri _1 di ritorno.
+      return `https://www.aerlingus.com/app/make/flight-search-result?fareType=ONEWAY&fareCategory=ECONOMY&sourceAirportCode_0=${origin}&destinationAirportCode_0=${destination}&departureDate_0=${departDate}&numAdults=1&numYoungAdults=0&numChildren=0&numInfants=0&promoCode=&groupBooking=false`;
     case "BA": {
       const o = cityOf(origin);
       const d = cityOf(destination);
@@ -222,6 +253,14 @@ export const HOMEPAGE_FALLBACK: Record<string, string> = {
   QF: "https://www.qantas.com", // Qantas — bloccato da Akamai ("Access Denied") sul motore vero
   SQ: "https://www.singaporeair.com/en_UK/it/home", // Singapore Airlines — hash SPA, stato di sessione
   KE: "https://www.koreanair.com/it/it", // Korean Air — calendario non automatizzabile, da riprovare
+  // Aggiunte il 27/09/2026, stesso giro esaustivo esteso a Sud America/Africa/altra Europa.
+  LA: "https://www.latamairlines.com/it/it", // LATAM — richiede un token di sessione (exp_id) non riproducibile
+  CM: "https://www.copaair.com", // Copa Airlines — non vola in Europa, difficile che compaia mai
+  ET: "https://www.ethiopianairlines.com/it/it", // Ethiopian — booking engine incoerente nei test, da riprovare
+  MS: "https://www.egyptair.com", // EgyptAir — bloccato da Cloudflare
+  AT: "https://www.royalairmaroc.com/it-it", // Royal Air Maroc — nessun URL con parametri, solo stato
+  DY: "https://www.norwegian.com/it/", // Norwegian — bloccato da Cloudflare
+  FI: "https://www.icelandair.com", // Icelandair — URL con token di sessione (base64+id), da riprovare
 };
 
 // Applica lo schema one-way diretto o, altrimenti, la homepage — su una singola tratta
