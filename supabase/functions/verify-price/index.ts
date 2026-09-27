@@ -400,15 +400,15 @@ Deno.serve(async (req) => {
     // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
     // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
     // direttamente — segnalato dall'utente, incoerente col resto.
-    // "io non ho mai messo la spunta con scalo" (segnalato dall'utente): il fallback non
-    // confermato sopra NON deve scattare quando la cache v2 ha appena confermato che QUESTO
-    // prezzo è per un volo DAVVERO senza scalo (match.numberOfChanges===0) — altrimenti si
-    // mostra "1 scalo" in dettaglio per un risultato appena dichiarato "✓ verificato"
-    // diretto, contraddicendo il filtro "solo diretti" che l'utente non ha disattivato.
-    // In quel caso resta il placeholder onesto di sempre (compagnia sconosciuta per QUELLA
-    // data esatta, ma il prezzo/rotta restano confermati senza scalo). Il fallback con
-    // scalo scatta solo quando NON abbiamo questa conferma (allowStops attivo, o città
-    // charter, o nessun match v2 fresco) — lì non c'è nulla da contraddire.
+    // "io non ho mai messo la spunta con scalo" (segnalato dall'utente): quando v2 ha
+    // appena confermato che QUESTO prezzo è per un volo DAVVERO senza scalo
+    // (match.numberOfChanges===0), non possiamo dire "1 scalo" come se fosse un fatto su
+    // QUEL volo — contraddirebbe il filtro "solo diretti" mai disattivato. Ma togliere il
+    // fallback del tutto ha rimesso "ancora niente dettaglio" (segnalato subito dopo): via
+    // di mezzo, lo si mostra comunque marcato `exampleOnly` — il client (LegBox) lo
+    // presenta come "esempio indicativo su una rotta simile", mai come descrizione del
+    // volo diretto confermato. Quando invece NON c'è nessuna conferma nonstop (allowStops
+    // attivo, o città charter) resta il messaggio "unverified" normale.
     const knownNonstop = Boolean(match && match.numberOfChanges === 0);
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
@@ -416,9 +416,10 @@ Deno.serve(async (req) => {
         : await (async () => {
             const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
             if (p) return [withAirlineDeepLink(p)];
-            if (knownNonstop) return [];
             const u = await fetchUnverifiedConnectingLeg(flight.origin, flight.destination, flight.departDate);
-            return u ? [withHomepageOnlyIfUnverified(u)] : [];
+            if (!u) return [];
+            const leg = withHomepageOnlyIfUnverified(u);
+            return [knownNonstop ? { ...leg, exampleOnly: true } : leg];
           })();
     const inboundLegsForDisplay =
       inboundLegsWithLinks.length > 0
@@ -432,7 +433,6 @@ Deno.serve(async (req) => {
             const candidates = broaderPerPair.filter((p): p is any => p !== null);
             const p = pickClosestDate(candidates, flight.returnDate);
             if (p) return [withAirlineDeepLink(p)];
-            if (knownNonstop) return [];
             const unverifiedPerPair = await Promise.all(
               returnOrigins.flatMap((returnOrigin) =>
                 homeAirports.map((airport) => fetchUnverifiedConnectingLeg(returnOrigin, airport, flight.returnDate))
@@ -440,7 +440,9 @@ Deno.serve(async (req) => {
             );
             const unverifiedCandidates = unverifiedPerPair.filter((p): p is any => p !== null);
             const u = unverifiedCandidates.sort((a, b) => a.transfers - b.transfers || a.price - b.price)[0] ?? null;
-            return u ? [withHomepageOnlyIfUnverified(u)] : [];
+            if (!u) return [];
+            const leg = withHomepageOnlyIfUnverified(u);
+            return [knownNonstop ? { ...leg, exampleOnly: true } : leg];
           })();
 
     // Bug notato dall'utente ("ogni volta che clicco non succede niente"): quando manca

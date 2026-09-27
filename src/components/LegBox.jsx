@@ -20,6 +20,13 @@ import { Card } from "./Card";
 // volo con scalo trovato invece di niente, ma MAI con la stessa fiducia di un dato
 // confermato — l'utente ha accettato il rischio di un'informazione ogni tanto sbagliata
 // pur di avere un nome di compagnia da cui partire, purché sia chiaro che va ricontrollata.
+//
+// leg.exampleOnly: caso diverso da unverified puro — qui v2 ha GIÀ confermato che il
+// prezzo è per un volo davvero senza scalo (segnalato dall'utente: "non ho mai messo la
+// spunta con scalo"), quindi "N scali" non può essere presentato come un fatto su QUEL
+// volo. Ma togliere il box del tutto rimetteva "ancora niente dettaglio" (segnalato subito
+// dopo) — via di mezzo: si mostra come ESEMPIO su una rotta simile, mai come descrizione
+// del volo confermato sopra.
 export function LegBox({ title, leg, route, date, numberOfChanges }) {
   if (leg) {
     return (
@@ -58,11 +65,19 @@ export function LegBox({ title, leg, route, date, numberOfChanges }) {
           </div>
           {leg.duration != null && <div>{formatDuration(leg.duration)}</div>}
         </div>
-        {leg.unverified && (
+        {leg.exampleOnly ? (
           <div style={{ fontSize: 11.5, color: COLORS.warn, fontWeight: 600, marginTop: 8 }}>
-            ⚠️ Non confermato — compagnia/orario probabili, non garantiti. Controlla sul sito
-            prima di fidarti.
+            ⚠️ Esempio indicativo su una rotta simile, NON il volo esatto — quello confermato
+            sopra è senza scalo, ma orario/compagnia precisi non sono disponibili. Controlla
+            sul sito.
           </div>
+        ) : (
+          leg.unverified && (
+            <div style={{ fontSize: 11.5, color: COLORS.warn, fontWeight: 600, marginTop: 8 }}>
+              ⚠️ Non confermato — compagnia/orario probabili, non garantiti. Controlla sul
+              sito prima di fidarti.
+            </div>
+          )
         )}
       </Card>
     );
