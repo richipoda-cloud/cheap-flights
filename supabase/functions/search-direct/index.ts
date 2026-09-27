@@ -115,7 +115,21 @@ Deno.serve(async (req) => {
       dateFrom && dateTo
         ? filtered.filter((r) => r.departDate >= dateFrom && r.departDate <= dateTo)
         : filtered;
-    const results = dateFiltered.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
+    // Segnalato dall'utente ("solo due voli del cazzo" per gli USA): v2/prices/latest
+    // mette in cache lo STESSO volo di andata abbinato a decine di date di ritorno
+    // diverse (stesso departDate, returnDate/nights diversi) — senza dedup, i 10 slot
+    // finali finivano quasi tutti occupati da varianti-ritorno della stessa manciata di
+    // partenze più economiche, invece di mostrare la vera varietà di date disponibili
+    // (18 partenze diverse trovate per MXP-NYC, non le 2 che sembravano in lista).
+    // Tenuta solo la combinazione più economica per ogni (origine, destinazione, andata).
+    const bestByDeparture = new Map<string, (typeof dateFiltered)[number]>();
+    for (const r of dateFiltered) {
+      const key = `${r.origin}-${r.destination}-${r.departDate}`;
+      const existing = bestByDeparture.get(key);
+      if (!existing || r.price < existing.price) bestByDeparture.set(key, r);
+    }
+    const deduped = [...bestByDeparture.values()];
+    const results = deduped.sort((a, b) => a.price - b.price).slice(0, MAX_RESULTS);
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

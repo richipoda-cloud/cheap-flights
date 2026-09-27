@@ -252,7 +252,14 @@ Deno.serve(async (req) => {
       : [flight.destination];
 
     const [latestPrices, outboundOptions, inboundOptionsPerPair] = await Promise.all([
-      fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate }),
+      // Segnalato dall'utente ("solo due voli del cazzo... senza dettagli"): senza limit
+      // esplicito qui restava il default (30) di fetchLatestPrices — v2/prices/latest ha
+      // MOLTE varianti di sola data di ritorno per la stessa andata (vedi dedup in
+      // search-direct), quindi i 30 più economici in assoluto per la rotta spesso NON
+      // includevano la combinazione esatta (andata+ritorno) appena mostrata in lista,
+      // pur essendo un risultato reale e recente — "confermato" falliva anche su risultati
+      // corretti. Stesso limite ampio già usato in search-direct.
+      fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate, limit: 1000 }),
       fetchOneWayPrices({
         origin: flight.origin,
         destination: flight.destination,
