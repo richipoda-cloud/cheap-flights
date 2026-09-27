@@ -259,13 +259,21 @@ export function Results() {
   // lista piuttosto che mostrare un prezzo trovato una volta chissà quando. I percorsi
   // creativi (isStopover) non c'entrano: le loro tratte vengono già da un match one-way
   // vero in search-stopover, mai vuote.
+  //
+  // BUG scoperto dopo (rotte USA/Giappone sempre vuote): il filtro sopra guardava SOLO
+  // outboundLeg/inboundLeg (dati v3, poco disponibili su intercontinentali), ignorando
+  // "confirmed" — che in verify-price/index.ts (bothDirectionsMatched || Boolean(match))
+  // diventa true anche quando il prezzo è stato ri-verificato live sulla cache v2 aggregata,
+  // senza dettaglio di volo. Quel caso NON è "nessun riscontro" come quello originale
+  // (compagnia/orario mancano, ma il prezzo è comunque confermato reale ora) — va tenuto.
+  // Va nascosto solo il caso davvero vuoto: né confirmed né alcuna tratta v3.
   const sortedResults = useMemo(() => {
     return [...directResults]
       .filter((r) => {
         if (r.isStopover) return true;
         const v = verifiedData[r.id];
         if (!v) return true; // verifica ancora in corso, non nascondere in anticipo
-        return v.outboundLeg != null || v.inboundLeg != null;
+        return v.confirmed || v.outboundLeg != null || v.inboundLeg != null;
       })
       .sort((a, b) => {
         const priceA = verifiedData[a.id]?.price ?? a.price;
