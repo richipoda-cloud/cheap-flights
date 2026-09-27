@@ -234,12 +234,29 @@ export function Results() {
   // vedi fix del 21/09/2026) l'ordine vero può cambiare, anche di parecchio, e la lista
   // restava ferma nell'ordine iniziale invece di riflettere il prezzo verificato più basso.
   // Riordina lato client usando il prezzo verificato quando c'è, altrimenti quello originale.
+  // Segnalato dall'utente ("se non sa nemmeno la compagnia perché me lo propone?"):
+  // search-direct pesca dalla cache v2 aggregata (può restare valida per settimane),
+  // ma a volte verify-price (v3, dati freschi per singolo volo) non trova ASSOLUTAMENTE
+  // niente su nessuna delle due tratte, nemmeno allargando la ricerca al mese — non solo
+  // "compagnia sconosciuta", proprio nessun riscontro che quel volo esista ancora. Un
+  // risultato così non è azionabile in alcun modo (niente compagnia, niente orario,
+  // niente link, nemmeno il messaggio "prenota da solo" ha senso): meglio toglierlo dalla
+  // lista piuttosto che mostrare un prezzo trovato una volta chissà quando. I percorsi
+  // creativi (isStopover) non c'entrano: le loro tratte vengono già da un match one-way
+  // vero in search-stopover, mai vuote.
   const sortedResults = useMemo(() => {
-    return [...directResults].sort((a, b) => {
-      const priceA = verifiedData[a.id]?.price ?? a.price;
-      const priceB = verifiedData[b.id]?.price ?? b.price;
-      return priceA - priceB;
-    });
+    return [...directResults]
+      .filter((r) => {
+        if (r.isStopover) return true;
+        const v = verifiedData[r.id];
+        if (!v) return true; // verifica ancora in corso, non nascondere in anticipo
+        return v.outboundLeg != null || v.inboundLeg != null;
+      })
+      .sort((a, b) => {
+        const priceA = verifiedData[a.id]?.price ?? a.price;
+        const priceB = verifiedData[b.id]?.price ?? b.price;
+        return priceA - priceB;
+      });
   }, [directResults, verifiedData]);
 
   if (!filters) return null;
@@ -283,6 +300,12 @@ export function Results() {
       {loadingDirect && <div style={{ color: COLORS.inkSoft }}>Ricerca in corso…</div>}
       {!loadingDirect && directResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>Nessun risultato diretto trovato.</div>
+      )}
+      {!loadingDirect && directResults.length > 0 && sortedResults.length === 0 && (
+        <div style={{ color: COLORS.inkSoft }}>
+          Trovati alcuni prezzi indicativi, ma nessuno con dati reali a supporto (compagnia,
+          orario) — tolti dalla lista invece di mostrarli senza nulla di verificabile.
+        </div>
       )}
       {sortedResults.length > 0 && (
         <FlatList>
