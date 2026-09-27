@@ -400,12 +400,23 @@ Deno.serve(async (req) => {
     // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
     // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
     // direttamente — segnalato dall'utente, incoerente col resto.
+    // "io non ho mai messo la spunta con scalo" (segnalato dall'utente): il fallback non
+    // confermato sopra NON deve scattare quando la cache v2 ha appena confermato che QUESTO
+    // prezzo è per un volo DAVVERO senza scalo (match.numberOfChanges===0) — altrimenti si
+    // mostra "1 scalo" in dettaglio per un risultato appena dichiarato "✓ verificato"
+    // diretto, contraddicendo il filtro "solo diretti" che l'utente non ha disattivato.
+    // In quel caso resta il placeholder onesto di sempre (compagnia sconosciuta per QUELLA
+    // data esatta, ma il prezzo/rotta restano confermati senza scalo). Il fallback con
+    // scalo scatta solo quando NON abbiamo questa conferma (allowStops attivo, o città
+    // charter, o nessun match v2 fresco) — lì non c'è nulla da contraddire.
+    const knownNonstop = Boolean(match && match.numberOfChanges === 0);
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
         ? outboundLegsWithLinks
         : await (async () => {
             const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
             if (p) return [withAirlineDeepLink(p)];
+            if (knownNonstop) return [];
             const u = await fetchUnverifiedConnectingLeg(flight.origin, flight.destination, flight.departDate);
             return u ? [withHomepageOnlyIfUnverified(u)] : [];
           })();
@@ -421,6 +432,7 @@ Deno.serve(async (req) => {
             const candidates = broaderPerPair.filter((p): p is any => p !== null);
             const p = pickClosestDate(candidates, flight.returnDate);
             if (p) return [withAirlineDeepLink(p)];
+            if (knownNonstop) return [];
             const unverifiedPerPair = await Promise.all(
               returnOrigins.flatMap((returnOrigin) =>
                 homeAirports.map((airport) => fetchUnverifiedConnectingLeg(returnOrigin, airport, flight.returnDate))
