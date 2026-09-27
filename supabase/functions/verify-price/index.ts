@@ -400,22 +400,17 @@ Deno.serve(async (req) => {
     // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
     // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
     // direttamente — segnalato dall'utente, incoerente col resto.
-    // REGOLA FINALE, DECISA DALL'UTENTE (27/09/2026) DOPO TROPPI AVANTI E INDIETRO su
-    // questo punto — non cambiare più senza che lo richieda esplicitamente: se il prezzo è
-    // GIÀ confermato senza scalo (match.numberOfChanges===0), il fallback con scalo NON
-    // scatta MAI, in nessuna forma (né "confermato", né "esempio indicativo") — l'utente ha
-    // trovato anche quest'ultima via di mezzo troppo confusa/angosciante da leggere. Meglio
-    // il placeholder onesto e vuoto ("disponibili al passo di prenotazione") che qualunque
-    // menzione di uno scalo su un risultato diretto. Il fallback con scalo resta SOLO per i
-    // casi senza nessuna conferma nonstop (allowStops attivo, o città charter).
-    const knownNonstop = Boolean(match && match.numberOfChanges === 0);
+    // REGOLA FINALE (27/09/2026, decisione presa dopo troppi avanti e indietro — non
+    // ricambiare senza richiesta esplicita): il fallback "non confermato" scatta SEMPRE
+    // quando manca un match diretto esatto, senza eccezioni per numberOfChanges — meglio
+    // avere quasi sempre un nome di compagnia (con l'avviso "non confermato" ben visibile)
+    // che un box vuoto la maggior parte delle volte.
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
         ? outboundLegsWithLinks
         : await (async () => {
             const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
             if (p) return [withAirlineDeepLink(p)];
-            if (knownNonstop) return [];
             const u = await fetchUnverifiedConnectingLeg(flight.origin, flight.destination, flight.departDate);
             return u ? [withHomepageOnlyIfUnverified(u)] : [];
           })();
@@ -431,7 +426,6 @@ Deno.serve(async (req) => {
             const candidates = broaderPerPair.filter((p): p is any => p !== null);
             const p = pickClosestDate(candidates, flight.returnDate);
             if (p) return [withAirlineDeepLink(p)];
-            if (knownNonstop) return [];
             const unverifiedPerPair = await Promise.all(
               returnOrigins.flatMap((returnOrigin) =>
                 homeAirports.map((airport) => fetchUnverifiedConnectingLeg(returnOrigin, airport, flight.returnDate))
