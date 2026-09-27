@@ -83,6 +83,16 @@ export async function fetchOneWayPrices({
   return (json.data ?? []).filter((r: any) => (r.transfers ?? 0) === 0).map(mapOneWayResult);
 }
 
+// TENTATIVO SCARTATO (non un semplice "esito incerto" come sotto): v1/prices/cheap come
+// ultimo fallback per compagnia/orario quando v3 non ha nulla. Codice scritto, deployato
+// e testato dal vivo il 27/09/2026 sul caso segnalato (MXP->NYC): l'endpoint ha
+// restituito "Wizz Air Malta" (W4) come compagnia — verificato sul sito reale Wizz Air
+// con lo stesso URL costruito automaticamente: "Nessun volo in questa data" su ENTRAMBE
+// le direzioni, rotta che Wizz Air (corto/medio raggio) non serve proprio. Dato di questa
+// cache inaffidabile al punto di inventare compagnie su rotte mai volate — mostrarlo
+// sarebbe stato peggio del placeholder onesto "disponibili al passo di prenotazione" che
+// c'era prima. Rimosso subito, nessun fallback aggiuntivo oltre fetchBroaderOneWayLeg.
+
 // ESPERIMENTO (esito incerto, da verificare dal vivo): stessa v3/prices_for_dates ma
 // one_way=false — restituisce l'offerta round-trip completa con un "link" più ricco di
 // quello one-way (contiene anche una firma del volo "t=" ed expected_price_uuid/currency,
