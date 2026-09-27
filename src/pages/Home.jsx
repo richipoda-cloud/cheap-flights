@@ -101,8 +101,12 @@ function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
               }}
               style={{
                 border: "none",
-                background: "rgba(255,255,255,0.2)",
-                color: "#FFFFFF",
+                // Segnalato dall'utente: grigio pieno, stonava col vetro smerigliato della
+                // card — stesso verde tenue (accentSoft) già usato per Preferiti/Storico/
+                // Suggeriti, così il bottone si intona al resto della home invece di un
+                // grigio che non appartiene alla palette dell'app.
+                background: COLORS.accentSoft,
+                color: COLORS.ink,
                 fontSize: 13,
                 fontWeight: 600,
                 borderRadius: RADIUS.pill,
