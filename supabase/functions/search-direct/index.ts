@@ -9,6 +9,7 @@ import {
   filterByFreshness,
   CHARTER_TRUSTED_CITIES,
 } from "../_shared/travelpayouts.ts";
+import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 // Restituire 30-50 risultati aveva senso solo se restavano tutti "indicativi" per
@@ -70,6 +71,64 @@ const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
   MX: ["CUN"], // Cancun, 4 (poco ma reale, meglio di zero)
 };
 
+// Segnalato dall'utente ("trovi i diretti e me li riporti CON i dettagli", dopo troppi
+// giri intorno al problema "prezzo confermato ma compagnia/orario a volte mancanti"):
+// finora "Risultati" nasceva SEMPRE da v2/prices/latest (solo prezzo, mai compagnia/
+// orario), poi verify-price provava a cercare orario/compagnia separatamente su v3 per
+// la STESSA data — spesso senza successo, perché v2 e v3 sono due cache scorrelate.
+// Qui invece si costruisce il risultato DIRETTAMENTE dalle tratte one-way vere di v3
+// (andata + ritorno, entrambe senza scalo, esistenti per davvero) — la data scelta è
+// SEMPRE una data che ha un volo one-way reale su entrambe le tratte, quindi il
+// dettaglio dopo (verify-price) lo ritrova sempre, per costruzione. Solo per città
+// "normali" (compagnie di linea) — le destinazioni charter (CHARTER_TRUSTED_CITIES)
+// restano sul percorso v2 già esistente, perché v3 non ha proprio dati nonstop per loro.
+//
+// Scoperto dal vivo (MXP-NYC): il ritorno nonstop NYC->MXP ha ZERO dati in v3 pur avendo
+// l'andata 83 — ma NYC->BGY o IST->BGY (aeroporto diverso, stesso viaggio) spesso SÌ
+// (53 per IST->BGY). Per questo il ritorno si cerca verso QUALUNQUE aeroporto di partenza
+// dell'utente, non solo quello usato all'andata — stesso principio già usato altrove
+// nell'app (aeroporto di ritorno diverso dalla partenza).
+async function fetchDirectRoundTrips(origins: string[], destination: string): Promise<any[]> {
+  const [outboundPerOrigin, inboundPerOrigin] = await Promise.all([
+    Promise.all(origins.map((o) => fetchOneWayPrices({ origin: o, destination, limit: 200 }))),
+    Promise.all(origins.map((o) => fetchOneWayPrices({ origin: destination, destination: o, limit: 200 }))),
+  ]);
+  const outboundOptions = outboundPerOrigin.flat();
+  const inboundOptions = inboundPerOrigin.flat();
+  if (!outboundOptions.length || !inboundOptions.length) return [];
+
+  const results: any[] = [];
+  for (const out of outboundOptions) {
+    const outTime = new Date(out.date).getTime();
+    let best: any = null;
+    for (const back of inboundOptions) {
+      const backTime = new Date(back.date).getTime();
+      if (backTime <= outTime) continue;
+      if (!best || back.price < best.price) best = back;
+    }
+    if (!best) continue;
+    const nights = Math.round((new Date(best.date).getTime() - outTime) / 86400000);
+    results.push({
+      id: `${out.originAirport}-${destination}-${out.date}-${best.date}`,
+      origin: out.originAirport,
+      destination,
+      destinationName: out.destinationName,
+      countryCode: out.countryCode,
+      departDate: out.date,
+      returnDate: best.date,
+      price: out.price + best.price,
+      currency: "EUR",
+      nights,
+      // v3/prices_for_dates espone found_at solo per prezzi delle ultime 48 ore (Travelpayouts
+      // lo popola solo così) — questi voli sono per definizione già "freschi", niente da
+      // scartare col filtro di freschezza (pensato per v2, che può restare in cache settimane).
+      foundAt: new Date().toISOString(),
+      numberOfChanges: 0,
+    });
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -104,7 +163,21 @@ Deno.serve(async (req) => {
         ),
       ])
     );
-    const merged = perOrigin.flat();
+    // Città "normali" (compagnie di linea, non charter) per cui vale la pena costruire
+    // il risultato direttamente da v3 one-way (vedi fetchDirectRoundTrips sopra) — quando
+    // destination è già una città/aeroporto (3 lettere) la si prova sempre, altrimenti solo
+    // le città curate note per un paese (COUNTRY_MAJOR_CITIES), escluse quelle charter
+    // (CHARTER_TRUSTED_CITIES: v3 non ha proprio dati nonstop per loro, provarci è inutile).
+    const regularCityTargets = [
+      ...(destination && destination.length === 3 && !CHARTER_TRUSTED_CITIES.has(destination)
+        ? [destination]
+        : []),
+      ...extraCityDestinations.filter((c) => !CHARTER_TRUSTED_CITIES.has(c)),
+    ];
+    const directRoundTripsPerCity = await Promise.all(
+      regularCityTargets.map((city) => fetchDirectRoundTrips(origins, city))
+    );
+    const merged = [...perOrigin.flat(), ...directRoundTripsPerCity.flat()];
     // Scarta prezzi in cache troppo vecchi PRIMA di scegliere i più economici: un prezzo
     // sballato (magari visto settimane fa) altrimenti vince facilmente il ranking per prezzo.
     const fresh = filterByFreshness(merged);
