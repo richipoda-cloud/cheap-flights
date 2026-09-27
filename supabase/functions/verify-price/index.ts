@@ -86,20 +86,43 @@ async function fetchBroaderOneWayLeg(
   return pickClosestDate(following, date);
 }
 
-// TENTATIVO SCARTATO #2 (dopo v1/prices/cheap sopra): mostrare come ultimo fallback i voli
-// CON scalo di v3/prices_for_dates (allowAllora scartati dal filtro transfers=0), invece
-// del solo placeholder onesto. Scritto, deployato e testato dal vivo il 27/09/2026 su
-// MXP->NYC: il primo risultato (Icelandair via Reykjavik, stesso aeroporto/compagnia sui
-// due segmenti) sembrava genuino, ma il secondo test (MXP->EWR) ha restituito
-// "easyJet, 1 scalo" per un itinerario reale MXP→CDG→ORY→EWR — CDG e ORY sono DUE
-// aeroporti parigini diversi (self-transfer venduto da Kiwi.com/gate "Kiwi.com" nel dato
-// grezzo), con la tratta transatlantica reale su una compagnia diversa non mostrata
-// affatto. "easyJet · 1 scalo" era quindi falso/fuorviante quanto il caso Wizz Air:
-// l'API non distingue in modo affidabile una connessione vera in un solo aeroporto/hub da
-// un self-transfer rischioso tra aeroporti diversi con compagnia nascosta — non c'è un
-// campo strutturato su cui filtrare, solo lo slug del link (fragile, non documentato, da
-// non usare per decidere cosa mostrare). Scartato: resta solo fetchBroaderOneWayLeg
-// (diretti, 2 mesi) prima del placeholder onesto "disponibili al passo di prenotazione".
+// RIPROVATO E TENUTO (27/09/2026), dopo due tentativi scartati (v1/prices/cheap con Wizz
+// Air fantasma; voli con scalo v3 presentati come "✓ verificato", con easyJet/self-transfer
+// CDG-ORY sbagliato): l'utente ha deciso esplicitamente di accettare il rischio pur di
+// avere un nome di compagnia invece di niente, PURCHÉ sia chiaro che non è confermato.
+// Ultimo fallback quando NEMMENO fetchBroaderOneWayLeg (diretti, 2 mesi) trova nulla:
+// stessa v3/prices_for_dates ma con gli scali inclusi (allowConnections), marcati
+// `unverified: true` da mapOneWayResult — il client (LegBox) li mostra con un avviso
+// esplicito "non confermato", mai come un volo diretto o una connessione reale accertata.
+// Mai un deepLink specifico per la rotta qui (withHomepageOnlyIfUnverified sotto): quello
+// presume un'informazione che non abbiamo la certezza sia corretta.
+async function fetchUnverifiedConnectingLeg(origin: string, destination: string, date: string): Promise<any | null> {
+  const thisMonth = date.slice(0, 7);
+  const [thisMonthOpts, nextMonthOpts] = await Promise.all([
+    fetchOneWayPrices({ origin, destination, limit: 100, departureAt: thisMonth, allowConnections: true }),
+    fetchOneWayPrices({ origin, destination, limit: 100, departureAt: nextMonth(thisMonth), allowConnections: true }),
+  ]);
+  const pool = [...thisMonthOpts, ...nextMonthOpts].filter((o: any) => (o.transfers ?? 0) > 0);
+  if (!pool.length) return null;
+
+  const target = new Date(date).getTime();
+  const [best] = pool.sort((a: any, b: any) => {
+    if (a.transfers !== b.transfers) return a.transfers - b.transfers;
+    const diffA = Math.abs(new Date(a.date).getTime() - target);
+    const diffB = Math.abs(new Date(b.date).getTime() - target);
+    return diffA - diffB || a.price - b.price;
+  });
+  return { ...best, approxDate: true };
+}
+
+// Solo homepage generica, mai lo schema di prenotazione diretta per rotta (vedi commento
+// su fetchUnverifiedConnectingLeg) — quello presume un volo diretto/confermato, qui non lo è.
+function withHomepageOnlyIfUnverified<T extends { airline?: string | null; unverified?: boolean }>(leg: T): T & { deepLink: string | null } {
+  if (!leg) return leg as T & { deepLink: string | null };
+  if (!leg.unverified) return withAirlineDeepLink(leg as any) as T & { deepLink: string | null };
+  const homepage = leg.airline ? HOMEPAGE_FALLBACK[leg.airline] : null;
+  return { ...leg, deepLink: homepage ?? null };
+}
 
 // "Aeroporto di ritorno diverso dalla partenza" deve restare un'alternativa comoda, non
 // un altro viaggio: 150km ≈ max 2 ore di auto/treno (Bergamo-Malpensa 77km entra,
@@ -382,7 +405,9 @@ Deno.serve(async (req) => {
         ? outboundLegsWithLinks
         : await (async () => {
             const p = await fetchBroaderOneWayLeg(flight.origin, flight.destination, flight.departDate);
-            return p ? [withAirlineDeepLink(p)] : [];
+            if (p) return [withAirlineDeepLink(p)];
+            const u = await fetchUnverifiedConnectingLeg(flight.origin, flight.destination, flight.departDate);
+            return u ? [withHomepageOnlyIfUnverified(u)] : [];
           })();
     const inboundLegsForDisplay =
       inboundLegsWithLinks.length > 0
@@ -395,7 +420,15 @@ Deno.serve(async (req) => {
             );
             const candidates = broaderPerPair.filter((p): p is any => p !== null);
             const p = pickClosestDate(candidates, flight.returnDate);
-            return p ? [withAirlineDeepLink(p)] : [];
+            if (p) return [withAirlineDeepLink(p)];
+            const unverifiedPerPair = await Promise.all(
+              returnOrigins.flatMap((returnOrigin) =>
+                homeAirports.map((airport) => fetchUnverifiedConnectingLeg(returnOrigin, airport, flight.returnDate))
+              )
+            );
+            const unverifiedCandidates = unverifiedPerPair.filter((p): p is any => p !== null);
+            const u = unverifiedCandidates.sort((a, b) => a.transfers - b.transfers || a.price - b.price)[0] ?? null;
+            return u ? [withHomepageOnlyIfUnverified(u)] : [];
           })();
 
     // Bug notato dall'utente ("ogni volta che clicco non succede niente"): quando manca

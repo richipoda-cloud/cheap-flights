@@ -132,6 +132,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                         airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline}
                         route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
                         departDate={result.departDate}
+                        unverified={Boolean(outboundLeg?.unverified)}
                         label="Prenota andata →"
                         style={{ flex: 1, justifyContent: "center" }}
                       />
@@ -140,6 +141,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                         airlineName={inboundLeg?.airlineName ?? inboundLeg?.airline}
                         route={`${result.destination ?? "?"} → ${result.origin ?? "?"}`}
                         departDate={result.returnDate}
+                        unverified={Boolean(inboundLeg?.unverified)}
                         label="Prenota ritorno →"
                         style={{ flex: 1, justifyContent: "center" }}
                       />
@@ -152,6 +154,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                       departDate={result.departDate}
                       returnDate={result.returnDate}
                       numberOfChanges={verifyData.numberOfChanges}
+                      unverified={Boolean(outboundLeg?.unverified || inboundLeg?.unverified)}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   )}

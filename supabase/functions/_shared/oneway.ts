@@ -12,7 +12,7 @@ const CITY_BY_CODE: Record<string, { name: string; country_code: string }> = Obj
 );
 const AIRLINE_NAME_BY_CODE: Record<string, string> = airlinesData as Record<string, string>;
 
-export function mapOneWayResult(r: any) {
+export function mapOneWayResult(r: any, unverified = false) {
   const city = CITY_BY_CODE[r.destination];
   const arrivalAt =
     r.departure_at && r.duration != null
@@ -32,6 +32,7 @@ export function mapOneWayResult(r: any) {
     airlineName: AIRLINE_NAME_BY_CODE[r.airline] ?? r.airline,
     flightNumber: r.flight_number,
     duration: r.duration,
+    transfers: r.transfers ?? 0,
     price: r.price,
     currency: "EUR",
     // Mai più Aviasales (era `https://www.aviasales.com${r.link}...`) — placeholder,
@@ -40,6 +41,12 @@ export function mapOneWayResult(r: any) {
     // resta null e il client mostra "prenota da solo" invece di un link a un sito terzo.
     deepLink: null,
     foundAt: r.found_at ?? null,
+    // true solo per i voli con scalo inclusi con allowConnections (vedi sopra) — l'API
+    // non garantisce che sia una connessione vera nello stesso hub e non un self-transfer
+    // rischioso tra aeroporti diversi (scoperto dal vivo, vedi commento su
+    // allowConnections): il client deve mostrarlo come "non confermato", mai come
+    // "✓ verificato" alla pari di un volo diretto o con scalo reale.
+    unverified,
   };
 }
 
@@ -49,6 +56,7 @@ export async function fetchOneWayPrices({
   destination,
   limit = 30,
   departureAt,
+  allowConnections = false,
 }: {
   origin: string;
   destination?: string | null;
@@ -59,6 +67,15 @@ export async function fetchOneWayPrices({
   // il match falliva e restava il placeholder "disponibili al passo di prenotazione" anche
   // per voli verificati e prenotabili. Passando la data all'API si cerca proprio quella.
   departureAt?: string | null;
+  // Deciso esplicitamente dall'utente il 27/09/2026 dopo due tentativi scartati (Wizz Air
+  // fantasma su v1/prices/cheap, easyJet self-transfer CDG/ORY su v3 con scalo): l'API non
+  // ha un campo per distinguere una connessione vera nello stesso hub da un self-transfer
+  // rischioso — invece di escluderle sempre (nessun dettaglio su molte intercontinentali),
+  // l'utente ha scelto di mostrarle comunque MA etichettate chiaramente come non
+  // confermate (vedi `unverified` in mapOneWayResult e il fallback in verify-price/
+  // index.ts) invece di "✓ verificato". Di default resta false ovunque già in uso
+  // (nessun cambio per i voli diretti normali, sempre affidabili).
+  allowConnections?: boolean;
 }) {
   if (!TRAVELPAYOUTS_TOKEN) throw new Error("TRAVELPAYOUTS_TOKEN non configurato");
 
@@ -76,20 +93,15 @@ export async function fetchOneWayPrices({
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
   if (!res.ok) return [];
   const json = await res.json();
-  // v3/prices_for_dates può restituire anche voli con scalo (campo "transfers") anche
-  // filtrando per prezzo più basso — mostrarli come "Diretto" con l'orario di arrivo
-  // finale dava durate assurde (es. 7h per una tratta di 1h) e un prezzo che poi in
-  // fase di prenotazione risultava per un volo diverso da quello indicato.
-  //
-  // TENTATO (27/09/2026) e SCARTATO: includere questi voli con scalo come ultimo
-  // fallback quando manca tutto il resto (rotte intercontinentali senza diretto, es.
-  // MXP-NYC) — un test dal vivo su MXP-EWR ha mostrato "easyJet, 1 scalo" per un
-  // itinerario reale MXP→CDG→ORY→EWR (CDG e ORY sono due aeroporti PARIGINI DIVERSI,
-  // self-transfer venduto da un gate terzo — Kiwi.com nel dato grezzo — con la vera
-  // tratta transatlantica su una compagnia mai mostrata). L'API non espone nessun campo
-  // per distinguere una connessione vera nello stesso aeroporto/hub da un self-transfer
-  // rischioso tra aeroporti diversi: restano quindi sempre esclusi, nessuna eccezione.
-  return (json.data ?? []).filter((r: any) => (r.transfers ?? 0) === 0).map(mapOneWayResult);
+  // v3/prices_for_dates può restituire anche voli con scalo (campo "transfers") — mostrarli
+  // come "Diretto" con l'orario di arrivo finale dava durate assurde e un prezzo che poi in
+  // fase di prenotazione risultava per un volo diverso da quello indicato. Esclusi di
+  // default (allowConnections=false, comportamento invariato per tutti i chiamanti
+  // esistenti); inclusi SOLO quando richiesto esplicitamente (vedi sopra), sempre marcati
+  // `unverified: true` da mapOneWayResult.
+  const raw = json.data ?? [];
+  const filtered = allowConnections ? raw : raw.filter((r: any) => (r.transfers ?? 0) === 0);
+  return filtered.map((r: any) => mapOneWayResult(r, (r.transfers ?? 0) > 0));
 }
 
 // TENTATIVO SCARTATO (non un semplice "esito incerto" come sotto): v1/prices/cheap come

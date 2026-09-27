@@ -150,6 +150,7 @@ export function Suggestions() {
                       departDate={r.departDate}
                       returnDate={r.returnDate}
                       numberOfChanges={verify.numberOfChanges}
+                      unverified={Boolean(verify.outboundLeg?.unverified || verify.inboundLeg?.unverified)}
                       style={{ width: "100%", justifyContent: "center" }}
                     />
                   </>

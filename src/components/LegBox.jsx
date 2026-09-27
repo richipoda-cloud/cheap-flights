@@ -13,6 +13,13 @@ import { Card } from "./Card";
 // diretto non ce l'ha proprio (es. Milano Linate, niente long-haul) quella ricerca non
 // troverà mai nulla, sempre. Senza questo campo il placeholder sembrava un buco nei dati
 // invece che "questa rotta richiede sempre almeno uno scalo".
+//
+// leg.unverified (deciso esplicitamente dall'utente il 27/09/2026, "trova soluzioni non
+// limiti", dopo due tentativi scartati per dati sbagliati — Wizz Air fantasma, easyJet
+// self-transfer CDG/ORY): quando NEMMENO un volo diretto è in cache, si mostra comunque il
+// volo con scalo trovato invece di niente, ma MAI con la stessa fiducia di un dato
+// confermato — l'utente ha accettato il rischio di un'informazione ogni tanto sbagliata
+// pur di avere un nome di compagnia da cui partire, purché sia chiaro che va ricontrollata.
 export function LegBox({ title, leg, route, date, numberOfChanges }) {
   if (leg) {
     return (
@@ -45,9 +52,18 @@ export function LegBox({ title, leg, route, date, numberOfChanges }) {
             color: COLORS.inkSoft,
           }}
         >
-          <div>{leg.airlineName ?? leg.airline} · Diretto</div>
+          <div>
+            {leg.airlineName ?? leg.airline} ·{" "}
+            {leg.transfers > 0 ? `${leg.transfers} scalo${leg.transfers > 1 ? "i" : ""}` : "Diretto"}
+          </div>
           {leg.duration != null && <div>{formatDuration(leg.duration)}</div>}
         </div>
+        {leg.unverified && (
+          <div style={{ fontSize: 11.5, color: COLORS.warn, fontWeight: 600, marginTop: 8 }}>
+            ⚠️ Non confermato — compagnia/orario probabili, non garantiti. Controlla sul sito
+            prima di fidarti.
+          </div>
+        )}
       </Card>
     );
   }

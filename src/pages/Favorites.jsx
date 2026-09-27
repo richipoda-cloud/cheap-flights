@@ -76,6 +76,7 @@ function FavoriteDetails({ flight }) {
         departDate={flight.departDate}
         returnDate={flight.returnDate}
         numberOfChanges={data?.numberOfChanges}
+        unverified={Boolean(data?.outboundLeg?.unverified || data?.inboundLeg?.unverified)}
         style={{ width: "100%", justifyContent: "center" }}
       />
     </div>

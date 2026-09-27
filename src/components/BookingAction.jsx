@@ -22,6 +22,11 @@ import { PrimaryButton } from "./PrimaryButton";
 // ricerca one-way qui sopra cerca SOLO senza scalo — su una rotta che un diretto non ce
 // l'ha proprio (es. Linate, niente long-haul) il messaggio sembrava un buco nei dati
 // invece che "questa rotta ha sempre almeno uno scalo".
+// unverified (deciso esplicitamente dall'utente il 27/09/2026, "trova soluzioni non
+// limiti"): quando compagnia/orario vengono dal fallback con scalo non confermato (vedi
+// LegBox), il link è solo l'homepage generica della compagnia PROBABILE — mai un bottone
+// verde sicuro come per un dato confermato, altrimenti sembra un link di prenotazione
+// affidabile quando è solo un suggerimento da ricontrollare.
 export function BookingAction({
   deepLink,
   airlineName,
@@ -29,10 +34,28 @@ export function BookingAction({
   departDate,
   returnDate,
   numberOfChanges,
+  unverified,
   label = "Vai alla prenotazione →",
   style,
   disabled,
 }) {
+  if (deepLink && unverified) {
+    return (
+      <div style={style}>
+        <PrimaryButton
+          variant="outline"
+          onClick={() => window.open(deepLink, "_blank", "noopener,noreferrer")}
+          disabled={disabled}
+          style={{ width: "100%", justifyContent: "center" }}
+        >
+          Vai al sito di {airlineName} (non confermato) →
+        </PrimaryButton>
+        <div style={{ fontSize: 11, color: COLORS.warn, marginTop: 6, textAlign: "center" }}>
+          ⚠️ Compagnia probabile, non garantita — controlla prima di prenotare.
+        </div>
+      </div>
+    );
+  }
   if (deepLink) {
     return (
       <PrimaryButton
