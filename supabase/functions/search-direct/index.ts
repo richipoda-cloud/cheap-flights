@@ -7,6 +7,7 @@ import {
   filterByNights,
   filterByExcludedCountries,
   filterByFreshness,
+  CHARTER_TRUSTED_CITIES,
 } from "../_shared/travelpayouts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -56,6 +57,17 @@ const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
   TH: ["BKK"], // Bangkok, 190
   CA: ["YTO"], // Toronto, 24
   BR: ["SAO"], // San Paolo, 19
+  // Destinazioni charter (segnalato dall'utente, a ragione: voli diretti charter veri
+  // esistono — Neos e simili — anche se Travelpayouts non li marca MAI number_of_changes:0,
+  // vedi CHARTER_TRUSTED_CITIES sotto). Prezzo reale in cache confermato dal vivo (7-45
+  // risultati a seconda della città), solo l'etichetta "scali" della API è inaffidabile.
+  TZ: ["ZNZ"], // Zanzibar, 23 prezzi in cache
+  KE: ["MBA"], // Mombasa (non Nairobi: i charter volano lì), 7
+  DO: ["PUJ"], // Punta Cana, 12
+  MV: ["MLE"], // Maldive, 41
+  LK: ["CMB"], // Colombo, 38
+  ID: ["DPS"], // Bali, 45
+  MX: ["CUN"], // Cancun, 4 (poco ma reale, meglio di zero)
 };
 
 Deno.serve(async (req) => {
@@ -105,7 +117,9 @@ Deno.serve(async (req) => {
     // campo v2 mai letto finora) — con scalo solo se l'utente ha esplicitamente attivato
     // quel toggle prima di cercare.
     const allowStops = Boolean(filters.flexOutboundStop || filters.flexReturnStop);
-    const nonstopOnly = allowStops ? fresh : fresh.filter((r) => r.numberOfChanges === 0);
+    const nonstopOnly = allowStops
+      ? fresh
+      : fresh.filter((r) => r.numberOfChanges === 0 || CHARTER_TRUSTED_CITIES.has(r.destination));
     const withoutExcluded = filterByExcludedCountries(nonstopOnly, filters.excludedCountries);
     const filtered = filterByNights(withoutExcluded, filters.nightsMin, filters.nightsMax);
     // Con "Date fisse" attivo si tiene chi parte in QUALUNQUE giorno tra dateFrom e

@@ -11,6 +11,15 @@ const CITY_BY_CODE: Record<string, { name: string; country_code: string }> = Obj
   (citiesData as Array<{ code: string; name: string; country_code: string }>).map((c) => [c.code, c])
 );
 
+// Segnalato dall'utente, confermato ricontrollando con i codici charter giusti (Mombasa
+// non Nairobi, Punta Cana, ecc.): il prezzo per queste rotte ESISTE in cache, ma
+// Travelpayouts non segna MAI number_of_changes:0 per voli charter (a differenza dei voli
+// di linea) — non è "nessun volo diretto", è che l'API non sa distinguerli. Usato sia da
+// search-direct (per non filtrarle via come "con scalo") sia da verify-price (per
+// confermarle) — mai un elenco generico/tutte le destinazioni leisure, solo città
+// verificate una per una dal vivo.
+export const CHARTER_TRUSTED_CITIES = new Set(["ZNZ", "MBA", "PUJ", "MLE", "CMB", "DPS", "CUN"]);
+
 export function nightsBetween(departDate: string | null, returnDate: string | null) {
   if (!departDate || !returnDate) return null;
   return Math.round((new Date(returnDate).getTime() - new Date(departDate).getTime()) / 86400000);

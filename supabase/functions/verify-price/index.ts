@@ -19,7 +19,12 @@
 // atterrare su uno diverso, quello si mostra. Round-trip combinato non ha più senso se i
 // due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
-import { TRAVELPAYOUTS_TOKEN, fetchLatestPrices, filterByFreshness } from "../_shared/travelpayouts.ts";
+import {
+  TRAVELPAYOUTS_TOKEN,
+  fetchLatestPrices,
+  filterByFreshness,
+  CHARTER_TRUSTED_CITIES,
+} from "../_shared/travelpayouts.ts";
 import { fetchOneWayPrices } from "../_shared/oneway.ts";
 import {
   cityOf,
@@ -294,7 +299,7 @@ Deno.serve(async (req) => {
       (r: any) =>
         r.departDate === flight.departDate &&
         r.returnDate === flight.returnDate &&
-        (flight.allowStops || r.numberOfChanges === 0)
+        (flight.allowStops || r.numberOfChanges === 0 || CHARTER_TRUSTED_CITIES.has(r.destination))
     );
     const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
     const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
