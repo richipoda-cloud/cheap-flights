@@ -34,9 +34,28 @@ const FETCH_LIMIT = 1000;
 // alla query per paese (mai al posto di) — non esaustiva, da ampliare se segnalato per
 // altri paesi (vedi TODO.md). Le altre città USA testate (LAX/CHI/ATL/BOS/SFO/LAS/WAS)
 // davano zero nonstop, coerente con la vera rete Malpensa-USA (pochi widebody).
+// Ampliato il 27/09/2026 ("verifica anche altre destinazioni con lo stesso problema"):
+// stesso identico test (destination=PAESE vs una a una le sue città più plausibili,
+// contando number_of_changes:0) ripetuto su ~25 paesi. Aggiunte solo le città con un
+// numero di voli nonstop reali chiaramente significativo (soglia pratica ~15+, non un
+// singolo risultato isolato che potrebbe anche essere rumore) — es. IST 231, BKK 190,
+// CAI 325, DXB 60. Paesi testati ma SENZA aggiunta perché zero nonstop anche a livello
+// di città (coerente con la vera rete, non un buco nei dati da correggere qui): QA (Doha),
+// MX, AR, AU, ZA, DO, CU, LK, ID, SG, KE, TZ, VN (HAN solo 2, MLE 1: troppo marginali).
 const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
   US: ["NYC", "MIA"],
   JP: ["TYO"],
+  AE: ["DXB"], // Dubai, 60 nonstop
+  EG: ["CAI"], // Il Cairo, 325 nonstop
+  MA: ["CMN", "RAK"], // Casablanca 16, Marrakech 26
+  IL: ["TLV"], // Tel Aviv, 27
+  TR: ["IST"], // Istanbul, 231
+  IN: ["DEL"], // Delhi, 27
+  CN: ["PEK", "PVG"], // Pechino 25, Shanghai 85
+  KR: ["SEL"], // Seoul, 17
+  TH: ["BKK"], // Bangkok, 190
+  CA: ["YTO"], // Toronto, 24
+  BR: ["SAO"], // San Paolo, 19
 };
 
 Deno.serve(async (req) => {

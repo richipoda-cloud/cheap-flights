@@ -10,15 +10,22 @@ voli diretti da Milano"): v2/prices/latest interrogato con `destination=CODICE P
 — verificato dal vivo: MXP->US (paese) dava 20 risultati totali, ZERO senza scalo;
 MXP->NYC (città) 182, di cui 83 senza scalo. `COUNTRY_MAJOR_CITIES` in
 `supabase/functions/search-direct/index.ts` aggiunge IN PIÙ una query per le città
-principali di un paese (oggi solo US: NYC/MIA, JP: TYO), verificate una per una dal vivo
-per avere davvero voli nonstop in cache — non esaustiva (impossibile per tutti i 237
-paesi, gli USA da soli hanno ~2000 città in `cities.json`).
+principali di un paese, verificate una per una dal vivo per avere davvero voli nonstop
+in cache — non esaustiva (impossibile per tutti i 237 paesi, gli USA da soli hanno ~2000
+città in `cities.json`).
 
-Da ampliare se altri paesi vengono segnalati con lo stesso sintomo (0 risultati diretti
-pur avendo voli reali) — stesso metodo: testare `destination=CODICE PAESE` vs le città
-principali una per una (query diretta a v2/prices/latest, contare `number_of_changes:0`)
-prima di aggiungere qualunque città alla lista, mai indovinare quali città potrebbero
-avere voli diretti.
+Stesso giorno, ampliato da 2 a 13 paesi dopo "verifica anche altre destinazioni con lo
+stesso problema" — testati ~25 paesi (destination=PAESE vs le sue città principali,
+soglia pratica ~15+ voli nonstop per aggiungerla, non un singolo risultato isolato).
+Aggiunti: US (NYC/MIA), JP (TYO), AE (DXB), EG (CAI), MA (CMN/RAK), IL (TLV), TR (IST),
+IN (DEL), CN (PEK/PVG), KR (SEL), TH (BKK), CA (YTO), BR (SAO). Testati ma SENZA aggiunta
+perché zero nonstop anche a livello di città (rete reale così, non un buco nei dati):
+QA (Doha), MX, AR, AU, ZA, DO, CU, LK, ID, SG, KE, TZ, VN.
+
+Da ampliare ulteriormente se altri paesi vengono segnalati con lo stesso sintomo — stesso
+metodo: testare `destination=CODICE PAESE` vs le città principali una per una (query
+diretta a v2/prices/latest, contare `number_of_changes:0`) prima di aggiungere qualunque
+città alla lista, mai indovinare quali città potrebbero avere voli diretti.
 
 ## Compromesso "voli con scalo nella lista base" (deciso il 27/09/2026: NO per ora)
 
