@@ -175,6 +175,15 @@ export function Results() {
   const [verifiedData, setVerifiedData] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [loadingDirect, setLoadingDirect] = useState(true);
+  // Segnalato dall'utente: i risultati comparivano e poi, dopo qualche secondo, sparivano.
+  // Causa: il filtro sotto (sortedResults) nasconde un risultato appena verifyPrice torna
+  // con ENTRAMBE le tratte nulle (voluto, vedi commento più sotto) — ma la lista veniva
+  // mostrata SUBITO, prima che le verifiche finissero, quindi l'utente vedeva la card e poi
+  // la vedeva sparire sotto i suoi occhi. Aspettare che TUTTE le verifiche siano arrivate
+  // (o fallite) prima di mostrare la lista elimina lo sparire a schermo: il filtro agisce
+  // prima del primo render della card, non dopo.
+  const [verifyingAll, setVerifyingAll] = useState(false);
+  const pendingVerifyRef = useRef(0);
   const [error, setError] = useState(null);
   const recordedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -202,6 +211,8 @@ export function Results() {
       .then((data) => {
         const list = data?.results ?? [];
         setDirectResults(list);
+        pendingVerifyRef.current = list.length;
+        setVerifyingAll(list.length > 0);
         // Lista tenuta volutamente corta (10 al massimo, vedi search-direct) proprio per
         // poterla verificare TUTTA dal vivo appena arriva, invece di lasciarla indicativa
         // finché non si apre il dettaglio — stessa somma tratte one-way del dettaglio.
@@ -221,7 +232,11 @@ export function Results() {
               if (!mountedRef.current || v?.price == null) return;
               setVerifiedData((prev) => ({ ...prev, [r.id]: v }));
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => {
+              pendingVerifyRef.current -= 1;
+              if (mountedRef.current && pendingVerifyRef.current <= 0) setVerifyingAll(false);
+            });
         });
       })
       .catch((e) => setError(e.message))
@@ -297,17 +312,21 @@ export function Results() {
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
 
-      {loadingDirect && <div style={{ color: COLORS.inkSoft }}>Ricerca in corso…</div>}
-      {!loadingDirect && directResults.length === 0 && (
+      {(loadingDirect || verifyingAll) && (
+        <div style={{ color: COLORS.inkSoft }}>
+          {loadingDirect ? "Ricerca in corso…" : "Verifica dati in corso…"}
+        </div>
+      )}
+      {!loadingDirect && !verifyingAll && directResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>Nessun risultato diretto trovato.</div>
       )}
-      {!loadingDirect && directResults.length > 0 && sortedResults.length === 0 && (
+      {!loadingDirect && !verifyingAll && directResults.length > 0 && sortedResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>
           Trovati alcuni prezzi indicativi, ma nessuno con dati reali a supporto (compagnia,
           orario) — tolti dalla lista invece di mostrarli senza nulla di verificabile.
         </div>
       )}
-      {sortedResults.length > 0 && (
+      {!verifyingAll && sortedResults.length > 0 && (
         <FlatList>
           {sortedResults.map((r, i) => (
             <ResultRow

@@ -48,7 +48,6 @@ const COUNTRY_NICKNAMES = {
   "repubblica ceca": "CZ", // ufficiale (attuale) "Cechia"
   usa: "US",
   america: "US",
-  "stati uniti d'america": "US",
   "emirati arabi": "AE",
   dubai: "AE",
   uae: "AE",
