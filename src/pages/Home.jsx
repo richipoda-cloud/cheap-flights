@@ -46,116 +46,71 @@ function describeLastSearch(filters) {
   return [dest, nights, dateLabel].filter(Boolean).join(" · ");
 }
 
-// Sfondo "vetro smerigliato" (translucido + blur di quel che c'è dietro) invece del
-// riquadro verde pieno di prima — richiesto esplicitamente dall'utente per poter
-// sovrapporre la card alla foto hero senza coprirla con un pannello opaco. Testo già
-// bianco/bianco trasparente (pensato per leggersi sul verde accent) resta leggibile
-// invariato anche sul vetro, complice la sfumatura scura sotto la foto (vedi Home()).
-function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
+// Riga cliccabile "Cerca voli" — non più una Card a sé, ora vive dentro l'unica card
+// grande insieme a Preferiti/Storico/Suggeriti (richiesto esplicitamente dall'utente:
+// "allungare la card Cerca voli per inglobare i tre bottoni" invece di card separate).
+function SearchRow({ onClick, subtitle }) {
   return (
-    <Card
-      onClick={onClick}
-      style={{
-        padding: 18,
-        background: "rgba(255,255,255,0.16)",
-        backdropFilter: "blur(18px)",
-        WebkitBackdropFilter: "blur(18px)",
-        border: "1px solid rgba(255,255,255,0.35)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
-        <div style={{ fontSize: 29, lineHeight: 1 }}>🔍</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF" }}>Cerca voli</div>
-          <div
-            style={{
-              fontSize: 15,
-              color: "rgba(255,255,255,0.85)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <span>🕐</span>
-            <span>{subtitle}</span>
-          </div>
+    <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 15, cursor: "pointer" }}>
+      <div style={{ fontSize: 29, lineHeight: 1 }}>🔍</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 20, color: "#FFFFFF" }}>Cerca voli</div>
+        <div
+          style={{
+            fontSize: 15,
+            color: "rgba(255,255,255,0.85)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          <span>🕐</span>
+          <span>{subtitle}</span>
         </div>
-        <ChevronRight size={24} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
       </div>
-
-      {lastSearchAt && (
-        <>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.25)", margin: "14px 0 12px" }} />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
-              Ultima ricerca: {formatRelativeTime(lastSearchAt)}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRepeat();
-              }}
-              style={{
-                border: "none",
-                // Malinteso corretto: l'utente voleva il grigio di QUESTO bottone spostato
-                // su Preferiti/Storico/Suggeriti (vedi SMALL_CARD_GREY sotto), non questo
-                // cambiato — resta quindi il vetro trasparente originale (si intona già
-                // alla card semi-trasparente "Cerca voli" sopra di esso).
-                background: "rgba(255,255,255,0.2)",
-                color: "#FFFFFF",
-                fontSize: 13,
-                fontWeight: 600,
-                borderRadius: RADIUS.pill,
-                padding: "6px 12px",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              ↻ Ripeti
-            </button>
-          </div>
-        </>
-      )}
-    </Card>
+      <ChevronRight size={24} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
+    </div>
   );
 }
 
-// Icona a sinistra del titolo (non più sopra, richiesto esplicitamente dall'utente) ma il
-// sottotitolo resta su una riga propria a piena larghezza sotto — non condivide la riga con
-// icona/freccia, altrimenti nelle due card strette (Preferiti/Storico) tornerebbe a
-// troncarsi con "…" come nella versione precedente a quella verticale.
-//
-// Sfondo grigio pieno (SMALL_CARD_GREY, non ancora in palette — l'app non ne aveva uno,
-// tutta calda verde/prugna) invece del verde accentSoft di prima: richiesto esplicitamente
-// dall'utente, stesso tono grigio già visto sul bottone "Ripeti" della card sopra. Restano
-// OPACHE (niente vetro/blur come SearchCard) così il testo scuro resta leggibile ovunque
-// cadano sulla foto, senza dover oscurare quella porzione di immagine.
+// Divisore sottile riusato tra le sezioni della card grande (era solo tra "Cerca voli" e
+// "Ultima ricerca" prima — ora separa anche i blocchi grigi Preferiti/Storico/Suggeriti).
+function HomeDivider() {
+  return <div style={{ height: 1, background: "rgba(255,255,255,0.25)", margin: "14px 0" }} />;
+}
+
+// Blocco grigio pieno (SMALL_CARD_GREY, non ancora in palette — l'app non ne aveva uno,
+// tutta calda verde/prugna) — richiesto esplicitamente dall'utente, stesso tono grigio del
+// bottone "Ripeti". Non più una Card a sé stante con ombra propria: ora è un blocco
+// annidato DENTRO l'unica card di vetro, niente ombra propria per non "galleggiare" dentro
+// un contenitore che ha già la sua.
 const SMALL_CARD_GREY = "#E4E1D9";
 
-function SmallCard({ icon, title, subtitle, onClick }) {
+function GreyChip({ icon, title, subtitle, onClick, style }) {
   return (
-    <Card
+    <div
       onClick={onClick}
       style={{
-        padding: 15,
         background: SMALL_CARD_GREY,
         border: "1px solid rgba(33,30,43,0.12)",
-        boxShadow: "0 4px 14px rgba(0,0,0,0.16)",
+        borderRadius: RADIUS.card,
+        padding: 13,
+        cursor: "pointer",
+        ...style,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{icon}</div>
-        <div style={{ fontWeight: 600, fontSize: 17, color: COLORS.ink, flex: 1, minWidth: 0 }}>{title}</div>
-        <ChevronRight size={21} color={COLORS.inkSoft} style={{ flexShrink: 0 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <div style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{icon}</div>
+        <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink, flex: 1, minWidth: 0 }}>{title}</div>
+        <ChevronRight size={19} color={COLORS.inkSoft} style={{ flexShrink: 0 }} />
       </div>
       {subtitle && (
-        <div style={{ fontSize: 13.5, color: COLORS.inkSoft, marginTop: 6 }}>{subtitle}</div>
+        <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 5 }}>{subtitle}</div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -320,9 +275,10 @@ export function Home() {
             colonna cresca invece di sovrapporre o tagliare le card. */}
         <div style={{ flex: 1, minHeight: 24 }} />
 
-        {/* Card Cerca voli + Preferiti/Storico + Suggeriti, impilate in un unico blocco
-            in fondo alla foto — le tre card in più stanno sopra la foto invece che in un
-            pannello bianco separato, confermato esplicitamente dall'utente. */}
+        {/* Un'unica card grande di vetro (Cerca voli + Ultima ricerca/Ripeti +
+            Preferiti/Storico/Suggeriti come blocchi grigi annidati) invece di 4 card
+            separate — richiesto esplicitamente dall'utente ("allungare la card Cerca
+            voli... per inglobare i tre bottoni"). */}
         <div
           style={{
             display: "flex",
@@ -330,32 +286,73 @@ export function Home() {
             paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
           }}
         >
-          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <SearchCard
-              onClick={() => navigate("/search")}
-              subtitle={lastSearchSubtitle}
-              lastSearchAt={lastSearch?.created_at}
-              onRepeat={repeatLastSearch}
-            />
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <SmallCard
-                  icon="⭐"
-                  title="Preferiti"
-                  subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
-                  onClick={() => navigate("/favorites")}
-                />
+          <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
+            <Card
+              style={{
+                padding: 18,
+                background: "rgba(255,255,255,0.16)",
+                backdropFilter: "blur(18px)",
+                WebkitBackdropFilter: "blur(18px)",
+                border: "1px solid rgba(255,255,255,0.35)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+              }}
+            >
+              <SearchRow onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
+
+              {lastSearch?.created_at && (
+                <>
+                  <HomeDivider />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
+                      Ultima ricerca: {formatRelativeTime(lastSearch.created_at)}
+                    </div>
+                    <button
+                      onClick={repeatLastSearch}
+                      style={{
+                        border: "none",
+                        background: "rgba(255,255,255,0.2)",
+                        color: "#FFFFFF",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        borderRadius: RADIUS.pill,
+                        padding: "6px 12px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ↻ Ripeti
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <HomeDivider />
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <GreyChip
+                    icon="⭐"
+                    title="Preferiti"
+                    subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
+                    onClick={() => navigate("/favorites")}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <GreyChip
+                    icon="🕐"
+                    title="Storico"
+                    subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
+                    onClick={() => navigate("/history")}
+                  />
+                </div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <SmallCard
-                  icon="🕐"
-                  title="Storico"
-                  subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
-                  onClick={() => navigate("/history")}
-                />
-              </div>
-            </div>
-            <SmallCard icon="✨" title="Suggeriti per te" subtitle={suggestSubtitle} onClick={() => navigate("/suggestions")} />
+              <div style={{ height: 10 }} />
+              <GreyChip
+                icon="✨"
+                title="Suggeriti per te"
+                subtitle={suggestSubtitle}
+                onClick={() => navigate("/suggestions")}
+              />
+            </Card>
           </div>
         </div>
       </div>
