@@ -82,20 +82,17 @@ function HomeDivider() {
   return <div style={{ height: 1, background: "rgba(255,255,255,0.25)", margin: "14px 0" }} />;
 }
 
-// Blocco grigio pieno (SMALL_CARD_GREY, non ancora in palette — l'app non ne aveva uno,
-// tutta calda verde/prugna) — richiesto esplicitamente dall'utente, stesso tono grigio del
-// bottone "Ripeti". Non più una Card a sé stante con ombra propria: ora è un blocco
-// annidato DENTRO l'unica card di vetro, niente ombra propria per non "galleggiare" dentro
-// un contenitore che ha già la sua.
-const SMALL_CARD_GREY = "#E4E1D9";
-
+// Stesso identico vetro grigio del bottone "Ripeti" (rgba(255,255,255,0.2), niente
+// bordo) — richiesto esplicitamente dall'utente ("prendi il colore del bottone Ripeti e
+// usalo anche per i tre bottoni"). Testo bianco invece di scuro: sullo stesso sfondo
+// traslucido di Ripeti il testo scuro perdeva contrasto nelle zone più chiare della foto,
+// il bianco resta leggibile come nel resto della card (stesso trattamento già in uso lì).
 function GreyChip({ icon, title, subtitle, onClick, style }) {
   return (
     <div
       onClick={onClick}
       style={{
-        background: SMALL_CARD_GREY,
-        border: "1px solid rgba(33,30,43,0.12)",
+        background: "rgba(255,255,255,0.2)",
         borderRadius: RADIUS.card,
         padding: 13,
         cursor: "pointer",
@@ -104,11 +101,11 @@ function GreyChip({ icon, title, subtitle, onClick, style }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
         <div style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{icon}</div>
-        <div style={{ fontWeight: 600, fontSize: 16, color: COLORS.ink, flex: 1, minWidth: 0 }}>{title}</div>
-        <ChevronRight size={19} color={COLORS.inkSoft} style={{ flexShrink: 0 }} />
+        <div style={{ fontWeight: 600, fontSize: 16, color: "#FFFFFF", flex: 1, minWidth: 0 }}>{title}</div>
+        <ChevronRight size={19} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
       </div>
       {subtitle && (
-        <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 5 }}>{subtitle}</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 5 }}>{subtitle}</div>
       )}
     </div>
   );
