@@ -8,7 +8,7 @@
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
 //
-// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (30/46).
+// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (39/46).
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -68,6 +68,15 @@ const DESTINATION_PHOTOS = {
   FRA: "https://images.unsplash.com/photo-1540646794357-6cbbd6f3501e", // Francoforte, skyline aereo
   HAM: "https://images.unsplash.com/photo-1551353471-1975b91e445b", // Amburgo, porto
   BEG: "https://images.unsplash.com/photo-1713132508337-4e06156b544f", // Belgrado, ponte sul fiume e citta'
+  GVA: "https://images.unsplash.com/photo-1633022326182-1b36700bc49a", // Ginevra, Jet d'Eau
+  EDI: "https://images.unsplash.com/photo-1619187731847-28392c0c7917", // Edimburgo, castello
+  MAN: "https://images.unsplash.com/photo-1663345332112-3d866f301ab4", // Manchester, skyline
+  HEL: "https://images.unsplash.com/photo-1538332576228-eb5b4c4de6f5", // Helsinki, Cattedrale
+  VNO: "https://images.unsplash.com/photo-1667743350028-e0a17093d7e4", // Vilnius, centro storico con torre dell'orologio
+  TLL: "https://images.unsplash.com/photo-1731139892979-6016ef80c69d", // Tallinn, centro storico
+  SOF: "https://images.unsplash.com/photo-1635544039349-eff845bd6220", // Sofia, Cattedrale Alexander Nevsky
+  LJU: "https://images.unsplash.com/photo-1578386269334-4e912b9cdbc8", // Lubiana, castello
+  BTS: "https://images.unsplash.com/photo-1693141157418-4543599b079c", // Bratislava, centro storico con torre dell'orologio
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
