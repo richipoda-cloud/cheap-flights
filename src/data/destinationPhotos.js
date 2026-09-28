@@ -1,8 +1,7 @@
 // Foto hero curate a mano per destinazione, usate in Home per lo sfondo dinamico legato
-// all'ultima ricerca fatta (vedi Home.jsx). Set iniziale con le 5 destinazioni piu'
-// ricorrenti nel progetto finora (Storico/Preferiti/test) — da ampliare nelle prossime
-// sessioni con le altre destinazioni gia' scelte (vedi memoria progetto: 28 extra-Europa/
-// charter + 46 europee, soggetto approvato per ciascuna).
+// all'ultima ricerca fatta (vedi Home.jsx). Ampliato progressivamente con le destinazioni
+// gia' scelte (vedi memoria progetto: 28 extra-Europa/charter + 46 europee, soggetto
+// approvato per ciascuna) man mano che si sourcia la foto vera su Unsplash.
 //
 // Ogni foto verificata a mano su unsplash.com prima di essere scelta: prefisso "photo-"
 // (gratuita), MAI "premium_photo-" (Unsplash+, richiede abbonamento) — stesso identico
@@ -14,6 +13,13 @@ const DESTINATION_PHOTOS = {
   BCN: "https://images.unsplash.com/photo-1583422409516-2895a77efded", // Barcellona, skyline
   LMP: "https://images.unsplash.com/photo-1706169577130-08529f31fbbf", // Lampedusa, spiaggia
   TCI: "https://images.unsplash.com/photo-1691397553539-c7c573138747", // Tenerife, paesaggio
+  NYC: "https://images.unsplash.com/photo-1499092346589-b9b6be3e94b2", // New York, skyline Manhattan/Brooklyn Bridge
+  MIA: "https://images.unsplash.com/photo-1717940749812-c202bec41ee5", // Miami, skyline da spiaggia
+  TYO: "https://images.unsplash.com/photo-1513407030348-c983a97b98d8", // Tokyo, skyline con Tokyo Tower
+  DXB: "https://images.unsplash.com/photo-1579525612525-053cd3e8cbd7", // Dubai, skyline aereo con Burj Khalifa
+  CAI: "https://images.unsplash.com/photo-1568322445389-f64ac2515020", // Il Cairo, Sfinge e Piramide
+  CMN: "https://images.unsplash.com/photo-1538230575309-59dfc388ae36", // Casablanca, citta'
+  RAK: "https://images.unsplash.com/photo-1570135460237-510ca82c6781", // Marrakech, medina/souk
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
