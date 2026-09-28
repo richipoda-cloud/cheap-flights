@@ -39,14 +39,14 @@ const DESTINATION_PHOTOS = {
   DPS: "https://images.unsplash.com/photo-1555400038-63f5ba517a47", // Bali, risaie a Tegalalang
   CUN: "https://images.unsplash.com/photo-1602088113235-229c19758e9f", // Cancun, spiaggia
   MAD: "https://images.unsplash.com/photo-1631178629147-b1e7e4a62403", // Madrid, skyline
-  LIS: "https://images.unsplash.com/photo-1626455613245-066bf428283c", // Lisbona, skyline al tramonto
+  LIS: "https://images.unsplash.com/photo-1697748525265-7431cba075b6", // Lisbona, tram di Alfama
   PAR: "https://images.unsplash.com/photo-1570097703229-b195d6dd291f", // Parigi, Tour Eiffel
   LON: "https://images.unsplash.com/photo-1549483249-f0b359d1e289", // Londra, skyline con Gherkin e Thames
   BER: "https://images.unsplash.com/photo-1599946347371-68eb71b16afc", // Berlino, skyline
   AMS: "https://images.unsplash.com/photo-1534351590666-13e3e96b5017", // Amsterdam, canali
   BRU: "https://images.unsplash.com/photo-1575845664732-ee40fdc525a3", // Bruxelles, edifici storici
   DUB: "https://images.unsplash.com/photo-1644955538144-7d896b5ffc70", // Dublino, skyline con ponte
-  VIE: "https://images.unsplash.com/photo-1516550893923-42d28e5677af", // Vienna, skyline aereo
+  VIE: "https://images.unsplash.com/photo-1516550893923-42d28e5677af", // Vienna, skyline al tramonto
   ZRH: "https://images.unsplash.com/photo-1664459937096-d395cd77f8b8", // Zurigo, ponte e citta'
   PRG: "https://images.unsplash.com/photo-1600623471616-8c1966c91ff6", // Praga, Ponte Carlo e Castello al tramonto
   BUD: "https://images.unsplash.com/photo-1616432902940-b7a1acbc60b3", // Budapest, Parlamento sul Danubio
