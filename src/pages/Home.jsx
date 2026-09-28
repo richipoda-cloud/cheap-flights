@@ -101,12 +101,12 @@ function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
               }}
               style={{
                 border: "none",
-                // Segnalato dall'utente: grigio pieno, stonava col vetro smerigliato della
-                // card — stesso verde tenue (accentSoft) già usato per Preferiti/Storico/
-                // Suggeriti, così il bottone si intona al resto della home invece di un
-                // grigio che non appartiene alla palette dell'app.
-                background: COLORS.accentSoft,
-                color: COLORS.ink,
+                // Malinteso corretto: l'utente voleva il grigio di QUESTO bottone spostato
+                // su Preferiti/Storico/Suggeriti (vedi SMALL_CARD_GREY sotto), non questo
+                // cambiato — resta quindi il vetro trasparente originale (si intona già
+                // alla card semi-trasparente "Cerca voli" sopra di esso).
+                background: "rgba(255,255,255,0.2)",
+                color: "#FFFFFF",
                 fontSize: 13,
                 fontWeight: 600,
                 borderRadius: RADIUS.pill,
@@ -129,19 +129,21 @@ function SearchCard({ onClick, subtitle, lastSearchAt, onRepeat }) {
 // icona/freccia, altrimenti nelle due card strette (Preferiti/Storico) tornerebbe a
 // troncarsi con "…" come nella versione precedente a quella verticale.
 //
-// Sfondo COLORS.accentSoft (verdino tenue, già in palette) invece del bianco pieno: ora
-// anche queste tre card stanno sopra la foto hero (allungata apposta), non più in un
-// pannello separato sotto — confermato esplicitamente dall'utente. Restano OPACHE (niente
-// vetro/blur come SearchCard) così il testo scuro resta leggibile ovunque cadano sulla
-// foto, senza dover oscurare quella porzione di immagine.
+// Sfondo grigio pieno (SMALL_CARD_GREY, non ancora in palette — l'app non ne aveva uno,
+// tutta calda verde/prugna) invece del verde accentSoft di prima: richiesto esplicitamente
+// dall'utente, stesso tono grigio già visto sul bottone "Ripeti" della card sopra. Restano
+// OPACHE (niente vetro/blur come SearchCard) così il testo scuro resta leggibile ovunque
+// cadano sulla foto, senza dover oscurare quella porzione di immagine.
+const SMALL_CARD_GREY = "#E4E1D9";
+
 function SmallCard({ icon, title, subtitle, onClick }) {
   return (
     <Card
       onClick={onClick}
       style={{
         padding: 15,
-        background: COLORS.accentSoft,
-        border: "1px solid rgba(110,127,92,0.28)",
+        background: SMALL_CARD_GREY,
+        border: "1px solid rgba(33,30,43,0.12)",
         boxShadow: "0 4px 14px rgba(0,0,0,0.16)",
       }}
     >
