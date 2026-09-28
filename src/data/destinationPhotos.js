@@ -8,7 +8,7 @@
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
 //
-// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (10/46).
+// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (19/46).
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -48,6 +48,15 @@ const DESTINATION_PHOTOS = {
   DUB: "https://images.unsplash.com/photo-1644955538144-7d896b5ffc70", // Dublino, skyline con ponte
   VIE: "https://images.unsplash.com/photo-1516550893923-42d28e5677af", // Vienna, skyline aereo
   ZRH: "https://images.unsplash.com/photo-1664459937096-d395cd77f8b8", // Zurigo, ponte e citta'
+  PRG: "https://images.unsplash.com/photo-1600623471616-8c1966c91ff6", // Praga, Ponte Carlo e Castello al tramonto
+  BUD: "https://images.unsplash.com/photo-1616432902940-b7a1acbc60b3", // Budapest, Parlamento sul Danubio
+  KRK: "https://images.unsplash.com/photo-1650709224943-7187a0bb1412", // Cracovia, centro storico
+  BUH: "https://images.unsplash.com/photo-1690285044968-e2c856885065", // Bucarest, Palazzo del Parlamento
+  ATH: "https://images.unsplash.com/photo-1603565816030-6b389eeb23cb", // Atene, Acropoli al tramonto
+  MLA: "https://images.unsplash.com/photo-1600498202878-79bdcbe69033", // Malta/La Valletta, skyline
+  PMI: "https://images.unsplash.com/photo-1579551450606-1b2180590522", // Palma di Maiorca, spiaggia
+  IBZ: "https://images.unsplash.com/photo-1622890806166-111d7f6c7c97", // Ibiza, spiaggia
+  NCE: "https://images.unsplash.com/photo-1554149082-75d460afced3", // Nizza, costa/Costa Azzurra
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
