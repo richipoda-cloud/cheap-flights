@@ -152,24 +152,21 @@ export function Home() {
   }, []);
 
   return (
-    // Segnalato PIÙ VOLTE dall'utente: "Suggeriti per te" restava tagliato in fondo.
-    // Due tentativi precedenti (height:100vh, poi 100dvh) presumevano di poter CALCOLARE
-    // esattamente quanto spazio serve e bloccare la pagina a quella misura con
-    // overflow:hidden — ma qualunque stima (altezza reale del testo su un dato telefono,
-    // wrapping del sottotitolo Suggeriti su più righe, dimensione testo di sistema
-    // dell'utente) può sbagliare, e con overflow:hidden un errore di stima non dà un
-    // bordo brutto: NASCONDE del tutto il contenuto, senza modo di raggiungerlo — questo
-    // è il difetto strutturale dietro tutti i tentativi precedenti, non un singolo bug.
+    // STORIA (da leggere prima di ritoccare questo): "Suggeriti per te" restava tagliato
+    // in fondo con height:100dvh + overflow:hidden — qualunque stima di quanto spazio
+    // serva (testo più lungo, dimensione carattere di sistema, telefono più basso) poteva
+    // sbagliare, e un errore di stima con overflow:hidden non dà un bordo brutto: NASCONDE
+    // del tutto il contenuto, senza modo di raggiungerlo. Per questo era stata tolta la
+    // rete di sicurezza dello scroll.
     //
-    // Ora: la foto è uno sfondo FISSO (position:fixed, non scrolla mai), il contenuto
-    // (saluto + card) è in flusso normale dentro una colonna flex con un divisore
-    // elastico (flex:1) che assorbe lo spazio vuoto — quando tutto ci sta (caso comune,
-    // verificato dal vivo), le card restano ancorate in fondo esattamente come prima,
-    // NESSUNA differenza visiva. Quando non ci sta (telefono più basso, testo più lungo,
-    // dimensione carattere di sistema più grande), la colonna cresce oltre lo schermo e
-    // la pagina scorre normalmente invece di tagliare via "Suggeriti" senza lasciare
-    // traccia — una rete di sicurezza, non il comportamento normale atteso.
-    <div style={{ position: "relative", minHeight: "100dvh" }}>
+    // Richiesto ora esplicitamente dall'utente ("non voglio che si possa scorrere nella
+    // home"): overflow:hidden reintrodotto qui, accettando consapevolmente lo stesso
+    // rischio di prima — con i sottotitoli tolti sotto Preferiti/Storico/Suggeriti il
+    // contenuto è molto più compatto e ci sta su schermi più piccoli di prima (verificato
+    // dal vivo su 375×812), ma su un telefono ANCORA più basso o un testo di sistema molto
+    // più grande potrebbe di nuovo tagliare via l'ultima riga senza alcun modo di
+    // raggiungerla — non c'è più lo scroll a fare da paracadute.
+    <div style={{ position: "relative", height: "100dvh", overflow: "hidden" }}>
       <div
         ref={heroRef}
         style={{
