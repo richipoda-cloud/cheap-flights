@@ -132,6 +132,26 @@ export function Home() {
   // punto è davvero quello che si vede in cima. Prima si tingeva solo una volta al mount,
   // ora segue lo scroll con IntersectionObserver sull'hero: azzurro finché è visibile,
   // COLORS.bg appena esce dallo schermo — sempre il colore vero di quel che c'è in cima.
+  // Segnalato dall'utente: "mi risulta ancora possibile scorrere su e giù" anche dopo
+  // aver messo overflow:hidden sul contenitore della pagina — quello impedisce solo al
+  // CONTENUTO di scorrere dentro il proprio box, non al bounce/rubber-band nativo di
+  // Safari iOS (e delle PWA), che agisce a livello di html/body definiti in fonts.css
+  // (niente overflow lì, serve altrove per le altre pagine che DEVONO scorrere). Bloccato
+  // qui solo per la durata di Home, ripristinato allo smontaggio così le altre pagine
+  // restano scorrevoli come sempre.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
   const heroRef = useRef(null);
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
