@@ -56,8 +56,16 @@ export function getCachedHeroColors(imageUrl) {
 // sapere quale sia l'ultima ricerca (arriva da una query al database, mai istantanea).
 // Qui si salva invece l'ultima foto mostrata per davvero, cosi' il prossimo avvio può
 // partire direttamente da quella (letta in modo sincrono, vedi Home.jsx) invece che da
-// un valore fisso — l'effect dopo il mount la corregge comunque se serve (nuova ricerca,
-// prossima della rotazione), ma senza passare dal default nel frattempo.
+// un valore fisso — l'effect dopo il mount la corregge comunque se serve (nuova ricerca),
+// ma senza passare dal default nel frattempo.
+//
+// rotationSignature: quando la foto salvata viene dalla rotazione "Ovunque" (non da una
+// destinazione fissa), memorizza la firma (id ricerca) usata per pescarla dal mazzo di
+// heroRotation.js — permette al prossimo avvio di far avanzare la rotazione in modo
+// SINCRONO (vedi consumeNextRotationSync), partendo già dalla foto NUOVA invece che da
+// questa (vecchia) per poi cambiarla sotto gli occhi dell'utente. Segnalato dall'utente:
+// senza questo, il flash sull'Islanda era sparito ma ne restava uno identico con "la foto
+// precedente" al posto dell'Islanda — stesso identico problema, causa diversa.
 const LAST_SHOWN_KEY = "hero-last-shown-v1";
 
 export function getLastShownHero() {
@@ -69,9 +77,9 @@ export function getLastShownHero() {
   }
 }
 
-export function setLastShownHero(url, skyColor, bottomColor) {
+export function setLastShownHero(url, skyColor, bottomColor, rotationSignature = null) {
   try {
-    localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ url, skyColor, bottomColor }));
+    localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ url, skyColor, bottomColor, rotationSignature }));
   } catch {
     // localStorage non disponibile — niente persistenza, nessun crash: si ricomincia
     // semplicemente dal default al prossimo avvio, come prima di questo fix.

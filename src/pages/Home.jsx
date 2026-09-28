@@ -9,7 +9,7 @@ import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 import { destinationPhotoUrl } from "../data/destinationPhotos";
 import { getCachedHeroColors, getLastShownHero, setLastShownHero, sampleHeroColors } from "../lib/heroColors";
-import { pickRotatingDestination, peekNextDestination } from "../lib/heroRotation";
+import { pickRotatingDestination, peekNextDestination, consumeNextRotationSync } from "../lib/heroRotation";
 
 // Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
 // su richiesta esplicita dell'utente ("più verde"): la versione precedente (rioliti di
@@ -54,7 +54,7 @@ function describeLastSearch(filters) {
 
 // Riga cliccabile "Cerca voli" — non più una Card a sé, ora vive dentro l'unica card
 // grande insieme a Preferiti/Storico/Suggeriti (richiesto esplicitamente dall'utente:
-// "allungare la card Cerca voli per inglobare i tre bottoni" invece di card separate).
+// "allungare la card Cerca voli... per inglobare i tre bottoni" invece di card separate).
 function SearchRow({ onClick, subtitle }) {
   return (
     <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 15, cursor: "pointer" }}>
@@ -116,6 +116,46 @@ function GreyChip({ icon, title, onClick, style }) {
   );
 }
 
+// Calcola lo stato iniziale dell'hero in modo SINCRONO, prima del primo render — chiamata
+// una sola volta per istanza del componente (vedi initialHeroRef sotto). Per le foto in
+// rotazione "Ovunque" non si limita a rileggere l'ultima foto mostrata (che sarebbe quella
+// VECCHIA): fa avanzare subito il mazzo di rotazione (consumeNextRotationSync, stessa
+// fonte in localStorage usata da pickRotatingDestination) cosi' si parte già dalla foto
+// NUOVA di questa apertura — esattamente quella che l'effect sotto sceglierebbe comunque
+// una volta noti i dati reali da Supabase, ma senza dover aspettare e senza passare prima
+// dalla foto precedente. Segnalato dall'utente: dopo aver tolto il flash sull'Islanda,
+// restava identico lo scambio "prima la foto precedente, poi quella nuova" — stesso
+// problema, causa diversa (qui la vecchia foto salvata NON è quella da mostrare ora,
+// perché la rotazione deve comunque avanzare ad ogni apertura).
+function computeInitialHero() {
+  const lastShown = getLastShownHero();
+
+  if (lastShown?.rotationSignature) {
+    const nextCode = consumeNextRotationSync(lastShown.rotationSignature);
+    const nextUrl = nextCode ? destinationPhotoUrl(nextCode) : null;
+    // Si usa la foto avanzata solo se i suoi colori sono già in cache (precampionati alla
+    // chiusura precedente, vedi peekNextDestination + sampleHeroColors sotto) — altrimenti
+    // si ricadrebbe comunque in un "flash" (foto giusta ma colori sbagliati per un
+    // istante), lo stesso problema che questa cache serve ad evitare.
+    const cachedColors = nextUrl ? getCachedHeroColors(nextUrl) : null;
+    if (nextUrl && cachedColors) {
+      return {
+        url: nextUrl,
+        skyColor: cachedColors.skyColor,
+        bottomColor: cachedColors.bottomColor,
+        consumedRotation: { signature: lastShown.rotationSignature, code: nextCode },
+      };
+    }
+  }
+
+  return {
+    url: lastShown?.url ?? DEFAULT_HERO_URL,
+    skyColor: lastShown?.skyColor ?? DEFAULT_HERO_SKY_COLOR,
+    bottomColor: lastShown?.bottomColor ?? DEFAULT_HERO_BOTTOM_COLOR,
+    consumedRotation: null,
+  };
+}
+
 export function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -123,35 +163,31 @@ export function Home() {
 
   const lastSearch = searches[0];
 
-  // Hero dinamico per destinazione (Home, sfondo di sfondo legato all'ultima ricerca) —
-  // di default resta la foto Islanda fissa (nessuna ricerca fatta, o destinazione senza
-  // foto curata ancora); se l'ultima ricerca ha una destinazione precisa presente in
-  // destinationPhotos.js, si passa a quella SOLO dopo che il colore vero e' stato
-  // campionato dal browser (sampleHeroColors, via canvas) — evita di mostrare la foto
-  // giusta con i colori sbagliati (cielo/dissolvenza) durante il caricamento.
-  // Stato iniziale: invece di partire sempre dall'Islanda, si parte dall'ultima foto
-  // mostrata per davvero in una sessione precedente (se c'è) — letta in modo sincrono,
-  // prima ancora che l'effect sotto sappia quale sia l'ultima ricerca (arriva da una
-  // query al database, mai istantanea). Segnalato dall'utente: senza questo, anche con
-  // la cache dei colori, si vedeva comunque l'Islanda per un istante ad ogni apertura,
-  // perché quello era il valore iniziale fisso del componente. L'effect sotto corregge
-  // comunque la foto se nel frattempo serve una diversa (nuova ricerca, prossima della
-  // rotazione) — ma senza passare dal default nel mentre.
-  const [heroUrl, setHeroUrl] = useState(() => getLastShownHero()?.url ?? DEFAULT_HERO_URL);
-  const [heroSkyColor, setHeroSkyColor] = useState(
-    () => getLastShownHero()?.skyColor ?? DEFAULT_HERO_SKY_COLOR
-  );
-  const [heroBottomColor, setHeroBottomColor] = useState(
-    () => getLastShownHero()?.bottomColor ?? DEFAULT_HERO_BOTTOM_COLOR
-  );
+  // Calcolato una sola volta per istanza del componente (non ad ogni render) — pattern
+  // "lazy ref init": la prima volta initialHeroRef.current è null e lo si valorizza, le
+  // volte successive si salta il calcolo. Necessario tenerlo in un ref (non in uno dei tre
+  // useState sotto) perché serve anche dopo il primo render, nell'effect, per sapere se la
+  // rotazione è già stata fatta avanzare qui e non ripeterla (vedi uso di
+  // initialHeroRef.current.consumedRotation più sotto).
+  const initialHeroRef = useRef(null);
+  if (initialHeroRef.current === null) {
+    initialHeroRef.current = computeInitialHero();
+  }
+  const initialHero = initialHeroRef.current;
 
-  // Imposta la foto hero E la salva come "ultima mostrata" (vedi sopra) — usata da tutti
-  // i punti sotto che decidono quale foto mostrare, cosi' il prossimo avvio parte da qui.
-  const applyHero = (url, skyColor, bottomColor) => {
+  const [heroUrl, setHeroUrl] = useState(initialHero.url);
+  const [heroSkyColor, setHeroSkyColor] = useState(initialHero.skyColor);
+  const [heroBottomColor, setHeroBottomColor] = useState(initialHero.bottomColor);
+
+  // Imposta la foto hero E la salva come "ultima mostrata" (vedi sopra) cosi' il prossimo
+  // avvio parte da qui. rotationSignature: passata solo quando questa foto viene dalla
+  // rotazione "Ovunque" (non da una destinazione fissa) — permette al prossimo avvio di
+  // far avanzare il mazzo in modo sincrono invece di ripartire da questa stessa foto.
+  const applyHero = (url, skyColor, bottomColor, rotationSignature = null) => {
     setHeroUrl(url);
     setHeroSkyColor(skyColor);
     setHeroBottomColor(bottomColor);
-    setLastShownHero(url, skyColor, bottomColor);
+    setLastShownHero(url, skyColor, bottomColor, rotationSignature);
   };
 
   useEffect(() => {
@@ -164,30 +200,41 @@ export function Home() {
 
     const destination = lastSearch?.filters?.destination;
     let url = destinationPhotoUrl(destination);
+    let rotationSignature = null;
 
     // Ricerca "Ovunque" (nessuna destinazione precisa scelta): se l'ultima ricerca di
     // questo tipo ha trovato risultati, i loro codici sono stati salvati a posteriori
     // dentro filters._resultDestinations (vedi Results.jsx, attachResultDestinations) —
-    // si ruota tra le foto di quelle destinazioni invece di restare sempre sul default,
-    // una diversa ad ogni apertura dell'app, ordine casuale ma senza ripetizioni finché
-    // non sono comparse tutte (poi si rimescola, vedi heroRotation.js). Richiesto
+    // si ruota tra le foto di quelle destinazioni invece di restare sempre sulla foto di
+    // default, una diversa ad ogni apertura dell'app, ordine casuale ma senza ripetizioni
+    // finché non sono comparse tutte (poi si rimescola, vedi heroRotation.js). Richiesto
     // esplicitamente dall'utente.
     if (!url) {
       const candidates = (lastSearch?.filters?._resultDestinations ?? []).filter(
         (code) => destinationPhotoUrl(code) != null
       );
       if (candidates.length > 0) {
-        const picked = pickRotatingDestination(String(lastSearch.id), candidates);
+        const signature = String(lastSearch.id);
+        rotationSignature = signature;
+
+        // Se il calcolo sincrono dello stato iniziale ha già fatto avanzare il mazzo per
+        // QUESTA stessa firma (stesso lotto di ricerca), si riusa quella scelta invece di
+        // richiamare pickRotatingDestination — che consumerebbe un SECONDO elemento dal
+        // mazzo, saltando una destinazione della rotazione. Se invece la firma è diversa
+        // (nel frattempo è stata registrata una nuova ricerca "Ovunque"), si sceglie da
+        // capo normalmente.
+        const consumed = initialHeroRef.current?.consumedRotation;
+        const picked = consumed && consumed.signature === signature ? consumed.code : pickRotatingDestination(signature, candidates);
         url = destinationPhotoUrl(picked);
 
         // Prepara in anticipo, mentre l'app è ancora aperta, la foto che uscirà alla
         // PROSSIMA apertura (non solo quella di adesso) — richiesto esplicitamente
         // dall'utente per evitare il flash sulla foto di default anche per le
         // destinazioni in rotazione. Campionamento in background: non tocca lo stato
-        // mostrato ora, si limita a scaldare la cache (vedi heroColors.js) così la
+        // mostrato ora, si limita a scaldare la cache (vedi heroColors.js) cosi' la
         // prossima volta il colore è già pronto. Se il mazzo è esaurito (il prossimo
         // giro rimescolerà) non c'è nulla di deterministico da preparare, si salta.
-        const nextCode = peekNextDestination(String(lastSearch.id));
+        const nextCode = peekNextDestination(signature);
         const nextUrl = nextCode ? destinationPhotoUrl(nextCode) : null;
         if (nextUrl) sampleHeroColors(nextUrl).catch(() => {});
       }
@@ -198,12 +245,13 @@ export function Home() {
       return;
     }
 
-    // Se questa foto è già in cache (vista in precedenza, o preparata in anticipo
-    // all'apertura scorsa dell'app), si mostra subito senza passare dal default —
-    // elimina il flash "prima Islanda poi la foto vera" segnalato dall'utente.
+    // Se questa foto è già in cache (vista in precedenza, preparata in anticipo
+    // all'apertura scorsa, o già impostata come stato iniziale sincrono qui sopra), si
+    // mostra subito senza passare dal default — elimina il flash "prima la foto
+    // sbagliata poi quella vera" segnalato dall'utente.
     const cachedColors = getCachedHeroColors(url);
     if (cachedColors) {
-      applyHero(url, cachedColors.skyColor, cachedColors.bottomColor);
+      applyHero(url, cachedColors.skyColor, cachedColors.bottomColor, rotationSignature);
       return;
     }
 
@@ -211,7 +259,7 @@ export function Home() {
     sampleHeroColors(url)
       .then(({ skyColor, bottomColor }) => {
         if (cancelled) return;
-        applyHero(url, skyColor, bottomColor);
+        applyHero(url, skyColor, bottomColor, rotationSignature);
       })
       .catch(() => {
         // Campionamento fallito (rete assente, immagine non raggiungibile) — resta sulla
@@ -232,7 +280,7 @@ export function Home() {
   // qui è solo un trucco visivo: si tinge quella barra (theme-color, che Safari iOS legge
   // anche in tab normale, non solo da installata) con lo stesso azzurro del cielo in cima
   // alla foto, campionato dal pixel reale dell'immagine (rgb 115,168,217 = #73A8D9, non a
-  // occhio) così la barra sembra continuare la foto invece di tagliarla con una fascia
+  // occhio) cosi' la barra sembra continuare la foto invece di tagliarla con una fascia
   // verde. Da installata in Home il fix vero (index.html, status bar black-translucent)
   // fa già disegnare la foto sotto la barra per davvero, questo qui non serve né disturba.
   //
