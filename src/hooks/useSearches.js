@@ -22,13 +22,37 @@ export function useSearches(userId) {
     reload();
   }, [reload]);
 
+  // Ritorna la riga inserita (serve l'id per poterla aggiornare in seguito, vedi
+  // attachResultDestinations) — prima non veniva restituito nulla perché non serviva.
   const recordSearch = useCallback(
     async (filters) => {
-      if (!userId) return;
-      await supabase.from("searches").insert({ user_id: userId, filters });
+      if (!userId) return null;
+      const { data } = await supabase
+        .from("searches")
+        .insert({ user_id: userId, filters })
+        .select()
+        .single();
       reload();
+      return data ?? null;
     },
     [userId, reload]
+  );
+
+  // Aggiunge a posteriori, dentro lo stesso JSON `filters` (nessuna migrazione schema),
+  // i codici delle destinazioni trovate per una ricerca "Ovunque" — usati poi in Home per
+  // far ruotare la foto hero tra quelle destinazioni invece di restare sempre sul default.
+  // Chiave interna "_resultDestinations", ignorata da describeLastSearch e dal resto
+  // della UI che legge solo i campi dei filtri veri e propri.
+  const attachResultDestinations = useCallback(
+    async (searchId, filters, codes) => {
+      if (!searchId || !codes || codes.length === 0) return;
+      await supabase
+        .from("searches")
+        .update({ filters: { ...filters, _resultDestinations: codes } })
+        .eq("id", searchId);
+      reload();
+    },
+    [reload]
   );
 
   const removeSearch = useCallback(
@@ -45,5 +69,13 @@ export function useSearches(userId) {
     reload();
   }, [userId, reload]);
 
-  return { searches, loading, recordSearch, removeSearch, removeAllSearches, reload };
+  return {
+    searches,
+    loading,
+    recordSearch,
+    attachResultDestinations,
+    removeSearch,
+    removeAllSearches,
+    reload,
+  };
 }

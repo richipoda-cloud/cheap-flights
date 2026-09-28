@@ -9,6 +9,7 @@ import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 import { destinationPhotoUrl } from "../data/destinationPhotos";
 import { sampleHeroColors } from "../lib/heroColors";
+import { pickRotatingDestination } from "../lib/heroRotation";
 
 // Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
 // su richiesta esplicita dell'utente ("più verde"): la versione precedente (rioliti di
@@ -134,7 +135,25 @@ export function Home() {
 
   useEffect(() => {
     const destination = lastSearch?.filters?.destination;
-    const url = destinationPhotoUrl(destination);
+    let url = destinationPhotoUrl(destination);
+
+    // Ricerca "Ovunque" (nessuna destinazione precisa scelta): se l'ultima ricerca di
+    // questo tipo ha trovato risultati, i loro codici sono stati salvati a posteriori
+    // dentro filters._resultDestinations (vedi Results.jsx, attachResultDestinations) —
+    // si ruota tra le foto di quelle destinazioni invece di restare sempre sul default,
+    // una diversa ad ogni apertura dell'app, ordine casuale ma senza ripetizioni finché
+    // non sono comparse tutte (poi si rimescola, vedi heroRotation.js). Richiesto
+    // esplicitamente dall'utente.
+    if (!url) {
+      const candidates = (lastSearch?.filters?._resultDestinations ?? []).filter(
+        (code) => destinationPhotoUrl(code) != null
+      );
+      if (candidates.length > 0) {
+        const picked = pickRotatingDestination(String(lastSearch.id), candidates);
+        url = destinationPhotoUrl(picked);
+      }
+    }
+
     if (!url) {
       setHeroUrl(DEFAULT_HERO_URL);
       setHeroSkyColor(DEFAULT_HERO_SKY_COLOR);
@@ -160,7 +179,7 @@ export function Home() {
     return () => {
       cancelled = true;
     };
-  }, [lastSearch?.filters?.destination]);
+  }, [lastSearch?.id, lastSearch?.filters?.destination, lastSearch?.filters?._resultDestinations]);
 
   const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
   const repeatLastSearch = () => navigate("/results", { state: { filters: lastSearch.filters } });

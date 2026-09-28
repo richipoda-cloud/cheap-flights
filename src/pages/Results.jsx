@@ -174,7 +174,7 @@ export function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { recordSearch } = useSearches(user?.id);
+  const { recordSearch, attachResultDestinations } = useSearches(user?.id);
 
   const filters = location.state?.filters;
   const [directResults, setDirectResults] = useState([]);
@@ -192,6 +192,7 @@ export function Results() {
   const pendingVerifyRef = useRef(0);
   const [error, setError] = useState(null);
   const recordedRef = useRef(false);
+  const recordedSearchRef = useRef(null);
   const mountedRef = useRef(true);
   const stopCheckedRef = useRef(new Set());
   useEffect(() => () => (mountedRef.current = false), []);
@@ -203,7 +204,11 @@ export function Results() {
   useEffect(() => {
     if (!filters || !user?.id || recordedRef.current) return;
     recordedRef.current = true;
-    recordSearch(filters);
+    // Tiene la riga appena inserita (serve il suo id per attachResultDestinations sotto,
+    // una volta che i risultati di una ricerca "Ovunque" sono pronti).
+    recordSearch(filters).then((row) => {
+      if (row) recordedSearchRef.current = row;
+    });
   }, [filters, user?.id, recordSearch]);
 
   useEffect(() => {
@@ -292,6 +297,26 @@ export function Results() {
         return priceA - priceB;
       });
   }, [directResults, verifiedData]);
+
+  // Solo per ricerche "Ovunque" (filters.destination vuoto/null): una volta che i
+  // risultati sono stabili (niente più caricamento/verifiche in corso), salviamo i codici
+  // delle destinazioni trovate (già ordinati per prezzo, deduplicati, max 10) nella ricerca
+  // appena registrata — usati poi in Home per far ruotare la foto hero tra queste
+  // destinazioni invece di restare sempre sulla foto di default. Una tantum per ricerca
+  // (attachedRef), non riparte ad ogni piccola variazione successiva di verifiedData.
+  const attachedRef = useRef(false);
+  useEffect(() => {
+    if (attachedRef.current) return;
+    if (loadingDirect || verifyingAll) return;
+    if (filters?.destination) return;
+    if (!recordedSearchRef.current) return;
+    if (sortedResults.length === 0) return;
+    attachedRef.current = true;
+    const codes = [...new Set(sortedResults.map((r) => r.destination).filter(Boolean))].slice(0, 10);
+    if (codes.length > 0) {
+      attachResultDestinations(recordedSearchRef.current.id, recordedSearchRef.current.filters, codes);
+    }
+  }, [loadingDirect, verifyingAll, filters, sortedResults, attachResultDestinations]);
 
   if (!filters) return null;
 
