@@ -20,6 +20,16 @@ const DESTINATION_PHOTOS = {
   CAI: "https://images.unsplash.com/photo-1568322445389-f64ac2515020", // Il Cairo, Sfinge e Piramide
   CMN: "https://images.unsplash.com/photo-1538230575309-59dfc388ae36", // Casablanca, citta'
   RAK: "https://images.unsplash.com/photo-1570135460237-510ca82c6781", // Marrakech, medina/souk
+  TLV: "https://images.unsplash.com/photo-1719757633949-3a0e42706f6d", // Tel Aviv, skyline da spiaggia
+  IST: "https://images.unsplash.com/photo-1619965342156-8e28c92028e7", // Istanbul, moschea sull'acqua
+  DEL: "https://images.unsplash.com/photo-1587474260584-136574528ed5", // Delhi, India Gate
+  BJS: "https://images.unsplash.com/photo-1701571398927-e6b1919390d0", // Pechino, skyline
+  SHA: "https://images.unsplash.com/photo-1545893835-abaa50cbe628", // Shanghai, skyline Lujiazui/Bund
+  SEL: "https://images.unsplash.com/photo-1532649097480-b67d52743b69", // Seoul, skyline notturno
+  BKK: "https://images.unsplash.com/photo-1563492065599-3520f775eeed", // Bangkok, templi
+  YTO: "https://images.unsplash.com/photo-1543962226-818f4301073f", // Toronto, skyline con CN Tower
+  SAO: "https://images.unsplash.com/photo-1561592390-42c07289e9cb", // San Paolo, skyline
+  ZNZ: "https://images.unsplash.com/photo-1575999502951-4ab25b5ca889", // Zanzibar, spiaggia
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
