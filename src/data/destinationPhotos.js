@@ -8,7 +8,7 @@
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
 //
-// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (19/46).
+// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (30/46).
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -57,6 +57,17 @@ const DESTINATION_PHOTOS = {
   PMI: "https://images.unsplash.com/photo-1579551450606-1b2180590522", // Palma di Maiorca, spiaggia
   IBZ: "https://images.unsplash.com/photo-1622890806166-111d7f6c7c97", // Ibiza, spiaggia
   NCE: "https://images.unsplash.com/photo-1554149082-75d460afced3", // Nizza, costa/Costa Azzurra
+  CPH: "https://images.unsplash.com/photo-1693085777063-138a4cf57c3f", // Copenaghen, Nyhavn
+  STO: "https://images.unsplash.com/photo-1759094310451-b1d216921168", // Stoccolma, skyline sul lungomare
+  RIX: "https://images.unsplash.com/photo-1685470934582-3636319a3be9", // Riga, centro storico con torre dell'orologio
+  SPU: "https://images.unsplash.com/photo-1629277911349-4414807025e0", // Spalato, costa
+  OPO: "https://images.unsplash.com/photo-1780999255455-1f881a62129c", // Porto, ponte Dom Luis I sul Douro
+  SVQ: "https://images.unsplash.com/photo-1509840841025-9088ba78a826", // Siviglia, Cattedrale
+  VLC: "https://images.unsplash.com/photo-1719401542194-95139aed215c", // Valencia, Citta' delle Arti e delle Scienze
+  MUC: "https://images.unsplash.com/photo-1577462282244-b58c2816d686", // Monaco di Baviera, vista aerea
+  FRA: "https://images.unsplash.com/photo-1540646794357-6cbbd6f3501e", // Francoforte, skyline aereo
+  HAM: "https://images.unsplash.com/photo-1551353471-1975b91e445b", // Amburgo, porto
+  BEG: "https://images.unsplash.com/photo-1713132508337-4e06156b544f", // Belgrado, ponte sul fiume e citta'
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
