@@ -8,8 +8,7 @@
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
 //
-// Le 28 destinazioni extra-Europa/charter sono complete qui sotto. Restano le 46 europee
-// (vedi memoria progetto) da aggiungere nelle prossime sessioni.
+// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (10/46).
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -39,6 +38,16 @@ const DESTINATION_PHOTOS = {
   CMB: "https://images.unsplash.com/photo-1740812517495-812e90ca01b1", // Colombo, citta' e oceano
   DPS: "https://images.unsplash.com/photo-1555400038-63f5ba517a47", // Bali, risaie a Tegalalang
   CUN: "https://images.unsplash.com/photo-1602088113235-229c19758e9f", // Cancun, spiaggia
+  MAD: "https://images.unsplash.com/photo-1631178629147-b1e7e4a62403", // Madrid, skyline
+  LIS: "https://images.unsplash.com/photo-1626455613245-066bf428283c", // Lisbona, skyline al tramonto
+  PAR: "https://images.unsplash.com/photo-1570097703229-b195d6dd291f", // Parigi, Tour Eiffel
+  LON: "https://images.unsplash.com/photo-1549483249-f0b359d1e289", // Londra, skyline con Gherkin e Thames
+  BER: "https://images.unsplash.com/photo-1599946347371-68eb71b16afc", // Berlino, skyline
+  AMS: "https://images.unsplash.com/photo-1534351590666-13e3e96b5017", // Amsterdam, canali
+  BRU: "https://images.unsplash.com/photo-1575845664732-ee40fdc525a3", // Bruxelles, edifici storici
+  DUB: "https://images.unsplash.com/photo-1644955538144-7d896b5ffc70", // Dublino, skyline con ponte
+  VIE: "https://images.unsplash.com/photo-1516550893923-42d28e5677af", // Vienna, skyline aereo
+  ZRH: "https://images.unsplash.com/photo-1664459937096-d395cd77f8b8", // Zurigo, ponte e citta'
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
