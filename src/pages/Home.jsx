@@ -8,7 +8,7 @@ import { useSearches } from "../hooks/useSearches";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 import { destinationPhotoUrl } from "../data/destinationPhotos";
-import { getCachedHeroColors, sampleHeroColors } from "../lib/heroColors";
+import { getCachedHeroColors, getLastShownHero, setLastShownHero, sampleHeroColors } from "../lib/heroColors";
 import { pickRotatingDestination, peekNextDestination } from "../lib/heroRotation";
 
 // Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
@@ -129,11 +129,39 @@ export function Home() {
   // destinationPhotos.js, si passa a quella SOLO dopo che il colore vero e' stato
   // campionato dal browser (sampleHeroColors, via canvas) — evita di mostrare la foto
   // giusta con i colori sbagliati (cielo/dissolvenza) durante il caricamento.
-  const [heroUrl, setHeroUrl] = useState(DEFAULT_HERO_URL);
-  const [heroSkyColor, setHeroSkyColor] = useState(DEFAULT_HERO_SKY_COLOR);
-  const [heroBottomColor, setHeroBottomColor] = useState(DEFAULT_HERO_BOTTOM_COLOR);
+  // Stato iniziale: invece di partire sempre dall'Islanda, si parte dall'ultima foto
+  // mostrata per davvero in una sessione precedente (se c'è) — letta in modo sincrono,
+  // prima ancora che l'effect sotto sappia quale sia l'ultima ricerca (arriva da una
+  // query al database, mai istantanea). Segnalato dall'utente: senza questo, anche con
+  // la cache dei colori, si vedeva comunque l'Islanda per un istante ad ogni apertura,
+  // perché quello era il valore iniziale fisso del componente. L'effect sotto corregge
+  // comunque la foto se nel frattempo serve una diversa (nuova ricerca, prossima della
+  // rotazione) — ma senza passare dal default nel mentre.
+  const [heroUrl, setHeroUrl] = useState(() => getLastShownHero()?.url ?? DEFAULT_HERO_URL);
+  const [heroSkyColor, setHeroSkyColor] = useState(
+    () => getLastShownHero()?.skyColor ?? DEFAULT_HERO_SKY_COLOR
+  );
+  const [heroBottomColor, setHeroBottomColor] = useState(
+    () => getLastShownHero()?.bottomColor ?? DEFAULT_HERO_BOTTOM_COLOR
+  );
+
+  // Imposta la foto hero E la salva come "ultima mostrata" (vedi sopra) — usata da tutti
+  // i punti sotto che decidono quale foto mostrare, cosi' il prossimo avvio parte da qui.
+  const applyHero = (url, skyColor, bottomColor) => {
+    setHeroUrl(url);
+    setHeroSkyColor(skyColor);
+    setHeroBottomColor(bottomColor);
+    setLastShownHero(url, skyColor, bottomColor);
+  };
 
   useEffect(() => {
+    // Aspetta che lo Storico sia stato caricato da Supabase prima di decidere qualcosa —
+    // altrimenti, al primo render, lastSearch è ancora undefined (non "nessuna ricerca
+    // fatta per davvero", solo "non ancora arrivata") e l'effect applicherebbe il default
+    // per un istante prima di correggersi, ricreando lo stesso flash che si vuole evitare
+    // partendo dall'ultima foto mostrata (vedi useState sopra).
+    if (loadingSearches) return;
+
     const destination = lastSearch?.filters?.destination;
     let url = destinationPhotoUrl(destination);
 
@@ -166,9 +194,7 @@ export function Home() {
     }
 
     if (!url) {
-      setHeroUrl(DEFAULT_HERO_URL);
-      setHeroSkyColor(DEFAULT_HERO_SKY_COLOR);
-      setHeroBottomColor(DEFAULT_HERO_BOTTOM_COLOR);
+      applyHero(DEFAULT_HERO_URL, DEFAULT_HERO_SKY_COLOR, DEFAULT_HERO_BOTTOM_COLOR);
       return;
     }
 
@@ -177,9 +203,7 @@ export function Home() {
     // elimina il flash "prima Islanda poi la foto vera" segnalato dall'utente.
     const cachedColors = getCachedHeroColors(url);
     if (cachedColors) {
-      setHeroUrl(url);
-      setHeroSkyColor(cachedColors.skyColor);
-      setHeroBottomColor(cachedColors.bottomColor);
+      applyHero(url, cachedColors.skyColor, cachedColors.bottomColor);
       return;
     }
 
@@ -187,22 +211,18 @@ export function Home() {
     sampleHeroColors(url)
       .then(({ skyColor, bottomColor }) => {
         if (cancelled) return;
-        setHeroUrl(url);
-        setHeroSkyColor(skyColor);
-        setHeroBottomColor(bottomColor);
+        applyHero(url, skyColor, bottomColor);
       })
       .catch(() => {
         // Campionamento fallito (rete assente, immagine non raggiungibile) — resta sulla
         // foto di default invece di rischiare foto giusta + colori sbagliati.
         if (cancelled) return;
-        setHeroUrl(DEFAULT_HERO_URL);
-        setHeroSkyColor(DEFAULT_HERO_SKY_COLOR);
-        setHeroBottomColor(DEFAULT_HERO_BOTTOM_COLOR);
+        applyHero(DEFAULT_HERO_URL, DEFAULT_HERO_SKY_COLOR, DEFAULT_HERO_BOTTOM_COLOR);
       });
     return () => {
       cancelled = true;
     };
-  }, [lastSearch?.id, lastSearch?.filters?.destination, lastSearch?.filters?._resultDestinations]);
+  }, [loadingSearches, lastSearch?.id, lastSearch?.filters?.destination, lastSearch?.filters?._resultDestinations]);
 
   const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
   const repeatLastSearch = () => navigate("/results", { state: { filters: lastSearch.filters } });

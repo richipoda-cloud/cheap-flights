@@ -50,6 +50,34 @@ export function getCachedHeroColors(imageUrl) {
   return readPersistentCache()[imageUrl] ?? null;
 }
 
+// Ultima foto (+ colori) effettivamente mostrata in Home, per-dispositivo — segnalato
+// dall'utente: anche con la cache sopra, all'apertura dell'app si vedeva comunque
+// l'Islanda per un istante, perché è il valore iniziale del componente PRIMA ancora di
+// sapere quale sia l'ultima ricerca (arriva da una query al database, mai istantanea).
+// Qui si salva invece l'ultima foto mostrata per davvero, cosi' il prossimo avvio può
+// partire direttamente da quella (letta in modo sincrono, vedi Home.jsx) invece che da
+// un valore fisso — l'effect dopo il mount la corregge comunque se serve (nuova ricerca,
+// prossima della rotazione), ma senza passare dal default nel frattempo.
+const LAST_SHOWN_KEY = "hero-last-shown-v1";
+
+export function getLastShownHero() {
+  try {
+    const raw = localStorage.getItem(LAST_SHOWN_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastShownHero(url, skyColor, bottomColor) {
+  try {
+    localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ url, skyColor, bottomColor }));
+  } catch {
+    // localStorage non disponibile — niente persistenza, nessun crash: si ricomincia
+    // semplicemente dal default al prossimo avvio, come prima di questo fix.
+  }
+}
+
 function hexOf(r, g, b) {
   return (
     "#" +
