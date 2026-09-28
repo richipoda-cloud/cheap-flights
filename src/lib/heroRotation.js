@@ -22,6 +22,25 @@ function shuffle(arr) {
   return a;
 }
 
+// Guarda quale sarà la PROSSIMA destinazione della rotazione senza consumarla dal mazzo
+// (a differenza di pickRotatingDestination) — usata da Home per "preparare in anticipo"
+// la foto successiva (precampionarne i colori, vedi heroColors.js) mentre l'app è ancora
+// aperta, così alla prossima apertura compare subito senza il flash sulla foto di default.
+// Richiesto esplicitamente dall'utente. Ritorna null se il mazzo corrente è già esaurito
+// (il prossimo giro rimescolerà una sequenza nuova, non prevedibile senza deciderla ora
+// per davvero) — caso raro, accettato: capita solo all'esaurimento di un giro completo.
+export function peekNextDestination(signature) {
+  let state = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state = raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+  if (!state || state.signature !== signature) return null;
+  return Array.isArray(state.bag) && state.bag.length > 0 ? state.bag[0] : null;
+}
+
 export function pickRotatingDestination(signature, codes) {
   if (!codes || codes.length === 0) return null;
   if (codes.length === 1) return codes[0];

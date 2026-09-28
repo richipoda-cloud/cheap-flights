@@ -9,7 +9,46 @@
 // images.unsplash.com e' bloccato dal proxy di rete della sessione — verificato dal vivo
 // il 28/09/2026 (curl -I restituisce 403 "blocked-by-allowlist"). Il browser dell'utente
 // non ha questa restrizione.
+//
+// Risultato cachato sia in memoria (Map, evita di far ripartire la Promise se la stessa
+// foto viene richiesta più volte nello stesso caricamento pagina) SIA in localStorage
+// (persistente tra aperture dell'app) — segnalato dall'utente: la prima volta che una
+// foto viene mostrata c'è comunque un breve caricamento (default Islanda finché il
+// colore vero non è pronto, il tempo di scaricare l'immagine e leggerla via canvas), ma
+// dalla seconda volta in poi (stessa foto già vista, o "preparata in anticipo" mentre
+// l'app era ancora aperta — vedi Home.jsx + heroRotation.js/peekNextDestination) il
+// colore è già in cache: la foto compare subito, senza passare dal default.
 const cache = new Map();
+const STORAGE_KEY = "hero-colors-cache-v1";
+
+function readPersistentCache() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    // localStorage non disponibile (navigazione privata, quota piena) — si procede
+    // senza cache persistente, solo quella in memoria per la sessione corrente.
+    return {};
+  }
+}
+
+function writePersistentEntry(imageUrl, colors) {
+  try {
+    const all = readPersistentCache();
+    all[imageUrl] = colors;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // Idem sopra — se non si riesce a salvare, niente persistenza, nessun crash.
+  }
+}
+
+// Lettura SINCRONA della cache persistente — usata da Home per mostrare la foto giusta
+// subito, senza passare dal default, se è già stata campionata in precedenza (in questa
+// sessione o in una passata) o preparata in anticipo.
+export function getCachedHeroColors(imageUrl) {
+  if (!imageUrl) return null;
+  return readPersistentCache()[imageUrl] ?? null;
+}
 
 function hexOf(r, g, b) {
   return (
@@ -35,9 +74,17 @@ function averageRegion(ctx, x, y, w, h) {
 }
 
 // Ritorna una Promise<{skyColor, bottomColor}>. Risultato cachato per URL — chiamata piu'
-// volte con la stessa foto (es. l'utente torna in Home) non ricampiona da capo.
+// volte con la stessa foto (es. l'utente torna in Home, o una foto "preparata in
+// anticipo" viene poi davvero mostrata) non ricampiona da capo.
 export function sampleHeroColors(imageUrl) {
   if (cache.has(imageUrl)) return cache.get(imageUrl);
+
+  const persisted = getCachedHeroColors(imageUrl);
+  if (persisted) {
+    const resolved = Promise.resolve(persisted);
+    cache.set(imageUrl, resolved);
+    return resolved;
+  }
 
   const promise = new Promise((resolve, reject) => {
     const img = new Image();
@@ -60,7 +107,9 @@ export function sampleHeroColors(imageUrl) {
 
         const skyColor = averageRegion(ctx, bandX, 0, bandW, bandH);
         const bottomColor = averageRegion(ctx, bandX, H - bandH, bandW, bandH);
-        resolve({ skyColor, bottomColor });
+        const result = { skyColor, bottomColor };
+        writePersistentEntry(imageUrl, result);
+        resolve(result);
       } catch (e) {
         // getImageData puo' fallire per "tainted canvas" se il CDN non manda header CORS
         // permissivi — non dovrebbe succedere con images.unsplash.com, ma niente crash:

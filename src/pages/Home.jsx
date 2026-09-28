@@ -8,8 +8,8 @@ import { useSearches } from "../hooks/useSearches";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 import { destinationPhotoUrl } from "../data/destinationPhotos";
-import { sampleHeroColors } from "../lib/heroColors";
-import { pickRotatingDestination } from "../lib/heroRotation";
+import { getCachedHeroColors, sampleHeroColors } from "../lib/heroColors";
+import { pickRotatingDestination, peekNextDestination } from "../lib/heroRotation";
 
 // Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
 // su richiesta esplicita dell'utente ("più verde"): la versione precedente (rioliti di
@@ -151,6 +151,17 @@ export function Home() {
       if (candidates.length > 0) {
         const picked = pickRotatingDestination(String(lastSearch.id), candidates);
         url = destinationPhotoUrl(picked);
+
+        // Prepara in anticipo, mentre l'app è ancora aperta, la foto che uscirà alla
+        // PROSSIMA apertura (non solo quella di adesso) — richiesto esplicitamente
+        // dall'utente per evitare il flash sulla foto di default anche per le
+        // destinazioni in rotazione. Campionamento in background: non tocca lo stato
+        // mostrato ora, si limita a scaldare la cache (vedi heroColors.js) così la
+        // prossima volta il colore è già pronto. Se il mazzo è esaurito (il prossimo
+        // giro rimescolerà) non c'è nulla di deterministico da preparare, si salta.
+        const nextCode = peekNextDestination(String(lastSearch.id));
+        const nextUrl = nextCode ? destinationPhotoUrl(nextCode) : null;
+        if (nextUrl) sampleHeroColors(nextUrl).catch(() => {});
       }
     }
 
@@ -160,6 +171,18 @@ export function Home() {
       setHeroBottomColor(DEFAULT_HERO_BOTTOM_COLOR);
       return;
     }
+
+    // Se questa foto è già in cache (vista in precedenza, o preparata in anticipo
+    // all'apertura scorsa dell'app), si mostra subito senza passare dal default —
+    // elimina il flash "prima Islanda poi la foto vera" segnalato dall'utente.
+    const cachedColors = getCachedHeroColors(url);
+    if (cachedColors) {
+      setHeroUrl(url);
+      setHeroSkyColor(cachedColors.skyColor);
+      setHeroBottomColor(cachedColors.bottomColor);
+      return;
+    }
+
     let cancelled = false;
     sampleHeroColors(url)
       .then(({ skyColor, bottomColor }) => {
