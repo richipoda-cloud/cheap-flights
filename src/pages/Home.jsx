@@ -268,7 +268,11 @@ export function Home() {
           style={{
             display: "flex",
             justifyContent: "center",
-            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+            // Alzato da 20 a 44px — richiesto esplicitamente dall'utente ("alza
+            // leggermente gli elementi... senza dover scorrere"): più margine dal bordo
+            // inferiore, la card resta comunque ancorata in basso (divisore elastico sopra)
+            // ma un po' più in alto invece che a filo schermo.
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 44px)",
           }}
         >
           <div style={{ width: "100%", maxWidth: 520, padding: "0 20px" }}>
