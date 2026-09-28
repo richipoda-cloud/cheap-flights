@@ -111,7 +111,7 @@ function GreyChip({ icon, title, onClick, style }) {
 export function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { searches } = useSearches(user?.id);
+  const { searches, loading: loadingSearches } = useSearches(user?.id);
 
   const lastSearch = searches[0];
   const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
@@ -291,29 +291,46 @@ export function Home() {
             >
               <SearchRow onClick={() => navigate("/search")} subtitle={lastSearchSubtitle} />
 
-              {lastSearch?.created_at && (
+              {/* Segnalato dall'utente: la card "si espandeva" un attimo dopo l'apertura —
+                  useSearches parte con searches=[] finché la query a Supabase non torna,
+                  quindi questa riga appariva di scatto (e allungava la card) un istante
+                  dopo il primo render invece di esserci già. Skeleton della STESSA altezza
+                  durante il caricamento: la card non cambia più dimensione quando arriva
+                  il dato vero (per chi ha già cercato — per chi non ha mai cercato resta un
+                  piccolo restringimento quando lo skeleton sparisce, caso raro e molto meno
+                  fastidioso di un'espansione improvvisa). */}
+              {(loadingSearches || lastSearch?.created_at) && (
                 <>
                   <HomeDivider />
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
-                      Ultima ricerca: {formatRelativeTime(lastSearch.created_at)}
-                    </div>
-                    <button
-                      onClick={repeatLastSearch}
-                      style={{
-                        border: "none",
-                        background: "rgba(255,255,255,0.2)",
-                        color: "#FFFFFF",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        borderRadius: RADIUS.pill,
-                        padding: "6px 12px",
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      ↻ Ripeti
-                    </button>
+                    {loadingSearches ? (
+                      <>
+                        <div style={{ height: 13, width: 140, borderRadius: 4, background: "rgba(255,255,255,0.15)" }} />
+                        <div style={{ height: 25, width: 74, borderRadius: RADIUS.pill, background: "rgba(255,255,255,0.12)" }} />
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
+                          Ultima ricerca: {formatRelativeTime(lastSearch.created_at)}
+                        </div>
+                        <button
+                          onClick={repeatLastSearch}
+                          style={{
+                            border: "none",
+                            background: "rgba(255,255,255,0.2)",
+                            color: "#FFFFFF",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            borderRadius: RADIUS.pill,
+                            padding: "6px 12px",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          ↻ Ripeti
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}
