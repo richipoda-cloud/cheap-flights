@@ -1,14 +1,14 @@
 // Foto hero curate a mano per destinazione, usate in Home per lo sfondo dinamico legato
-// all'ultima ricerca fatta (vedi Home.jsx). Ampliato progressivamente con le destinazioni
-// gia' scelte (vedi memoria progetto: 28 extra-Europa/charter + 46 europee, soggetto
-// approvato per ciascuna) man mano che si sourcia la foto vera su Unsplash.
+// all'ultima ricerca fatta (vedi Home.jsx). Completato con tutte le destinazioni gia'
+// scelte (vedi memoria progetto: 28 extra-Europa/charter + 46 europee), ciascuna con
+// soggetto/stile approvato e foto vera scelta dall'utente tra opzioni reali su Unsplash.
 //
 // Ogni foto verificata a mano su unsplash.com prima di essere scelta: prefisso "photo-"
 // (gratuita), MAI "premium_photo-" (Unsplash+, richiede abbonamento) — stesso identico
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
 //
-// Le 28 destinazioni extra-Europa/charter sono complete. Europee in corso (39/46).
+// Set completo: 74 destinazioni (28 extra-Europa/charter + 46 europee).
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -77,6 +77,14 @@ const DESTINATION_PHOTOS = {
   SOF: "https://images.unsplash.com/photo-1635544039349-eff845bd6220", // Sofia, Cattedrale Alexander Nevsky
   LJU: "https://images.unsplash.com/photo-1578386269334-4e912b9cdbc8", // Lubiana, castello
   BTS: "https://images.unsplash.com/photo-1693141157418-4543599b079c", // Bratislava, centro storico con torre dell'orologio
+  LUX: "https://images.unsplash.com/photo-1588336899745-22da91d8f816", // Lussemburgo, quartiere Grund/centro storico
+  REK: "https://images.unsplash.com/photo-1474690870753-1b92efa1f2d8", // Reykjavik, Cattedrale Hallgrimskirkja
+  FAO: "https://images.unsplash.com/photo-1608649944716-228404a0a8bb", // Faro/Algarve, scogliere sulla spiaggia
+  AGP: "https://images.unsplash.com/photo-1726565305996-08a316995026", // Malaga, spiaggia
+  JTR: "https://images.unsplash.com/photo-1672622851784-0dbd3df4c088", // Santorini, tramonto sull'acqua
+  JMK: "https://images.unsplash.com/photo-1700420242966-7e201c7283eb", // Mykonos, mulini a vento
+  RHO: "https://images.unsplash.com/photo-1711203485232-963a98a864ca", // Rodi, vicolo del centro storico
+  CFU: "https://images.unsplash.com/photo-1662406984807-03b106d39d3a", // Corfu', vista costiera con edifici
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
