@@ -54,7 +54,7 @@ function describeLastSearch(filters) {
 
 // Riga cliccabile "Cerca voli" — non più una Card a sé, ora vive dentro l'unica card
 // grande insieme a Preferiti/Storico/Suggeriti (richiesto esplicitamente dall'utente:
-// "allungare la card Cerca voli... per inglobare i tre bottoni" invece di card separate).
+// "allungare la card Cerca voli per inglobare i tre bottoni" invece di card separate).
 function SearchRow({ onClick, subtitle }) {
   return (
     <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 15, cursor: "pointer" }}>
@@ -114,6 +114,67 @@ function GreyChip({ icon, title, onClick, style }) {
       </div>
     </div>
   );
+}
+
+// Mostra la foto hero con una dissolvenza morbida invece di uno scatto secco quando
+// cambia (apertura app con foto già in cache, avanzamento rotazione, ecc.) — segnalato
+// dall'utente ("non molto fluido... vedo delle flashatine"): anche una volta risolti i
+// veri "flash" (foto sbagliata per un istante), il cambio da una foto all'altra restava
+// un salto istantaneo del backgroundImage, percepito comunque come uno scatto. Tiene due
+// livelli sovrapposti (solo quello attivo ha opacity 1) e sposta l'opacità da 0 a 1 sul
+// nuovo livello dopo che l'immagine è stata precaricata (altrimenti si vedrebbe un
+// riquadro vuoto dissolversi mentre l'immagine scarica) — se il browser ce l'ha già in
+// cache (caso più comune, vedi heroColors.js/sampleHeroColors che la scarica comunque per
+// campionarne i colori) il precaricamento è pressoché istantaneo.
+function useCrossfadeHero(targetUrl, fadeMs = 450) {
+  const [layers, setLayers] = useState(() => [
+    { url: targetUrl, opacity: 1 },
+    { url: null, opacity: 0 },
+  ]);
+  const activeIndexRef = useRef(0);
+  const shownUrlRef = useRef(targetUrl);
+
+  useEffect(() => {
+    if (!targetUrl || targetUrl === shownUrlRef.current) return;
+    shownUrlRef.current = targetUrl;
+    let cancelled = false;
+
+    const startCrossfade = () => {
+      if (cancelled) return;
+      const inactive = activeIndexRef.current === 0 ? 1 : 0;
+      setLayers((prev) => {
+        const next = [...prev];
+        next[inactive] = { url: targetUrl, opacity: 0 };
+        return next;
+      });
+      // Un frame dopo aver impostato l'immagine (a opacity 0), si alza l'opacità a 1 —
+      // cosi' la transizione CSS parte davvero da 0 invece di saltare subito a 1 (il
+      // browser deve "vedere" il frame a opacity:0 prima di animare verso 1).
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setLayers((prev) => {
+          const next = [...prev];
+          next[inactive] = { ...next[inactive], opacity: 1 };
+          next[activeIndexRef.current] = { ...next[activeIndexRef.current], opacity: 0 };
+          return next;
+        });
+        activeIndexRef.current = inactive;
+      });
+    };
+
+    // Precarica la foto nuova prima di iniziare la dissolvenza — evita di far comparire un
+    // riquadro vuoto che si dissolve mentre l'immagine è ancora in download.
+    const img = new Image();
+    img.onload = startCrossfade;
+    img.onerror = startCrossfade; // fallisce il precarico: si passa comunque, senza bloccarsi
+    img.src = targetUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [targetUrl]);
+
+  return layers;
 }
 
 // Calcola lo stato iniziale dell'hero in modo SINCRONO, prima del primo render — chiamata
@@ -310,6 +371,8 @@ export function Home() {
     };
   }, []);
 
+  const heroLayers = useCrossfadeHero(heroUrl);
+
   const heroRef = useRef(null);
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -345,17 +408,32 @@ export function Home() {
     // più grande potrebbe di nuovo tagliare via l'ultima riga senza alcun modo di
     // raggiungerla — non c'è più lo scroll a fare da paracadute.
     <div style={{ position: "relative", height: "100dvh", overflow: "hidden" }}>
-      <div
-        ref={heroRef}
-        style={{
-          position: "fixed",
-          inset: 0,
-          backgroundImage: `url(${heroUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center 62%",
-          zIndex: 0,
-        }}
-      />
+      {/* Due livelli sovrapposti invece di un singolo backgroundImage — vedi
+          useCrossfadeHero sopra: quando la foto cambia, il livello nuovo sale da opacity 0
+          a 1 (transition qui sotto) invece di sostituire il backgroundImage di scatto.
+          heroRef sta sul contenitore, stabile indipendentemente da quale livello è attivo,
+          cosi' l'IntersectionObserver dello scroll (vedi effect sotto) continua a
+          funzionare invariato. */}
+      <div ref={heroRef} style={{ position: "fixed", inset: 0 }}>
+        {heroLayers.map(
+          (layer, i) =>
+            layer.url && (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: `url(${layer.url})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center 62%",
+                  opacity: layer.opacity,
+                  transition: "opacity 450ms ease",
+                  zIndex: 0,
+                }}
+              />
+            )
+        )}
+      </div>
       {/* Sfumature scure alleggerite — segnalato dall'utente: coprivano troppo la
           foto ("non troppo coperta"). Restano solo dove serve davvero leggibilità
           (saluto in cima, card Cerca voli in vetro in fondo), molto più strette e
@@ -397,6 +475,7 @@ export function Home() {
           bottom: 0,
           height: 64,
           background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${heroBottomColor} 100%)`,
+          transition: "background 450ms ease",
           pointerEvents: "none",
           zIndex: 0,
         }}
