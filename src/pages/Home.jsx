@@ -234,7 +234,10 @@ export function Home() {
             sotto la status bar/dynamic island quando l'app è installata in Home. */}
         <div
           style={{
-            paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)",
+            // Alzato da 14 a 6px — richiesto esplicitamente dall'utente ("alza
+            // leggermente il titolo in alto"), resta comunque sotto la safe-area (status
+            // bar/dynamic island quando installata).
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 6px)",
             display: "flex",
             justifyContent: "center",
           }}
