@@ -4,9 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Card } from "../components/Card";
 import { COLORS, RADIUS } from "../theme/colors";
 import { useAuth } from "../hooks/useAuth";
-import { useFavorites } from "../hooks/useFavorites";
 import { useSearches } from "../hooks/useSearches";
-import { useSuggestions } from "../hooks/useSuggestions";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
 
@@ -87,7 +85,9 @@ function HomeDivider() {
 // usalo anche per i tre bottoni"). Testo bianco invece di scuro: sullo stesso sfondo
 // traslucido di Ripeti il testo scuro perdeva contrasto nelle zone più chiare della foto,
 // il bianco resta leggibile come nel resto della card (stesso trattamento già in uso lì).
-function GreyChip({ icon, title, subtitle, onClick, style }) {
+// Sottotitolo (conteggio preferiti/ricerche, riassunto suggeriti) tolto — richiesto
+// esplicitamente dall'utente: solo icona + titolo, niente altro sotto.
+function GreyChip({ icon, title, onClick, style }) {
   return (
     <div
       onClick={onClick}
@@ -104,9 +104,6 @@ function GreyChip({ icon, title, subtitle, onClick, style }) {
         <div style={{ fontWeight: 600, fontSize: 16, color: "#FFFFFF", flex: 1, minWidth: 0 }}>{title}</div>
         <ChevronRight size={19} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
       </div>
-      {subtitle && (
-        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 5 }}>{subtitle}</div>
-      )}
     </div>
   );
 }
@@ -114,20 +111,11 @@ function GreyChip({ icon, title, subtitle, onClick, style }) {
 export function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { favorites } = useFavorites(user?.id);
   const { searches } = useSearches(user?.id);
-  const { suggestions } = useSuggestions(user?.id);
 
-  const favCount = favorites.length;
-  const searchCount = searches.length;
   const lastSearch = searches[0];
   const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
   const repeatLastSearch = () => navigate("/results", { state: { filters: lastSearch.filters } });
-
-  const suggestSubtitle =
-    suggestions.topOrigins.length > 0
-      ? `${suggestions.topOrigins[0]} · ${suggestions.topNights ? `viaggi di ${suggestions.topNights} notti` : "weekend brevi"} · in base alle tue ricerche`
-      : "In base alle tue ricerche passate";
 
   // In Safari con l'indirizzo digitato (non installata in Home) la barra di stato/URL
   // resta sempre opaca sopra la pagina — nessun sito può davvero disegnarci sotto, quindi
@@ -326,29 +314,14 @@ export function Home() {
               <HomeDivider />
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <GreyChip
-                    icon="⭐"
-                    title="Preferiti"
-                    subtitle={favCount > 0 ? `${favCount} rott${favCount === 1 ? "a" : "e"} salvat${favCount === 1 ? "a" : "e"}` : null}
-                    onClick={() => navigate("/favorites")}
-                  />
+                  <GreyChip icon="⭐" title="Preferiti" onClick={() => navigate("/favorites")} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <GreyChip
-                    icon="🕐"
-                    title="Storico"
-                    subtitle={searchCount > 0 ? `${searchCount} ricerch${searchCount === 1 ? "a" : "e"}` : null}
-                    onClick={() => navigate("/history")}
-                  />
+                  <GreyChip icon="🕐" title="Storico" onClick={() => navigate("/history")} />
                 </div>
               </div>
               <div style={{ height: 10 }} />
-              <GreyChip
-                icon="✨"
-                title="Suggeriti per te"
-                subtitle={suggestSubtitle}
-                onClick={() => navigate("/suggestions")}
-              />
+              <GreyChip icon="✨" title="Suggeriti per te" onClick={() => navigate("/suggestions")} />
             </Card>
           </div>
         </div>
