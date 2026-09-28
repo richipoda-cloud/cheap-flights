@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Card } from "../components/Card";
@@ -7,6 +7,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 import { destinationName } from "../lib/countryNames";
 import { formatRelativeTime } from "../lib/formatters";
+import { destinationPhotoUrl } from "../data/destinationPhotos";
+import { sampleHeroColors } from "../lib/heroColors";
 
 // Foto Islanda via Unsplash CDN con resize on-the-fly — sostituita di nuovo il 21/09/2026
 // su richiesta esplicita dell'utente ("più verde"): la versione precedente (rioliti di
@@ -15,8 +17,13 @@ import { formatRelativeTime } from "../lib/formatters";
 // unsplash.com/s/photos/iceland-moss-mountains, controllando che fosse gratuita (prefisso
 // "photo-", non "premium_photo-" = Unsplash+, non usabile senza abbonamento) prima di
 // sceglierla. w=1200/q=80/dpr=2 per restare nitida sugli schermi ad alta densità.
-const HERO_IMAGE_URL =
+const DEFAULT_HERO_URL =
   "https://images.unsplash.com/photo-1530295314625-30d3b777ac7a?auto=format&fit=crop&w=1200&q=80&dpr=2";
+
+// Colore del cielo dell'hero di default (Islanda), stesso principio di HERO_BOTTOM_COLOR
+// sotto — estratto qui come costante cosi' da poterlo riusare come fallback quando una
+// foto per destinazione non ha ancora restituito il proprio colore campionato.
+const DEFAULT_HERO_SKY_COLOR = "#73A8D9";
 
 // Colore reale del bordo inferiore della foto (campionato via canvas sul crop effettivo
 // "cover" a proporzioni da telefono, non a occhio — stesso metodo già usato per il
@@ -26,7 +33,7 @@ const HERO_IMAGE_URL =
 // tono muschioso vero del fondo dell'immagine: usato sia per la dissolvenza qui sotto sia
 // come background_color del manifest (vedi public/manifest.json), cosi' la foto prosegue
 // visivamente anche nella schermata di avvio dell'app installata, non solo nel browser.
-const HERO_BOTTOM_COLOR = "#4E5541";
+const DEFAULT_HERO_BOTTOM_COLOR = "#4E5541";
 
 // Riassunto compatto dell'ultima ricerca salvata (tabella `searches`, non i filtri
 // "sticky" del form che cambiano ad ogni modifica) — usato come sottotitolo della card
@@ -114,6 +121,47 @@ export function Home() {
   const { searches, loading: loadingSearches } = useSearches(user?.id);
 
   const lastSearch = searches[0];
+
+  // Hero dinamico per destinazione (Home, sfondo di sfondo legato all'ultima ricerca) —
+  // di default resta la foto Islanda fissa (nessuna ricerca fatta, o destinazione senza
+  // foto curata ancora); se l'ultima ricerca ha una destinazione precisa presente in
+  // destinationPhotos.js, si passa a quella SOLO dopo che il colore vero e' stato
+  // campionato dal browser (sampleHeroColors, via canvas) — evita di mostrare la foto
+  // giusta con i colori sbagliati (cielo/dissolvenza) durante il caricamento.
+  const [heroUrl, setHeroUrl] = useState(DEFAULT_HERO_URL);
+  const [heroSkyColor, setHeroSkyColor] = useState(DEFAULT_HERO_SKY_COLOR);
+  const [heroBottomColor, setHeroBottomColor] = useState(DEFAULT_HERO_BOTTOM_COLOR);
+
+  useEffect(() => {
+    const destination = lastSearch?.filters?.destination;
+    const url = destinationPhotoUrl(destination);
+    if (!url) {
+      setHeroUrl(DEFAULT_HERO_URL);
+      setHeroSkyColor(DEFAULT_HERO_SKY_COLOR);
+      setHeroBottomColor(DEFAULT_HERO_BOTTOM_COLOR);
+      return;
+    }
+    let cancelled = false;
+    sampleHeroColors(url)
+      .then(({ skyColor, bottomColor }) => {
+        if (cancelled) return;
+        setHeroUrl(url);
+        setHeroSkyColor(skyColor);
+        setHeroBottomColor(bottomColor);
+      })
+      .catch(() => {
+        // Campionamento fallito (rete assente, immagine non raggiungibile) — resta sulla
+        // foto di default invece di rischiare foto giusta + colori sbagliati.
+        if (cancelled) return;
+        setHeroUrl(DEFAULT_HERO_URL);
+        setHeroSkyColor(DEFAULT_HERO_SKY_COLOR);
+        setHeroBottomColor(DEFAULT_HERO_BOTTOM_COLOR);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lastSearch?.filters?.destination]);
+
   const lastSearchSubtitle = describeLastSearch(lastSearch?.filters) ?? "Ovunque · Sempre · Filtri";
   const repeatLastSearch = () => navigate("/results", { state: { filters: lastSearch.filters } });
 
@@ -156,7 +204,7 @@ export function Home() {
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
     const previous = meta?.getAttribute("content");
-    const setColor = (visible) => meta?.setAttribute("content", visible ? "#73A8D9" : COLORS.bg);
+    const setColor = (visible) => meta?.setAttribute("content", visible ? heroSkyColor : COLORS.bg);
     setColor(true);
 
     const el = heroRef.current;
@@ -169,7 +217,7 @@ export function Home() {
       observer?.disconnect();
       if (previous != null) meta?.setAttribute("content", previous);
     };
-  }, []);
+  }, [heroSkyColor]);
 
   return (
     // STORIA (da leggere prima di ritoccare questo): "Suggeriti per te" restava tagliato
@@ -192,7 +240,7 @@ export function Home() {
         style={{
           position: "fixed",
           inset: 0,
-          backgroundImage: `url(${HERO_IMAGE_URL})`,
+          backgroundImage: `url(${heroUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center 62%",
           zIndex: 0,
@@ -238,7 +286,7 @@ export function Home() {
           right: 0,
           bottom: 0,
           height: 64,
-          background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${HERO_BOTTOM_COLOR} 100%)`,
+          background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${heroBottomColor} 100%)`,
           pointerEvents: "none",
           zIndex: 0,
         }}
