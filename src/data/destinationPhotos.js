@@ -7,6 +7,9 @@
 // (gratuita), MAI "premium_photo-" (Unsplash+, richiede abbonamento) — stesso identico
 // controllo gia' fatto per la foto Islanda di default in Home.jsx. Chiave = codice citta'/
 // aeroporto Travelpayouts (src/data/cities.json), maiuscolo.
+//
+// Le 28 destinazioni extra-Europa/charter sono complete qui sotto. Restano le 46 europee
+// (vedi memoria progetto) da aggiungere nelle prossime sessioni.
 const DESTINATION_PHOTOS = {
   TIA: "https://images.unsplash.com/photo-1632353913765-9b56b7b4bd55", // Tirana, Piazza Skanderbeg
   ZAG: "https://images.unsplash.com/photo-1761422901254-e5c1ad423b1c", // Zagabria, Piazza Ban Jelacic
@@ -30,6 +33,12 @@ const DESTINATION_PHOTOS = {
   YTO: "https://images.unsplash.com/photo-1543962226-818f4301073f", // Toronto, skyline con CN Tower
   SAO: "https://images.unsplash.com/photo-1561592390-42c07289e9cb", // San Paolo, skyline
   ZNZ: "https://images.unsplash.com/photo-1575999502951-4ab25b5ca889", // Zanzibar, spiaggia
+  MBA: "https://images.unsplash.com/photo-1642741974974-37cafd8fc3bf", // Mombasa/Diani, spiaggia al tramonto
+  PUJ: "https://images.unsplash.com/photo-1705507972578-78537a2dda73", // Punta Cana, spiaggia
+  MLE: "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b", // Maldive, bungalow sull'acqua
+  CMB: "https://images.unsplash.com/photo-1740812517495-812e90ca01b1", // Colombo, citta' e oceano
+  DPS: "https://images.unsplash.com/photo-1555400038-63f5ba517a47", // Bali, risaie a Tegalalang
+  CUN: "https://images.unsplash.com/photo-1602088113235-229c19758e9f", // Cancun, spiaggia
 };
 
 // Stessi parametri usati per la foto di default (Home.jsx): w=1200/q=80/dpr=2 per restare
