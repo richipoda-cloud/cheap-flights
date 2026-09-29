@@ -101,13 +101,18 @@ export function FlightDetail() {
 
   const nights = flight.nights ?? "?";
 
+  // justSaved NON torna più a false dopo i 2s (bug segnalato dall'utente, stesso di
+  // Results.jsx: aspettando la fine dell'animazione e ricliccando sulla stessa tratta, si
+  // creava un secondo preferito identico — nessun controllo di duplicato, solo il timer
+  // del feedback visivo). Ora resta "✓ Salvato" e disabilitato per il resto della
+  // permanenza della pagina, una volta salvata.
   const handleSaveFavorite = () => {
+    if (justSaved) return;
     addFavorite(
       { ...flight, price: verifiedPrice ?? flight.price, searchFilters: filters },
       flight.isStopover ? true : confirmed
     );
     setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 2000);
   };
 
   return (

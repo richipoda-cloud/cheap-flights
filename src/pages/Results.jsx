@@ -27,7 +27,7 @@ function FlatList({ children }) {
   );
 }
 
-// Bottone per salvare il volo direttamente dalla lista dei Risultati — richiesto
+// Bottone icona per salvare il volo direttamente dalla lista dei Risultati — richiesto
 // esplicitamente dall'utente ("dove ti ho indicato bisogna inserire un bottone con
 // l'icona della stella... per poter effettivamente salvare il volo"): prima l'unico modo
 // era aprire il dettaglio del volo (FlightDetail, bottone "★ Salva nei preferiti"), qui
@@ -42,6 +42,10 @@ function FlatList({ children }) {
 // (che è già il trattamento del bottone di prenotazione) per restare un'azione secondaria
 // riconoscibile, non una seconda CTA identica. Testo "Salva tratta" aggiunto accanto
 // all'icona — richiesto esplicitamente dall'utente, prima era solo l'icona.
+// justSaved NON torna più a false dopo i 2s (bug segnalato dall'utente: aspettando la
+// fine dell'animazione e ricliccando sulla stessa tratta, si creava un secondo preferito
+// identico — nessun controllo di duplicato, solo il timer del feedback visivo). Ora resta
+// "✓ Salvata" e disabilitato per il resto della sessione su questa riga, una volta salvata.
 function SaveFavoriteButton({ onSave }) {
   const [justSaved, setJustSaved] = useState(false);
   if (!onSave) return null;
@@ -52,7 +56,6 @@ function SaveFavoriteButton({ onSave }) {
         if (justSaved) return;
         onSave();
         setJustSaved(true);
-        setTimeout(() => setJustSaved(false), 2000);
       }}
       disabled={justSaved}
       style={{
