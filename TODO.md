@@ -118,10 +118,22 @@ Implementata al 100%, in più round successivi:
 
 Confermato funzionante dall'utente il 28/09/2026 ("molto meglio").
 
+## Salva nei preferiti direttamente dai Risultati (FATTO 29/09/2026)
+
+Richiesto esplicitamente dall'utente (screenshot con cerchio accanto al bottone "Vai alla
+prenotazione"): prima l'unico modo per salvare un volo nei Preferiti era aprire il
+dettaglio (FlightDetail). Ora `src/pages/Results.jsx` ha un bottone icona ★ (componente
+`SaveFavoriteButton`, stesso comportamento/stile del bottone di FlightDetail) accanto al
+bottone di prenotazione in ogni variante di riga espansa — volo diretto singolo, doppio
+biglietto andata/ritorno separato, percorso con scalo/creativo, e durante il caricamento
+orari. Snapshot salvato identico a quello di FlightDetail. Non compare se l'utente non è
+loggato.
+
 ## Bug minori noti, non urgenti
 
-- Nessun feedback visivo dopo "Salva nei preferiti" e nessuna deduplicazione se il
-  bottone viene cliccato più volte di fretta
+- Nessuna deduplicazione se il bottone "Salva nei preferiti" viene cliccato più volte
+  di fretta (il feedback visivo 2s "✓ Salvato" c'è, ma non impedisce un secondo salvataggio
+  dopo che è scaduto)
 - Campo destinazione in Search richiede doppio click
 - Voci Storico poco distintive (non mostrano notti/flessibilità nell'elenco)
 - Falso avviso "returnsElsewhere" su codici città con più aeroporti sotto lo stesso
