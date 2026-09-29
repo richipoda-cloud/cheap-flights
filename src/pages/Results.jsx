@@ -27,7 +27,7 @@ function FlatList({ children }) {
   );
 }
 
-// Bottone icona per salvare il volo direttamente dalla lista dei Risultati — richiesto
+// Bottone per salvare il volo direttamente dalla lista dei Risultati — richiesto
 // esplicitamente dall'utente ("dove ti ho indicato bisogna inserire un bottone con
 // l'icona della stella... per poter effettivamente salvare il volo"): prima l'unico modo
 // era aprire il dettaglio del volo (FlightDetail, bottone "★ Salva nei preferiti"), qui
@@ -36,6 +36,12 @@ function FlatList({ children }) {
 // justSaved locale (non nel genitore): ogni riga tiene il proprio stato del bottone,
 // stesso pattern di FlightDetail (2s poi torna cliccabile — dedup doppio click resta un
 // bug noto, non introdotto qui, vedi TODO.md).
+// Colore allineato al verde del bottone di prenotazione affiancato (COLORS.accent, non
+// più COLORS.plum) — richiesto esplicitamente dall'utente ("la stella non la voglio
+// rosso ma dello stesso verde del bottone di fianco"). Bordo/testo verdi invece di pieno
+// (che è già il trattamento del bottone di prenotazione) per restare un'azione secondaria
+// riconoscibile, non una seconda CTA identica. Testo "Salva tratta" aggiunto accanto
+// all'icona — richiesto esplicitamente dall'utente, prima era solo l'icona.
 function SaveFavoriteButton({ onSave }) {
   const [justSaved, setJustSaved] = useState(false);
   if (!onSave) return null;
@@ -49,22 +55,25 @@ function SaveFavoriteButton({ onSave }) {
         setTimeout(() => setJustSaved(false), 2000);
       }}
       disabled={justSaved}
-      title={justSaved ? "Salvato nei preferiti" : "Salva nei preferiti"}
       style={{
-        width: 44,
         flexShrink: 0,
+        whiteSpace: "nowrap",
         borderRadius: RADIUS.button,
-        border: `1px solid ${justSaved ? COLORS.accent : COLORS.hairline}`,
+        border: `1px solid ${COLORS.accent}`,
         background: justSaved ? COLORS.accentSoft : "transparent",
-        color: justSaved ? COLORS.accent : COLORS.plum,
-        fontSize: 18,
+        color: COLORS.accent,
+        fontFamily: "'Inter', sans-serif",
+        fontWeight: 600,
+        fontSize: 13,
+        padding: "0 14px",
         cursor: justSaved ? "default" : "pointer",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
+        gap: 6,
       }}
     >
-      {justSaved ? "✓" : "★"}
+      <span>{justSaved ? "✓" : "★"}</span>
+      <span>{justSaved ? "Salvata" : "Salva tratta"}</span>
     </button>
   );
 }
