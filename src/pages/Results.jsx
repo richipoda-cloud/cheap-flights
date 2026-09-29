@@ -8,6 +8,7 @@ import { BookingAction } from "../components/BookingAction";
 import { searchDirect, verifyPrice } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
+import { useFavorites } from "../hooks/useFavorites";
 
 // Lista piatta con separatori sottili tra le righe (non una card per riga) — un unico
 // box bianco arrotondato che contiene tutte le righe di un gruppo (diretti o creativi).
@@ -26,10 +27,52 @@ function FlatList({ children }) {
   );
 }
 
+// Bottone icona per salvare il volo direttamente dalla lista dei Risultati — richiesto
+// esplicitamente dall'utente ("dove ti ho indicato bisogna inserire un bottone con
+// l'icona della stella... per poter effettivamente salvare il volo"): prima l'unico modo
+// era aprire il dettaglio del volo (FlightDetail, bottone "★ Salva nei preferiti"), qui
+// stesso principio ma senza dover navigare via. `onSave` è undefined quando l'utente non
+// è loggato (nessun favorites possibile) — in quel caso il bottone non compare affatto.
+// justSaved locale (non nel genitore): ogni riga tiene il proprio stato del bottone,
+// stesso pattern di FlightDetail (2s poi torna cliccabile — dedup doppio click resta un
+// bug noto, non introdotto qui, vedi TODO.md).
+function SaveFavoriteButton({ onSave }) {
+  const [justSaved, setJustSaved] = useState(false);
+  if (!onSave) return null;
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (justSaved) return;
+        onSave();
+        setJustSaved(true);
+        setTimeout(() => setJustSaved(false), 2000);
+      }}
+      disabled={justSaved}
+      title={justSaved ? "Salvato nei preferiti" : "Salva nei preferiti"}
+      style={{
+        width: 44,
+        flexShrink: 0,
+        borderRadius: RADIUS.button,
+        border: `1px solid ${justSaved ? COLORS.accent : COLORS.hairline}`,
+        background: justSaved ? COLORS.accentSoft : "transparent",
+        color: justSaved ? COLORS.accent : COLORS.plum,
+        fontSize: 18,
+        cursor: justSaved ? "default" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {justSaved ? "✓" : "★"}
+    </button>
+  );
+}
+
 // Espande sul posto invece di navigare al dettaglio (stesso pattern di Preferiti) —
 // per i diretti riusa il verifyData già ottenuto per il badge "✓ verificato" (nessuna
 // chiamata doppia), per i percorsi creativi mostra le tratte già pronte da search-stopover.
-function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyData }) {
+function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyData, onSaveFavorite }) {
   const price = verifiedPrice ?? result.price;
   const deepLink = verifyData?.deepLink ?? result.deepLink;
   // "✓ verificato" solo se verify-price ha davvero trovato cache abbastanza fresca da
@@ -37,6 +80,11 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
   // prezzo originale non ricontrollato, resta onestamente "~" come i risultati non ancora
   // verificati, invece di promettere un'affidabilità che non c'è.
   const confirmed = Boolean(verifyData?.confirmed);
+  // Stesso identico snapshot costruito da FlightDetail (handleSaveFavorite) — prezzo
+  // migliore disponibile + i filtri che hanno prodotto questo risultato, non solo il
+  // volo nudo. isFresh: i percorsi creativi non hanno un concetto di "confermato" (vedi
+  // useFavorites.js), gli altri seguono l'esito reale della verifica.
+  const handleSave = () => onSaveFavorite?.(price, result.isStopover ? true : confirmed);
 
   return (
     <div style={{ borderBottom: isLast ? "none" : `1px solid ${COLORS.hairline}` }}>
@@ -83,9 +131,14 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
       {expanded && (
         <div style={{ padding: "0 16px 16px" }} onClick={(e) => e.stopPropagation()}>
           {result.isStopover ? (
-            result.legs?.map((leg, i) => (
-              <LegRow key={leg.id} index={i + 1} total={result.legs.length} leg={leg} />
-            ))
+            <>
+              {result.legs?.map((leg, i) => (
+                <LegRow key={leg.id} index={i + 1} total={result.legs.length} leg={leg} />
+              ))}
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <SaveFavoriteButton onSave={handleSave} />
+              </div>
+            </>
           ) : verifyData ? (
             (() => {
               const outboundLegs = verifyData.outboundLegs ?? (verifyData.outboundLeg ? [verifyData.outboundLeg] : []);
@@ -127,6 +180,7 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                   )}
                   {verifyData.returnsElsewhere ? (
                     <div style={{ display: "flex", gap: 8 }}>
+                      <SaveFavoriteButton onSave={handleSave} />
                       <BookingAction
                         deepLink={outboundLeg?.deepLink}
                         airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline}
@@ -147,22 +201,28 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
                       />
                     </div>
                   ) : (
-                    <BookingAction
-                      deepLink={deepLink}
-                      airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
-                      route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
-                      departDate={result.departDate}
-                      returnDate={result.returnDate}
-                      numberOfChanges={verifyData.numberOfChanges}
-                      unverified={Boolean(outboundLeg?.unverified || inboundLeg?.unverified)}
-                      style={{ width: "100%", justifyContent: "center" }}
-                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <SaveFavoriteButton onSave={handleSave} />
+                      <BookingAction
+                        deepLink={deepLink}
+                        airlineName={outboundLeg?.airlineName ?? outboundLeg?.airline ?? inboundLeg?.airlineName ?? inboundLeg?.airline}
+                        route={`${result.origin ?? "?"} → ${result.destination ?? "?"}`}
+                        departDate={result.departDate}
+                        returnDate={result.returnDate}
+                        numberOfChanges={verifyData.numberOfChanges}
+                        unverified={Boolean(outboundLeg?.unverified || inboundLeg?.unverified)}
+                        style={{ flex: 1, justifyContent: "center" }}
+                      />
+                    </div>
                   )}
                 </>
               );
             })()
           ) : (
-            <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>Carico orari…</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 12.5, color: COLORS.inkSoft, flex: 1 }}>Carico orari…</div>
+              <SaveFavoriteButton onSave={handleSave} />
+            </div>
           )}
         </div>
       )}
@@ -175,6 +235,7 @@ export function Results() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { recordSearch, attachResultDestinations } = useSearches(user?.id);
+  const { addFavorite } = useFavorites(user?.id);
 
   const filters = location.state?.filters;
   const [directResults, setDirectResults] = useState([]);
@@ -381,6 +442,11 @@ export function Results() {
               onToggle={() => toggleExpand(r.id)}
               verifiedPrice={verifiedData[r.id]?.price}
               verifyData={verifiedData[r.id]}
+              onSaveFavorite={
+                user?.id
+                  ? (price, isFresh) => addFavorite({ ...r, price, searchFilters: filters }, isFresh)
+                  : undefined
+              }
             />
           ))}
         </FlatList>
