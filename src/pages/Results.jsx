@@ -433,9 +433,17 @@ export function Results() {
       )}
       {!loadingDirect && !verifyingAll && directResults.length > 0 && sortedResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>
-          Trovati alcuni prezzi indicativi, ma nessuno con un volo reale confermato (compagnia,
-          orario, su quelle date esatte) — tolti dalla lista invece di mostrare un prezzo
-          abbinato a un volo indovinato.
+          {/* Riformulato (richiesto dall'utente 02/10/2026): "nessuno con un volo reale
+              confermato" suonava come se non esistesse alcun volo per quella rotta/data,
+              mentre in realtà spesso esistono voli con scalo che semplicemente non vengono
+              cercati di default (fetchOneWayPrices scarta i voli con scalo a meno che
+              "Andata/Ritorno con scalo" non sia attivo — vedi verify-price/index.ts). Il testo
+              ora dice esattamente quello che sappiamo per certo (nessun DIRETTO confermato),
+              senza affermare che non esista alcun volo in assoluto, e suggerisce l'azione
+              concreta per cercare anche quelli con scalo. */}
+          Nessun volo diretto confermato per queste date — possono comunque esistere voli con
+          scalo: prova ad attivare "Andata con scalo" / "Ritorno con scalo" nei filtri per
+          cercarli anche.
         </div>
       )}
       {!verifyingAll && sortedResults.length > 0 && (
