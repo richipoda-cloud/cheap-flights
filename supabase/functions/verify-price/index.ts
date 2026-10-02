@@ -194,12 +194,20 @@ function nearbyAirports(code: string, maxKm: number): string[] {
   return result;
 }
 
-// "Andata/Ritorno con scalo" (flight.checkOutboundStop / flight.checkReturnStop): cerca
-// un vero scalo (2 biglietti separati via un hub) per QUELLA tratta specifica, solo se
-// batte il prezzo diretto — calcolato on-demand (chiamato solo quando l'utente espande
-// un risultato con il relativo interruttore attivo, mai per i 10 risultati insieme:
-// il costo in chiamate sarebbe eccessivo per una verifica automatica di massa).
-const CONNECTION_HUB_CANDIDATES = 5;
+// "Con scalo" (flight.checkOutboundStop / flight.checkReturnStop): cerca un vero scalo
+// (2 biglietti separati via un hub) per QUELLA tratta specifica, solo se batte il prezzo
+// diretto — calcolato on-demand (chiamato dal client solo quando serve davvero, mai per
+// tutti i risultati insieme: il costo in chiamate sarebbe eccessivo per una verifica
+// automatica di massa — vedi il commento sul fallback automatico in Results.jsx, che
+// proprio per questo si limita a poche proposte e le lancia in sequenza, non tutte insieme).
+//
+// RIDOTTO da 5 a 3 (02/10/2026): scoperto che il fallback automatico "con scalo" di
+// Results.jsx, lanciando questa ricerca per più risultati, poteva sommare decine di
+// chiamate Travelpayouts e sforare un rate limit — fetchOneWayPrices scarta silenziosamente
+// qualunque risposta non-OK (quindi anche un 429) come "nessun dato", facendo sembrare
+// anche rotte normalmente ricche di voli come prive di risultati. 3 hub resta comunque
+// sufficiente a trovare uno scalo valido nella grande maggioranza dei casi reali.
+const CONNECTION_HUB_CANDIDATES = 3;
 
 async function findConnectionHubs(origin: string, excludeDestination: string, count: number) {
   const options = await fetchOneWayPrices({ origin, limit: 200 });
@@ -343,8 +351,8 @@ Deno.serve(async (req) => {
     // durante l'esperimento round-trip: 0 match su 6 rotte reali testate dal vivo).
     // Stesso filtro di search-direct (segnalato dall'utente: "non ho attivato il bottone
     // con scalo, perché propone rotte con scalo?") — senza flight.allowStops (passato dal
-    // client solo se il toggle "Andata/Ritorno con scalo" è attivo) non va confermato un
-    // prezzo che in realtà è per un itinerario con scalo (number_of_changes>0).
+    // client solo se il toggle "Con scalo" è attivo) non va confermato un prezzo che in
+    // realtà è per un itinerario con scalo (number_of_changes>0).
     const match = filterByFreshness(latestPrices).find(
       (r: any) =>
         r.departDate === flight.departDate &&
@@ -362,8 +370,8 @@ Deno.serve(async (req) => {
           inboundLeg.destinationAirport !== flight.origin)
     );
 
-    // "Andata/Ritorno con scalo", solo su richiesta esplicita (vedi sopra) — confrontato
-    // col diretto già trovato, tenuto solo se davvero più economico.
+    // "Con scalo", solo su richiesta esplicita (vedi sopra) — confrontato col diretto già
+    // trovato, tenuto solo se davvero più economico.
     const [outboundConnection, returnConnection] = await Promise.all([
       flight.checkOutboundStop
         ? cheapestConnection(flight.origin, flight.destination, flight.departDate)

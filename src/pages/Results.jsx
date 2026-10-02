@@ -281,11 +281,23 @@ export function Results() {
   // risulta confermato, invece di lasciare l'utente a dover tornare indietro e riattivare un
   // filtro a mano, si rilancia da sola la stessa verifica ma con checkOutboundStop/
   // checkReturnStop forzati a true (normalmente attivi solo se l'utente accende i toggle
-  // "Andata/Ritorno con scalo" nei filtri) — mostrate poi in una sezione separata, mai
-  // mescolate silenziosamente tra i diretti (vedi hasStopBadge sopra e la UI sotto).
-  // Costo: fino a 5 hub candidati x 2 chiamate ciascuno PER RISULTATO (vedi cheapestConnection
-  // in verify-price/index.ts) — accettabile perché scatta solo nel caso limite (nessun
-  // diretto confermato), mai sulla lista normale.
+  // "Con scalo" nei filtri) — mostrate poi in una sezione separata, mai mescolate
+  // silenziosamente tra i diretti (vedi hasStopBadge sopra e la UI sotto).
+  //
+  // BUG SCOPERTO IL 02/10/2026 (segnalato dall'utente: pure la Thailandia, rotta
+  // documentata come ricca di voli diretti — vedi COUNTRY_MAJOR_CITIES in search-direct —
+  // tornava zero risultati): la prima versione lanciava verifyPrice per TUTTI i risultati
+  // diretti (fino a 10) IN PARALLELO, ognuno con checkOutboundStop+checkReturnStop attivi —
+  // fino a ~20 chiamate Travelpayouts a risultato (cheapestConnection in verify-price:
+  // CONNECTION_HUB_CANDIDATES hub x 2 chiamate x 2 direzioni), quindi fino a ~200 chiamate
+  // TUTTE INSIEME per una singola ricerca. fetchOneWayPrices scarta silenziosamente
+  // qualunque risposta non-OK (quindi anche un rate limit, 429) come "nessun dato" — un
+  // limite di frequenza colpito si presentava quindi indistinguibile da scarsità di dati
+  // reale, su QUALSIASI rotta, non solo quelle genuinamente povere. Due correzioni:
+  // (1) qui ci si limita alle poche proposte dirette più economiche, non tutte e 10;
+  // (2) le si verifica IN SEQUENZA (una alla volta, await) invece che tutte insieme in
+  // parallelo, per restare ben sotto qualunque soglia plausibile anche nel caso peggiore.
+  const SCALO_FALLBACK_LIMIT = 3;
   const [scaloVerifiedData, setScaloVerifiedData] = useState({});
   const [verifyingScalo, setVerifyingScalo] = useState(false);
   const pendingScaloRef = useRef(0);
@@ -334,7 +346,7 @@ export function Results() {
             // Coerenza col filtro "solo diretti di default" di search-direct (segnalato
             // dall'utente): senza questo verify-price poteva rifiutare di confermare un
             // prezzo con scalo che search-direct aveva incluso apposta perché il toggle
-            // "Andata/Ritorno con scalo" è attivo.
+            // "Con scalo" è attivo.
             allowStops: Boolean(filters.flexOutboundStop || filters.flexReturnStop),
           };
           verifyPrice(payload)
@@ -391,33 +403,42 @@ export function Results() {
   // frattempo l'utente aveva già chiesto esplicitamente "con scalo" nei filtri, le verifiche
   // dirette qui sopra l'hanno già cercato (allowStops) quindi questo fallback non serve;
   // riprovarlo comunque non fa danni, nel peggiore dei casi ritrova zero risultati anche lui.
+  //
+  // Limitato alle SCALO_FALLBACK_LIMIT proposte più economiche e lanciato IN SEQUENZA
+  // (non in parallelo) — vedi il commento sullo stato sopra per il bug di rate limit che
+  // questo corregge.
   useEffect(() => {
     if (loadingDirect || verifyingAll) return;
     if (scaloAttemptedRef.current) return;
     if (directResults.length === 0 || sortedResults.length > 0) return;
     scaloAttemptedRef.current = true;
-    pendingScaloRef.current = directResults.length;
+    const candidates = [...directResults].sort((a, b) => a.price - b.price).slice(0, SCALO_FALLBACK_LIMIT);
+    pendingScaloRef.current = candidates.length;
     setVerifyingScalo(true);
-    directResults.forEach((r) => {
-      const payload = {
-        ...r,
-        ...(filters?.flexArrival ? { homeAirports: filters.origins } : {}),
-        ...(filters?.flexDeparture ? { flexReturnOrigin: true } : {}),
-        allowStops: true,
-        checkOutboundStop: true,
-        checkReturnStop: true,
-      };
-      verifyPrice(payload)
-        .then((v) => {
-          if (!mountedRef.current || v?.price == null) return;
-          setScaloVerifiedData((prev) => ({ ...prev, [r.id]: v }));
-        })
-        .catch(() => {})
-        .finally(() => {
+    (async () => {
+      for (const r of candidates) {
+        if (!mountedRef.current) break;
+        const payload = {
+          ...r,
+          ...(filters?.flexArrival ? { homeAirports: filters.origins } : {}),
+          ...(filters?.flexDeparture ? { flexReturnOrigin: true } : {}),
+          allowStops: true,
+          checkOutboundStop: true,
+          checkReturnStop: true,
+        };
+        try {
+          const v = await verifyPrice(payload);
+          if (mountedRef.current && v?.price != null) {
+            setScaloVerifiedData((prev) => ({ ...prev, [r.id]: v }));
+          }
+        } catch {
+          // ignorato, stesso comportamento di prima
+        } finally {
           pendingScaloRef.current -= 1;
           if (mountedRef.current && pendingScaloRef.current <= 0) setVerifyingScalo(false);
-        });
-    });
+        }
+      }
+    })();
   }, [loadingDirect, verifyingAll, directResults, sortedResults, filters]);
 
   // Stessa idea di sortedResults, ma sui risultati del fallback "con scalo": tenuti solo
@@ -452,9 +473,9 @@ export function Results() {
 
   const toggleExpand = (id) => {
     setExpandedId((current) => (current === id ? null : id));
-    // "Andata/Ritorno con scalo": ricerca costosa (5 hub candidati x 2 chiamate ciascuno),
-    // per questo NON gira per tutti i 10 risultati come le altre flessibilità, ma solo per
-    // la card che l'utente apre davvero, e solo una volta (stopCheckedRef).
+    // "Con scalo": ricerca costosa (hub candidati x 2 chiamate ciascuno), per questo NON
+    // gira per tutti i 10 risultati come le altre flessibilità, ma solo per la card che
+    // l'utente apre davvero, e solo una volta (stopCheckedRef).
     if ((filters.flexOutboundStop || filters.flexReturnStop) && !stopCheckedRef.current.has(id)) {
       stopCheckedRef.current.add(id);
       const result = directResults.find((r) => r.id === id);
