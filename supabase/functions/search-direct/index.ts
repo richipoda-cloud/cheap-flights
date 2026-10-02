@@ -88,6 +88,18 @@ const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
 // (53 per IST->BGY). Per questo il ritorno si cerca verso QUALUNQUE aeroporto di partenza
 // dell'utente, non solo quello usato all'andata — stesso principio già usato altrove
 // nell'app (aeroporto di ritorno diverso dalla partenza).
+//
+// `fromV3: true` aggiunto (02/10/2026, bug segnalato dall'utente: "Destinazione fissa
+// Stati Uniti" non trovava NEMMENO UN risultato confermato, nonostante NYC/MIA abbiano
+// dati v3 reali): questi risultati sono costruiti da voli one-way VERI, quindi garantiti
+// riconfermabili da verify-price (stessa esatta data, per costruzione) — a differenza dei
+// risultati da v2/prices/latest (destination="US", paese), che tornano prezzi per
+// QUALUNQUE città americana (non solo NYC/MIA) su una data scelta quasi a caso dalla
+// cache, spesso NON riconfermabile. Prima i due tipi venivano ordinati insieme per solo
+// prezzo: se v2 restituiva prezzi (magari non più validi) per altre città USA più
+// economici di NYC/MIA, occupavano tutti i 10 posti finali e i risultati DAVVERO
+// confermabili (NYC/MIA) restavano fuori dalla lista — da qui "nemmeno uno" confermato,
+// pur esistendo dati reali sottostanti. Vedi priorità in fondo al file.
 async function fetchDirectRoundTrips(origins: string[], destination: string): Promise<any[]> {
   const [outboundPerOrigin, inboundPerOrigin] = await Promise.all([
     Promise.all(origins.map((o) => fetchOneWayPrices({ origin: o, destination, limit: 200 }))),
@@ -124,6 +136,7 @@ async function fetchDirectRoundTrips(origins: string[], destination: string): Pr
       // scartare col filtro di freschezza (pensato per v2, che può restare in cache settimane).
       foundAt: new Date().toISOString(),
       numberOfChanges: 0,
+      fromV3: true,
     });
   }
   return results;
@@ -215,7 +228,18 @@ Deno.serve(async (req) => {
       const existing = bestByDeparture.get(key);
       if (!existing || r.price < existing.price) bestByDeparture.set(key, r);
     }
-    const deduped = [...bestByDeparture.values()].sort((a, b) => a.price - b.price);
+    // PRIORITÀ (02/10/2026, bug "nemmeno un risultato confermato per Stati Uniti" —
+    // vedi commento su fromV3 in fetchDirectRoundTrips sopra): prima tutti i risultati
+    // costruiti da v3 (garantiti riconfermabili), ordinati per prezzo tra loro; SOLO DOPO
+    // quelli dal solo aggregato v2 (mai garantiti), anche se questi ultimi avessero un
+    // prezzo più basso. Prima era un unico sort per prezzo: un prezzo v2 economico ma non
+    // riconfermabile per un'altra città USA poteva occupare il posto di un volo NYC/MIA
+    // vero e verificabile, lasciando la lista finale senza un solo risultato confermabile
+    // pur esistendoci dati reali sottostanti.
+    const deduped = [...bestByDeparture.values()].sort((a, b) => {
+      if (Boolean(a.fromV3) !== Boolean(b.fromV3)) return a.fromV3 ? -1 : 1;
+      return a.price - b.price;
+    });
     // Segnalato dall'utente ("come mai per USA trova solo New York?"): col dedup sopra
     // ogni data è un volo reale diverso, ma una destinazione con tante date economiche
     // (New York, 18) può comunque occupare TUTTI i 10 posti finali solo perché in media
