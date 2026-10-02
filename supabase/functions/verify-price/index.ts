@@ -19,6 +19,13 @@
 // atterrare su uno diverso, quello si mostra. Round-trip combinato non ha più senso se i
 // due aeroporti differiscono: in quel caso niente deepLink unico, il client prenota i due
 // biglietti separati con i deep link già presenti su outboundLeg/inboundLeg.
+//
+// ESPERIMENTO ROUND-TRIP (02/10/2026, CHIUSO — richiesto dall'utente, "lavoriamo su come
+// sfruttare Aviasales che già va"): provato v3/prices_for_dates con one_way=false per le
+// rotte USA/Giappone/ecc. prive di match esatto, nella speranza di dati più ricchi. Testato
+// dal vivo (MXP-MIA 17-25/11/2026): risposta `{"data": []}`, vuota — stesso buco di cache
+// della modalità one-way, nessun vantaggio. Rimosso il campo di debug e la chiamata grezza
+// che lo popolava; non riprovare senza una nuova idea concreta sul perché dovrebbe funzionare.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -246,38 +253,6 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundL
   return null;
 }
 
-// ESPERIMENTO TEMPORANEO (02/10/2026, richiesto dall'utente — "lavoriamo su come sfruttare
-// Aviasales che già va"): v3/prices_for_dates con one_way=false (round-trip) NON è mai stato
-// testato dal vivo (vedi commento "ESPERIMENTO" su fetchRoundTripOffers in oneway.ts). Non
-// posso chiamare Travelpayouts dalla sandbox di sviluppo (bloccato dal proxy di rete), quindi
-// questa chiamata grezza (senza mapping, per vedere ESATTAMENTE cosa torna l'API) gira solo
-// quando l'app vera fa una verify-price — il risultato arriva nel campo `debugRoundTrip` qui
-// sotto, SOLO quando né il diretto né lo scalo "non confermato" hanno trovato niente (stesso
-// caso delle rotte USA/Giappone/ecc.). DA RIMUOVERE non appena abbiamo visto la forma reale
-// dei dati — mai lasciare in produzione un campo di debug a tempo indeterminato.
-async function fetchRoundTripDebugRaw(origin: string, destination: string, departureAt: string, returnAt: string) {
-  if (!TRAVELPAYOUTS_TOKEN) return { error: "no token" };
-  try {
-    const params = new URLSearchParams({
-      origin,
-      destination,
-      currency: "eur",
-      token: TRAVELPAYOUTS_TOKEN,
-      limit: "5",
-      sorting: "price",
-      one_way: "false",
-      departure_at: departureAt,
-      return_at: returnAt,
-    });
-    const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/prices_for_dates?${params.toString()}`);
-    if (!res.ok) return { error: `HTTP ${res.status}` };
-    const json = await res.json();
-    return { data: (json.data ?? []).slice(0, 3) };
-  } catch (err) {
-    return { error: String(err) };
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -479,23 +454,6 @@ Deno.serve(async (req) => {
       ? deepLink ?? outboundLegsForDisplay[0]?.deepLink ?? inboundLegsForDisplay[0]?.deepLink ?? null
       : null;
 
-    // ESPERIMENTO TEMPORANEO (vedi commento su fetchRoundTripDebugRaw sopra): gira ogni
-    // volta che manca un match ESATTO confermato su entrambe le direzioni (stesso identico
-    // caso delle rotte USA/Giappone/ecc., che arrivano qui con outboundLegsForDisplay/
-    // inboundLegsForDisplay già riempiti dal fallback "non confermato" — quindi NON basta
-    // controllarli vuoti, serve lo stesso flag bothDirectionsMatched usato sopra per
-    // decidere prezzo/conferma). Nessun impatto sulle rotte europee già confermate, che non
-    // rallentano per questo test.
-    let debugRoundTrip: any = null;
-    if (!bothDirectionsMatched) {
-      debugRoundTrip = await fetchRoundTripDebugRaw(
-        flight.origin,
-        flight.destination,
-        flight.departDate,
-        flight.returnDate
-      );
-    }
-
     return new Response(
       JSON.stringify({
         price,
@@ -511,9 +469,6 @@ Deno.serve(async (req) => {
         // _shared/travelpayouts.ts. Serve al client per non far sembrare un buco nei
         // dati quando in realtà quella rotta un volo diretto non lo ha proprio.
         numberOfChanges: match?.numberOfChanges ?? null,
-        // TEMPORANEO — esperimento round-trip richiesto dall'utente il 02/10/2026, vedi
-        // fetchRoundTripDebugRaw sopra. Da rimuovere appena verificato dal vivo.
-        debugRoundTrip,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

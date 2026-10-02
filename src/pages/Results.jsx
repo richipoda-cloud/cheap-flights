@@ -236,37 +236,6 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
               <SaveFavoriteButton onSave={handleSave} />
             </div>
           )}
-          {/* TEMPORANEO — esperimento round-trip richiesto dall'utente il 02/10/2026 ("lavoriamo
-              su come sfruttare Aviasales che già va"): verify-price prova v3/prices_for_dates
-              con one_way=false (mai testato dal vivo, vedi fetchRoundTripDebugRaw in
-              verify-price/index.ts) ogni volta che manca un match esatto confermato su
-              entrambe le direzioni — stesso caso delle rotte USA/Giappone/ecc. (anche quando i
-              box Andata/Ritorno mostrano già un volo "non confermato" dal fallback esistente).
-              Questo blocco mostra il dato grezzo direttamente in pagina, senza bisogno di
-              strumenti sviluppatore, così possiamo vedere cosa restituisce davvero Travelpayouts.
-              DA RIMUOVERE appena verificato — mai lasciare debug grezzo in produzione a tempo
-              indeterminato. */}
-          {verifyData?.debugRoundTrip && (
-            <div
-              style={{
-                marginTop: 12,
-                padding: 10,
-                background: COLORS.cream,
-                border: `1px dashed ${COLORS.warn}`,
-                borderRadius: RADIUS.button,
-                fontSize: 10.5,
-                color: COLORS.ink,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                fontFamily: "monospace",
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.warn }}>
-                🔧 DEBUG esperimento round-trip (temporaneo)
-              </div>
-              {JSON.stringify(verifyData.debugRoundTrip, null, 2)}
-            </div>
-          )}
         </div>
       )}
     </div>
