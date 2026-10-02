@@ -440,10 +440,14 @@ export function Results() {
               "Andata/Ritorno con scalo" non sia attivo — vedi verify-price/index.ts). Il testo
               ora dice esattamente quello che sappiamo per certo (nessun DIRETTO confermato),
               senza affermare che non esista alcun volo in assoluto, e suggerisce l'azione
-              concreta per cercare anche quelli con scalo. */}
+              concreta per cercare anche quelli con scalo.
+              "vantaggiosi" aggiunto su richiesta dell'utente: chiarisce che quei voli con scalo,
+              se attivati, non vengono mostrati comunque — compaiono SOLO se risultano più
+              economici del diretto (vedi cheapestConnection in verify-price/index.ts: "tenuto
+              solo se davvero più economico"), mai come alternativa indiscriminata. */}
           Nessun volo diretto confermato per queste date — possono comunque esistere voli con
           scalo: prova ad attivare "Andata con scalo" / "Ritorno con scalo" nei filtri per
-          cercarli anche.
+          cercarli anche (vengono mostrati solo se risultano vantaggiosi rispetto al diretto).
         </div>
       )}
       {!verifyingAll && sortedResults.length > 0 && (
