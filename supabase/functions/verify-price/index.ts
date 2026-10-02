@@ -31,14 +31,25 @@
 // l'esperimento sopra — "non mi interessa trovare un prezzo per un volo che non posso
 // sapere... io devo trovare un volo vero"): esposto qui `flightConfirmed` (= bothDirectionsMatched
 // sotto) perché il client (Results.jsx) possa nascondere del tutto un risultato quando NON
-// conosciamo il volo reale (compagnia/orario su ENTRAMBE le tratte, data esatta) — un prezzo
-// confermato da solo (v2 aggregato, `confirmed`) non basta più a tenerlo in lista: l'utente
-// vuole solo voli che può davvero prenotare sapendo cosa sta comprando, mai un prezzo
-// abbinato a un volo indovinato/di un altro giorno. Capovolge la regola del 27/09/2026
-// ("meglio un nome di compagnia indovinato che niente"): quella restava valida nel box di
-// dettaglio quando il risultato era comunque mostrato, ma ora quei risultati non arrivano
-// proprio in lista, quindi il fallback "non confermato" sotto resta solo per i Preferiti
-// già salvati (FlightDetail.jsx), non per i Risultati di una nuova ricerca.
+// conosciamo il volo reale (compagnia/orario su ENTRAMBE le tratte) — un prezzo confermato
+// da solo (v2 aggregato, `confirmed`) non basta più a tenerlo in lista: l'utente vuole solo
+// voli che può davvero prenotare sapendo cosa sta comprando, mai un prezzo abbinato a un
+// volo indovinato. Capovolge la regola del 27/09/2026 ("meglio un nome di compagnia
+// indovinato che niente"): quella restava valida nel box di dettaglio quando il risultato
+// era comunque mostrato, ma ora quei risultati non arrivano proprio in lista, quindi il
+// fallback "non confermato" sotto resta solo per i Preferiti già salvati (FlightDetail.jsx),
+// non per i Risultati di una nuova ricerca.
+//
+// TOLLERANZA DI DATA SOLO PER LO SCALO (02/10/2026, richiesta esplicita dell'utente dopo
+// aver visto che Thailandia e Stati Uniti trovavano zero proposte con scalo pur dopo aver
+// escluso il rate limit come causa — vedi CONNECTION_DATE_TOLERANCE_DAYS sotto): la regola
+// "data esatta o niente" sopra resta intatta per i voli DIRETTI (flightConfirmed normale).
+// Per il solo scalo, cercare la tratta via hub esattamente nello stesso giorno già raro del
+// diretto è quasi sempre impossibile su rotte intercontinentali (cache one-way sparsa per
+// data esatta, stesso problema noto di fetchBroaderOneWayLeg) — l'utente ha scelto
+// esplicitamente una tolleranza di qualche giorno, ma SEGNALATA onestamente (leg.approxDate,
+// stesso trattamento già usato per i diretti senza match esatto), non un ritorno silenzioso
+// alla vecchia politica "va bene indovinare" del 27/09/2026.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -76,6 +87,25 @@ function pickClosestDate(options: any[], date: string) {
     return diffA - diffB || a.price - b.price;
   });
   return { ...best, approxDate: true };
+}
+
+// Variante di pickClosestDate usata SOLO da cheapestConnection sotto: qui la data È parte
+// della decisione di prezzo/conferma (non solo del box informativo), quindi serve un limite
+// esplicito a quanto ci si può allontanare dalla data richiesta (maxDiffDays) — altrimenti
+// "il più vicino trovato" potrebbe benissimo essere un mese dopo, inaccettabile per uno
+// scalo che l'utente si aspetta vicino alla data cercata. Tagga approxDate solo se la data
+// trovata differisce davvero da quella richiesta (coerente con LegBox/LegRow).
+function pickCheapestNearDate(options: any[], date: string, maxDiffDays: number) {
+  const target = new Date(date).getTime();
+  const DAY_MS = 86400000;
+  const inRange = options.filter((o) => Math.abs(new Date(o.date).getTime() - target) <= maxDiffDays * DAY_MS);
+  if (!inRange.length) return null;
+  const [best] = inRange.sort((a, b) => {
+    const diffA = Math.abs(new Date(a.date).getTime() - target);
+    const diffB = Math.abs(new Date(b.date).getTime() - target);
+    return a.price - b.price || diffA - diffB;
+  });
+  return { ...best, approxDate: best.date !== date };
 }
 
 function nextMonth(yyyyMm: string): string {
@@ -201,13 +231,22 @@ function nearbyAirports(code: string, maxKm: number): string[] {
 // automatica di massa — vedi il commento sul fallback automatico in Results.jsx, che
 // proprio per questo si limita a poche proposte e le lancia in sequenza, non tutte insieme).
 //
-// RIDOTTO da 5 a 3 (02/10/2026): scoperto che il fallback automatico "con scalo" di
-// Results.jsx, lanciando questa ricerca per più risultati, poteva sommare decine di
-// chiamate Travelpayouts e sforare un rate limit — fetchOneWayPrices scarta silenziosamente
-// qualunque risposta non-OK (quindi anche un 429) come "nessun dato", facendo sembrare
-// anche rotte normalmente ricche di voli come prive di risultati. 3 hub resta comunque
-// sufficiente a trovare uno scalo valido nella grande maggioranza dei casi reali.
+// RIDOTTO da 5 a 3 (02/10/2026, poi confermato NON essere la causa del "zero risultati" —
+// vedi nota in cima al file): 3 hub resta comunque sufficiente a trovare uno scalo valido
+// nella grande maggioranza dei casi reali, e tenerlo basso resta prudente visto il numero
+// di chiamate per tentativo aumentato sotto dalla tolleranza di data.
 const CONNECTION_HUB_CANDIDATES = 3;
+
+// Quanti giorni di distanza dalla data richiesta si accettano per la PRIMA tratta (hub di
+// andata) — vedi nota "TOLLERANZA DI DATA SOLO PER LO SCALO" in cima al file. 3 giorni:
+// abbastanza per intercettare la cache one-way sparsa delle rotte intercontinentali, senza
+// scivolare su una data così lontana da non assomigliare più al viaggio richiesto.
+const CONNECTION_DATE_TOLERANCE_DAYS = 3;
+// Quanti giorni dopo l'arrivo della prima tratta si accetta la seconda (il volo verso la
+// destinazione finale) — rappresenta la finestra di scalo realistica per un self-transfer
+// (stesso giorno o il successivo è la norma, oltre i 2 giorni non è più "uno scalo" ma una
+// sosta turistica non richiesta).
+const CONNECTION_LAYOVER_MAX_DAYS = 2;
 
 async function findConnectionHubs(origin: string, excludeDestination: string, count: number) {
   const options = await fetchOneWayPrices({ origin, limit: 200 });
@@ -223,21 +262,48 @@ async function findConnectionHubs(origin: string, excludeDestination: string, co
     .map(([hub]) => hub);
 }
 
+// Pool one-way su una rotta per un mese e il successivo (stesso pattern di
+// fetchBroaderOneWayLeg) — serve qui per dare a pickCheapestNearDate margine entro cui
+// scegliere, invece della sola (spesso vuota) data esatta richiesta.
+async function fetchOneWayPool(origin: string, destination: string, monthAnchor: string) {
+  const thisMonth = monthAnchor.slice(0, 7);
+  const [thisMonthOpts, nextMonthOpts] = await Promise.all([
+    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: thisMonth }),
+    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: nextMonth(thisMonth) }),
+  ]);
+  return [...thisMonthOpts, ...nextMonthOpts];
+}
+
 async function cheapestConnection(origin: string, destination: string, date: string) {
   const hubs = await findConnectionHubs(origin, destination, CONNECTION_HUB_CANDIDATES);
   const attempts = await Promise.all(
     hubs.map(async (hub) => {
-      const [leg1Options, leg2Options] = await Promise.all([
-        fetchOneWayPrices({ origin, destination: hub, limit: 50, departureAt: date }),
-        fetchOneWayPrices({ origin: hub, destination, limit: 50, departureAt: date }),
-      ]);
-      const leg1 = pickCheapestOnDate(leg1Options, date);
+      // Prima tratta: tolleranza di qualche giorno sulla data richiesta (vedi
+      // CONNECTION_DATE_TOLERANCE_DAYS) — su rotte intercontinentali la cache one-way è
+      // troppo sparsa per pretendere l'esattezza che basta invece sulle rotte dirette.
+      const leg1Pool = await fetchOneWayPool(origin, hub, date);
+      const leg1 = pickCheapestNearDate(leg1Pool, date, CONNECTION_DATE_TOLERANCE_DAYS);
       if (!leg1) return null;
-      // Vincolo di sequenza: la seconda tratta deve partire dopo l'arrivo della prima,
-      // altrimenti l'itinerario è fisicamente impossibile da seguire.
-      const leg2 = leg2Options.filter((o: any) => o.date >= leg1.date).sort((a: any, b: any) => a.price - b.price)[0];
+      // Seconda tratta: cercata attorno alla data EFFETTIVA della prima (non più quella
+      // originale, che potrebbe già essere slittata) — e filtrata per partire dopo il suo
+      // arrivo, entro una finestra di scalo realistica (CONNECTION_LAYOVER_MAX_DAYS),
+      // altrimenti l'itinerario non rappresenterebbe più uno scalo dello stesso viaggio.
+      const leg2Pool = await fetchOneWayPool(hub, destination, leg1.date);
+      const leg2Candidates = leg2Pool.filter((o: any) => {
+        const diffDays = (new Date(o.date).getTime() - new Date(leg1.date).getTime()) / 86400000;
+        return diffDays >= 0 && diffDays <= CONNECTION_LAYOVER_MAX_DAYS;
+      });
+      const leg2 = leg2Candidates.sort(
+        (a: any, b: any) => a.price - b.price || new Date(a.date).getTime() - new Date(b.date).getTime()
+      )[0];
       if (!leg2) return null;
-      return { legs: [leg1, leg2], total: leg1.price + leg2.price };
+      // Stesso avviso onesto già usato per i diretti senza match esatto (LegBox) — qui
+      // segnala che l'intero scalo è slittato di qualche giorno dalla data richiesta.
+      const shifted = Boolean(leg1.approxDate);
+      return {
+        legs: [leg1, { ...leg2, approxDate: shifted }],
+        total: leg1.price + leg2.price,
+      };
     })
   );
   const valid = attempts.filter((a): a is { legs: any[]; total: number } => a !== null);
@@ -490,9 +556,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         price,
         confirmed,
-        // Volo reale conosciuto (compagnia/orario su ENTRAMBE le tratte, data esatta) —
-        // vedi commento in cima al file (decisione 02/10/2026). Results.jsx usa questo,
-        // non `confirmed`, per decidere se mostrare il risultato in lista.
+        // Volo reale conosciuto (compagnia/orario su ENTRAMBE le tratte) — vedi commento in
+        // cima al file (decisione 02/10/2026, con la tolleranza di data dello scalo). Results.jsx
+        // usa questo, non `confirmed`, per decidere se mostrare il risultato in lista.
         flightConfirmed: bothDirectionsMatched,
         deepLink: finalDeepLink,
         outboundLeg: outboundLegsForDisplay[0] ?? null,
