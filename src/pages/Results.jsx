@@ -92,6 +92,10 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
   // prezzo originale non ricontrollato, resta onestamente "~" come i risultati non ancora
   // verificati, invece di promettere un'affidabilità che non c'è.
   const confirmed = Boolean(verifyData?.confirmed);
+  // Richiesto dall'utente (02/10/2026): le proposte trovate SOLO cercando anche gli scali
+  // (vedi sezione "con scalo" in Results sotto) vanno riconoscibili a colpo d'occhio dalla
+  // lista principale, non solo aprendo il dettaglio — altrimenti sembrerebbero diretti.
+  const hasStopBadge = Boolean(verifyData?.hasStop);
   // Stesso identico snapshot costruito da FlightDetail (handleSaveFavorite) — prezzo
   // migliore disponibile + i filtri che hanno prodotto questo risultato, non solo il
   // volo nudo. isFresh: i percorsi creativi non hanno un concetto di "confermato" (vedi
@@ -131,7 +135,9 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
             {price} {result.currency ?? "€"}
           </div>
           {confirmed ? (
-            <div style={{ fontSize: 10.5, color: COLORS.accent }}>✓ verificato</div>
+            <div style={{ fontSize: 10.5, color: COLORS.accent }}>
+              ✓ verificato{hasStopBadge ? " · con scalo" : ""}
+            </div>
           ) : (
             verifiedPrice != null && (
               <div style={{ fontSize: 10.5, color: COLORS.inkSoft }}>da confermare al link</div>
@@ -270,6 +276,21 @@ export function Results() {
   const stopCheckedRef = useRef(new Set());
   useEffect(() => () => (mountedRef.current = false), []);
 
+  // Ricerca "con scalo" automatica di ripiego (richiesta dall'utente 02/10/2026, al posto
+  // di un semplice messaggio "prova ad attivare il filtro"): quando NESSUN risultato diretto
+  // risulta confermato, invece di lasciare l'utente a dover tornare indietro e riattivare un
+  // filtro a mano, si rilancia da sola la stessa verifica ma con checkOutboundStop/
+  // checkReturnStop forzati a true (normalmente attivi solo se l'utente accende i toggle
+  // "Andata/Ritorno con scalo" nei filtri) — mostrate poi in una sezione separata, mai
+  // mescolate silenziosamente tra i diretti (vedi hasStopBadge sopra e la UI sotto).
+  // Costo: fino a 5 hub candidati x 2 chiamate ciascuno PER RISULTATO (vedi cheapestConnection
+  // in verify-price/index.ts) — accettabile perché scatta solo nel caso limite (nessun
+  // diretto confermato), mai sulla lista normale.
+  const [scaloVerifiedData, setScaloVerifiedData] = useState({});
+  const [verifyingScalo, setVerifyingScalo] = useState(false);
+  const pendingScaloRef = useRef(0);
+  const scaloAttemptedRef = useRef(false);
+
   // Separato dall'effect di ricerca: user?.id arriva async (sessione risolta dopo il
   // mount), quindi va aspettato con la sua dependency, non catturato nella closure
   // stale di un effect a dependency [] — altrimenti recordSearch(userId=undefined)
@@ -365,6 +386,48 @@ export function Results() {
       });
   }, [directResults, verifiedData]);
 
+  // Scatta UNA SOLA VOLTA (scaloAttemptedRef) quando le verifiche dirette sono finite e
+  // NESSUN risultato è rimasto confermato — vedi commento sullo stato sopra. Se nel
+  // frattempo l'utente aveva già chiesto esplicitamente "con scalo" nei filtri, le verifiche
+  // dirette qui sopra l'hanno già cercato (allowStops) quindi questo fallback non serve;
+  // riprovarlo comunque non fa danni, nel peggiore dei casi ritrova zero risultati anche lui.
+  useEffect(() => {
+    if (loadingDirect || verifyingAll) return;
+    if (scaloAttemptedRef.current) return;
+    if (directResults.length === 0 || sortedResults.length > 0) return;
+    scaloAttemptedRef.current = true;
+    pendingScaloRef.current = directResults.length;
+    setVerifyingScalo(true);
+    directResults.forEach((r) => {
+      const payload = {
+        ...r,
+        ...(filters?.flexArrival ? { homeAirports: filters.origins } : {}),
+        ...(filters?.flexDeparture ? { flexReturnOrigin: true } : {}),
+        allowStops: true,
+        checkOutboundStop: true,
+        checkReturnStop: true,
+      };
+      verifyPrice(payload)
+        .then((v) => {
+          if (!mountedRef.current || v?.price == null) return;
+          setScaloVerifiedData((prev) => ({ ...prev, [r.id]: v }));
+        })
+        .catch(() => {})
+        .finally(() => {
+          pendingScaloRef.current -= 1;
+          if (mountedRef.current && pendingScaloRef.current <= 0) setVerifyingScalo(false);
+        });
+    });
+  }, [loadingDirect, verifyingAll, directResults, sortedResults, filters]);
+
+  // Stessa idea di sortedResults, ma sui risultati del fallback "con scalo": tenuti solo
+  // se davvero confermati (compagnia/orario reali su entrambe le tratte, anche con scalo).
+  const scaloResults = useMemo(() => {
+    return directResults
+      .filter((r) => Boolean(scaloVerifiedData[r.id]?.flightConfirmed))
+      .sort((a, b) => (scaloVerifiedData[a.id]?.price ?? a.price) - (scaloVerifiedData[b.id]?.price ?? b.price));
+  }, [directResults, scaloVerifiedData]);
+
   // Solo per ricerche "Ovunque" (filters.destination vuoto/null): una volta che i
   // risultati sono stabili (niente più caricamento/verifiche in corso), salviamo i codici
   // delle destinazioni trovate (già ordinati per prezzo, deduplicati, max 10) nella ricerca
@@ -412,6 +475,13 @@ export function Results() {
     }
   };
 
+  // Stesso identico toggle, ma per le righe del fallback "con scalo" (expandedId/stato
+  // condiviso con la lista principale — un solo risultato alla volta espanso in pagina,
+  // le due liste non si vedono mai contemporaneamente visto che una sostituisce l'altra).
+  const toggleExpandScalo = (id) => {
+    setExpandedId((current) => (current === id ? null : id));
+  };
+
   return (
     <div style={{ padding: 20, paddingBottom: 130 }}>
       <div style={{ fontWeight: 600, fontSize: 20, color: COLORS.accent, marginBottom: 4 }}>
@@ -430,25 +500,6 @@ export function Results() {
       )}
       {!loadingDirect && !verifyingAll && directResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>Nessun risultato diretto trovato.</div>
-      )}
-      {!loadingDirect && !verifyingAll && directResults.length > 0 && sortedResults.length === 0 && (
-        <div style={{ color: COLORS.inkSoft }}>
-          {/* Riformulato (richiesto dall'utente 02/10/2026): "nessuno con un volo reale
-              confermato" suonava come se non esistesse alcun volo per quella rotta/data,
-              mentre in realtà spesso esistono voli con scalo che semplicemente non vengono
-              cercati di default (fetchOneWayPrices scarta i voli con scalo a meno che
-              "Andata/Ritorno con scalo" non sia attivo — vedi verify-price/index.ts). Il testo
-              ora dice esattamente quello che sappiamo per certo (nessun DIRETTO confermato),
-              senza affermare che non esista alcun volo in assoluto, e suggerisce l'azione
-              concreta per cercare anche quelli con scalo.
-              "vantaggiosi" aggiunto su richiesta dell'utente: chiarisce che quei voli con scalo,
-              se attivati, non vengono mostrati comunque — compaiono SOLO se risultano più
-              economici del diretto (vedi cheapestConnection in verify-price/index.ts: "tenuto
-              solo se davvero più economico"), mai come alternativa indiscriminata. */}
-          Nessun volo diretto confermato per queste date — possono comunque esistere voli con
-          scalo: prova ad attivare "Andata con scalo" / "Ritorno con scalo" nei filtri per
-          cercarli anche (vengono mostrati solo se risultano vantaggiosi rispetto al diretto).
-        </div>
       )}
       {!verifyingAll && sortedResults.length > 0 && (
         <FlatList>
@@ -469,6 +520,50 @@ export function Results() {
             />
           ))}
         </FlatList>
+      )}
+
+      {/* Fallback "con scalo" (richiesto dall'utente 02/10/2026): quando NESSUN diretto è
+          confermato, invece di un semplice messaggio che chiede di riattivare un filtro a
+          mano, si mostrano QUI direttamente le proposte trovate cercando anche gli scali —
+          vedi l'effect scaloAttemptedRef sopra. Sezione separata (mai mescolata ai diretti),
+          ogni riga già etichettata "· con scalo" dentro ResultRow. */}
+      {!loadingDirect && !verifyingAll && directResults.length > 0 && sortedResults.length === 0 && (
+        <>
+          {verifyingScalo && (
+            <div style={{ color: COLORS.inkSoft }}>Nessun diretto confermato — cerco anche con scalo…</div>
+          )}
+          {!verifyingScalo && scaloResults.length > 0 && (
+            <>
+              <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 8 }}>
+                Nessun volo diretto confermato per queste date — solo con scalo:
+              </div>
+              <FlatList>
+                {scaloResults.map((r, i) => (
+                  <ResultRow
+                    key={r.id}
+                    result={r}
+                    isLast={i === scaloResults.length - 1}
+                    expanded={expandedId === r.id}
+                    onToggle={() => toggleExpandScalo(r.id)}
+                    verifiedPrice={scaloVerifiedData[r.id]?.price}
+                    verifyData={scaloVerifiedData[r.id]}
+                    onSaveFavorite={
+                      user?.id
+                        ? (price, isFresh) => addFavorite({ ...r, price, searchFilters: filters }, isFresh)
+                        : undefined
+                    }
+                  />
+                ))}
+              </FlatList>
+            </>
+          )}
+          {!verifyingScalo && scaloResults.length === 0 && (
+            <div style={{ color: COLORS.inkSoft }}>
+              Nessun volo reale trovato per queste date, nemmeno con scalo (compagnia e orario
+              certi) — riprova con date diverse o una destinazione fissa.
+            </div>
+          )}
+        </>
       )}
     </div>
   );
