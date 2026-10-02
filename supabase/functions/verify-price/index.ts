@@ -92,7 +92,7 @@ async function fetchBroaderOneWayLeg(
 // avere un nome di compagnia invece di niente, PURCHÉ sia chiaro che non è confermato.
 // Ultimo fallback quando NEMMENO fetchBroaderOneWayLeg (diretti, 2 mesi) trova nulla:
 // stessa v3/prices_for_dates ma con gli scali inclusi (allowConnections), marcati
-// `unverified: true` da mapOneWayResult — il client (LegBox) li mostra con un avviso
+// `unverified: true` da mapOneWayResult (il client — LegBox — li mostra con un avviso
 // esplicito "non confermato", mai come un volo diretto o una connessione reale accertata.
 // Mai un deepLink specifico per la rotta qui (withHomepageOnlyIfUnverified sotto): quello
 // presume un'informazione che non abbiamo la certezza sia corretta.
@@ -244,6 +244,38 @@ async function buildSingleTicketDeepLink(flight: any, outboundLeg: any, inboundL
   // compagnia/data/orario (già noti dai box Andata/Ritorno) e rimanda l'utente a
   // prenotare da sé sul sito della compagnia invece di un link verso un comparatore terzo.
   return null;
+}
+
+// ESPERIMENTO TEMPORANEO (02/10/2026, richiesto dall'utente — "lavoriamo su come sfruttare
+// Aviasales che già va"): v3/prices_for_dates con one_way=false (round-trip) NON è mai stato
+// testato dal vivo (vedi commento "ESPERIMENTO" su fetchRoundTripOffers in oneway.ts). Non
+// posso chiamare Travelpayouts dalla sandbox di sviluppo (bloccato dal proxy di rete), quindi
+// questa chiamata grezza (senza mapping, per vedere ESATTAMENTE cosa torna l'API) gira solo
+// quando l'app vera fa una verify-price — il risultato arriva nel campo `debugRoundTrip` qui
+// sotto, SOLO quando né il diretto né lo scalo "non confermato" hanno trovato niente (stesso
+// caso delle rotte USA/Giappone/ecc.). DA RIMUOVERE non appena abbiamo visto la forma reale
+// dei dati — mai lasciare in produzione un campo di debug a tempo indeterminato.
+async function fetchRoundTripDebugRaw(origin: string, destination: string, departureAt: string, returnAt: string) {
+  if (!TRAVELPAYOUTS_TOKEN) return { error: "no token" };
+  try {
+    const params = new URLSearchParams({
+      origin,
+      destination,
+      currency: "eur",
+      token: TRAVELPAYOUTS_TOKEN,
+      limit: "5",
+      sorting: "price",
+      one_way: "false",
+      departure_at: departureAt,
+      return_at: returnAt,
+    });
+    const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/prices_for_dates?${params.toString()}`);
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    const json = await res.json();
+    return { data: (json.data ?? []).slice(0, 3) };
+  } catch (err) {
+    return { error: String(err) };
+  }
 }
 
 Deno.serve(async (req) => {
@@ -447,6 +479,23 @@ Deno.serve(async (req) => {
       ? deepLink ?? outboundLegsForDisplay[0]?.deepLink ?? inboundLegsForDisplay[0]?.deepLink ?? null
       : null;
 
+    // ESPERIMENTO TEMPORANEO (vedi commento su fetchRoundTripDebugRaw sopra): gira ogni
+    // volta che manca un match ESATTO confermato su entrambe le direzioni (stesso identico
+    // caso delle rotte USA/Giappone/ecc., che arrivano qui con outboundLegsForDisplay/
+    // inboundLegsForDisplay già riempiti dal fallback "non confermato" — quindi NON basta
+    // controllarli vuoti, serve lo stesso flag bothDirectionsMatched usato sopra per
+    // decidere prezzo/conferma). Nessun impatto sulle rotte europee già confermate, che non
+    // rallentano per questo test.
+    let debugRoundTrip: any = null;
+    if (!bothDirectionsMatched) {
+      debugRoundTrip = await fetchRoundTripDebugRaw(
+        flight.origin,
+        flight.destination,
+        flight.departDate,
+        flight.returnDate
+      );
+    }
+
     return new Response(
       JSON.stringify({
         price,
@@ -462,6 +511,9 @@ Deno.serve(async (req) => {
         // _shared/travelpayouts.ts. Serve al client per non far sembrare un buco nei
         // dati quando in realtà quella rotta un volo diretto non lo ha proprio.
         numberOfChanges: match?.numberOfChanges ?? null,
+        // TEMPORANEO — esperimento round-trip richiesto dall'utente il 02/10/2026, vedi
+        // fetchRoundTripDebugRaw sopra. Da rimuovere appena verificato dal vivo.
+        debugRoundTrip,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
