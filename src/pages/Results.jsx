@@ -338,31 +338,25 @@ export function Results() {
   // vedi fix del 21/09/2026) l'ordine vero può cambiare, anche di parecchio, e la lista
   // restava ferma nell'ordine iniziale invece di riflettere il prezzo verificato più basso.
   // Riordina lato client usando il prezzo verificato quando c'è, altrimenti quello originale.
-  // Segnalato dall'utente ("se non sa nemmeno la compagnia perché me lo propone?"):
-  // search-direct pesca dalla cache v2 aggregata (può restare valida per settimane),
-  // ma a volte verify-price (v3, dati freschi per singolo volo) non trova ASSOLUTAMENTE
-  // niente su nessuna delle due tratte, nemmeno allargando la ricerca al mese — non solo
-  // "compagnia sconosciuta", proprio nessun riscontro che quel volo esista ancora. Un
-  // risultato così non è azionabile in alcun modo (niente compagnia, niente orario,
-  // niente link, nemmeno il messaggio "prenota da solo" ha senso): meglio toglierlo dalla
-  // lista piuttosto che mostrare un prezzo trovato una volta chissà quando. I percorsi
-  // creativi (isStopover) non c'entrano: le loro tratte vengono già da un match one-way
-  // vero in search-stopover, mai vuote.
   //
-  // BUG scoperto dopo (rotte USA/Giappone sempre vuote): il filtro sopra guardava SOLO
-  // outboundLeg/inboundLeg (dati v3, poco disponibili su intercontinentali), ignorando
-  // "confirmed" — che in verify-price/index.ts (bothDirectionsMatched || Boolean(match))
-  // diventa true anche quando il prezzo è stato ri-verificato live sulla cache v2 aggregata,
-  // senza dettaglio di volo. Quel caso NON è "nessun riscontro" come quello originale
-  // (compagnia/orario mancano, ma il prezzo è comunque confermato reale ora) — va tenuto.
-  // Va nascosto solo il caso davvero vuoto: né confirmed né alcuna tratta v3.
+  // DECISIONE 02/10/2026 (richiesta esplicita dell'utente, dopo aver visto dal vivo un
+  // risultato USA con prezzo "✓ verificato" ma volo "⚠️ Non confermato" di un altro giorno:
+  // "non mi interessa trovare un prezzo per un volo che non posso sapere... io devo trovare
+  // un volo vero"): prima bastava `confirmed` (prezzo confermato, anche solo dalla cache
+  // aggregata v2 senza dettaglio di volo) O una qualunque tratta v3 trovata (anche solo
+  // approssimata/non confermata) per tenere il risultato in lista — risultato: su rotte
+  // intercontinentali si mostrava spesso un prezzo vero abbinato a un volo indovinato di
+  // un'altra data, che sembrava riferirsi a quel prezzo ma non era così. Ora si tiene SOLO
+  // se verify-price conferma `flightConfirmed` (volo reale, compagnia/orario su ENTRAMBE le
+  // tratte, per le date esatte cercate) — i percorsi creativi (isStopover) non c'entrano,
+  // le loro tratte vengono già da un match one-way vero in search-stopover, mai approssimato.
   const sortedResults = useMemo(() => {
     return [...directResults]
       .filter((r) => {
         if (r.isStopover) return true;
         const v = verifiedData[r.id];
         if (!v) return true; // verifica ancora in corso, non nascondere in anticipo
-        return v.confirmed || v.outboundLeg != null || v.inboundLeg != null;
+        return Boolean(v.flightConfirmed);
       })
       .sort((a, b) => {
         const priceA = verifiedData[a.id]?.price ?? a.price;
@@ -439,8 +433,9 @@ export function Results() {
       )}
       {!loadingDirect && !verifyingAll && directResults.length > 0 && sortedResults.length === 0 && (
         <div style={{ color: COLORS.inkSoft }}>
-          Trovati alcuni prezzi indicativi, ma nessuno con dati reali a supporto (compagnia,
-          orario) — tolti dalla lista invece di mostrarli senza nulla di verificabile.
+          Trovati alcuni prezzi indicativi, ma nessuno con un volo reale confermato (compagnia,
+          orario, su quelle date esatte) — tolti dalla lista invece di mostrare un prezzo
+          abbinato a un volo indovinato.
         </div>
       )}
       {!verifyingAll && sortedResults.length > 0 && (

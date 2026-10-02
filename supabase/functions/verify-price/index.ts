@@ -26,6 +26,19 @@
 // dal vivo (MXP-MIA 17-25/11/2026): risposta `{"data": []}`, vuota — stesso buco di cache
 // della modalità one-way, nessun vantaggio. Rimosso il campo di debug e la chiamata grezza
 // che lo popolava; non riprovare senza una nuova idea concreta sul perché dovrebbe funzionare.
+//
+// DECISIONE FINALE (02/10/2026, richiesta esplicita dell'utente dopo aver visto dal vivo
+// l'esperimento sopra — "non mi interessa trovare un prezzo per un volo che non posso
+// sapere... io devo trovare un volo vero"): esposto qui `flightConfirmed` (= bothDirectionsMatched
+// sotto) perché il client (Results.jsx) possa nascondere del tutto un risultato quando NON
+// conosciamo il volo reale (compagnia/orario su ENTRAMBE le tratte, data esatta) — un prezzo
+// confermato da solo (v2 aggregato, `confirmed`) non basta più a tenerlo in lista: l'utente
+// vuole solo voli che può davvero prenotare sapendo cosa sta comprando, mai un prezzo
+// abbinato a un volo indovinato/di un altro giorno. Capovolge la regola del 27/09/2026
+// ("meglio un nome di compagnia indovinato che niente"): quella restava valida nel box di
+// dettaglio quando il risultato era comunque mostrato, ma ora quei risultati non arrivano
+// proprio in lista, quindi il fallback "non confermato" sotto resta solo per i Preferiti
+// già salvati (FlightDetail.jsx), non per i Risultati di una nuova ricerca.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -75,6 +88,10 @@ function nextMonth(yyyyMm: string): string {
 // UNA direzione/mese, non nell'altra — il fallback sul solo mese richiesto restava vuoto
 // anche se la STESSA rotta aveva dati un mese dopo. Prova anche il mese successivo prima di
 // arrendersi, sempre solo per il box informativo (vedi pickClosestDate).
+//
+// Usato ora SOLO quando questa chiamata arriva per un Preferito già salvato (FlightDetail.jsx)
+// — per una ricerca nuova (Results.jsx) il risultato senza match esatto viene tolto dalla
+// lista PRIMA di arrivare a mostrare questo fallback (vedi flightConfirmed sopra).
 async function fetchBroaderOneWayLeg(
   origin: string,
   destination: string,
@@ -103,6 +120,9 @@ async function fetchBroaderOneWayLeg(
 // esplicito "non confermato", mai come un volo diretto o una connessione reale accertata.
 // Mai un deepLink specifico per la rotta qui (withHomepageOnlyIfUnverified sotto): quello
 // presume un'informazione che non abbiamo la certezza sia corretta.
+//
+// Stesso discorso di fetchBroaderOneWayLeg sopra: dal 02/10/2026 questo fallback non
+// determina più se un risultato compare nei Risultati di una ricerca nuova.
 async function fetchUnverifiedConnectingLeg(origin: string, destination: string, date: string): Promise<any | null> {
   const thisMonth = date.slice(0, 7);
   const [thisMonthOpts, nextMonthOpts] = await Promise.all([
@@ -381,6 +401,10 @@ Deno.serve(async (req) => {
     // solo quella metà — spacciata per prezzo A/R confermato. Serve un match esatto su
     // ENTRAMBE le direzioni prima di fidarsi della somma; altrimenti si ricade sull'aggregato
     // v2 (o sul prezzo originale non confermato), mai su un totale parziale.
+    //
+    // bothDirectionsMatched è anche il segnale di "volo reale conosciuto" esposto come
+    // flightConfirmed sotto (vedi commento in cima al file, decisione 02/10/2026) — un
+    // match v2 (match?.price, solo prezzo) NON basta più a considerare il volo "noto".
     const bothDirectionsMatched = outboundLegs.length > 0 && inboundLegs.length > 0;
     const allLegs = [...outboundLegs, ...inboundLegs];
     const price = bothDirectionsMatched ? allLegs.reduce((sum, l) => sum + l.price, 0) : match?.price ?? flight.price;
@@ -407,11 +431,11 @@ Deno.serve(async (req) => {
     // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
     // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
     // direttamente — segnalato dall'utente, incoerente col resto.
-    // REGOLA FINALE (27/09/2026, decisione presa dopo troppi avanti e indietro — non
-    // ricambiare senza richiesta esplicita): il fallback "non confermato" scatta SEMPRE
-    // quando manca un match diretto esatto, senza eccezioni per numberOfChanges — meglio
-    // avere quasi sempre un nome di compagnia (con l'avviso "non confermato" ben visibile)
-    // che un box vuoto la maggior parte delle volte.
+    //
+    // Questo fallback resta per i Preferiti già salvati (FlightDetail.jsx) — per i
+    // Risultati di una nuova ricerca, da 02/10/2026 non decide più se il risultato compare
+    // (vedi flightConfirmed/bothDirectionsMatched sopra): Results.jsx nasconde il risultato
+    // a prescindere da cosa arriva qui, quando bothDirectionsMatched è false.
     const outboundLegsForDisplay =
       outboundLegsWithLinks.length > 0
         ? outboundLegsWithLinks
@@ -458,6 +482,10 @@ Deno.serve(async (req) => {
       JSON.stringify({
         price,
         confirmed,
+        // Volo reale conosciuto (compagnia/orario su ENTRAMBE le tratte, data esatta) —
+        // vedi commento in cima al file (decisione 02/10/2026). Results.jsx usa questo,
+        // non `confirmed`, per decidere se mostrare il risultato in lista.
+        flightConfirmed: bothDirectionsMatched,
         deepLink: finalDeepLink,
         outboundLeg: outboundLegsForDisplay[0] ?? null,
         inboundLeg: inboundLegsForDisplay[0] ?? null,
