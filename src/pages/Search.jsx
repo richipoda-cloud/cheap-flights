@@ -299,14 +299,25 @@ const DEFAULT_FILTERS = {
   daysMax: MAX_DAYS,
   flexDeparture: false,
   flexArrival: false,
-  flexOutboundStop: false,
-  flexReturnStop: false,
+  // Richiesto dall'utente (02/10/2026): "Andata con scalo" e "Ritorno con scalo" erano due
+  // toggle separati che quasi nessuno usava indipendentemente — uniti in un solo flexStop
+  // ("Con scalo"), che in runSearch sotto viene comunque spedito come entrambi i flag
+  // flexOutboundStop/flexReturnStop (stesso valore) così che Results.jsx e verify-price
+  // restano identici, nessun cambio lato server.
+  flexStop: false,
 };
 
 function loadPersistedFilters() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT_FILTERS, ...JSON.parse(raw) } : DEFAULT_FILTERS;
+    if (!raw) return DEFAULT_FILTERS;
+    const parsed = JSON.parse(raw);
+    // Retrocompatibilità coi filtri salvati prima della fusione (02/10/2026): se c'era
+    // uno dei due vecchi toggle attivo, flexStop parte attivo di conseguenza.
+    if (parsed.flexStop === undefined && (parsed.flexOutboundStop || parsed.flexReturnStop)) {
+      parsed.flexStop = true;
+    }
+    return { ...DEFAULT_FILTERS, ...parsed };
   } catch {
     return DEFAULT_FILTERS;
   }
@@ -335,8 +346,9 @@ export function Search() {
   const [daysMax, setDaysMaxState] = useState(() => loadPersistedFilters().daysMax);
   const [flexDeparture, setFlexDeparture] = useState(() => loadPersistedFilters().flexDeparture);
   const [flexArrival, setFlexArrival] = useState(() => loadPersistedFilters().flexArrival);
-  const [flexOutboundStop, setFlexOutboundStop] = useState(() => loadPersistedFilters().flexOutboundStop);
-  const [flexReturnStop, setFlexReturnStop] = useState(() => loadPersistedFilters().flexReturnStop);
+  // Unico toggle "Con scalo" (vedi commento su DEFAULT_FILTERS) al posto dei due separati
+  // flexOutboundStop/flexReturnStop.
+  const [flexStop, setFlexStop] = useState(() => loadPersistedFilters().flexStop);
   const [countryInput, setCountryInput] = useState("");
 
   useEffect(() => {
@@ -350,27 +362,14 @@ export function Search() {
       daysMax,
       flexDeparture,
       flexArrival,
-      flexOutboundStop,
-      flexReturnStop,
+      flexStop,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // storage non disponibile (privata/bloccato): i filtri restano solo per la sessione corrente
     }
-  }, [
-    origins,
-    destination,
-    dateMode,
-    dateFrom,
-    dateTo,
-    daysMin,
-    daysMax,
-    flexDeparture,
-    flexArrival,
-    flexOutboundStop,
-    flexReturnStop,
-  ]);
+  }, [origins, destination, dateMode, dateFrom, dateTo, daysMin, daysMax, flexDeparture, flexArrival, flexStop]);
 
   const [originError, setOriginError] = useState(null);
 
@@ -458,8 +457,7 @@ export function Search() {
     setDaysMaxState(MAX_DAYS);
     setFlexDeparture(false);
     setFlexArrival(false);
-    setFlexOutboundStop(false);
-    setFlexReturnStop(false);
+    setFlexStop(false);
     setCountryInput("");
     if (!prefsLoading) setExcludedCountries([]); // persiste subito anche lato server, come gli altri filtri
   };
@@ -486,8 +484,11 @@ export function Search() {
       nightsMax: noLimit ? null : daysMax - 1,
       flexDeparture,
       flexArrival,
-      flexOutboundStop,
-      flexReturnStop,
+      // Un solo toggle in interfaccia, ma Results.jsx/verify-price si aspettano ancora i
+      // due flag separati (andata/ritorno) — inviati entrambi con lo stesso valore così
+      // nessun cambio è servito lato server per questa semplificazione.
+      flexOutboundStop: flexStop,
+      flexReturnStop: flexStop,
       // "Escludi paesi" ha senso solo con "Ovunque" (vedi commento nell'Accordion sotto:
       // il filtro vive solo in quella modalità) — con una destinazione fissa la mandiamo
       // comunque? No: l'utente ha scelto DOVE andare, escludere paesi non c'entra più.
@@ -695,17 +696,14 @@ export function Search() {
             onChange={setFlexDeparture}
           />
         )}
+        {/* Richiesto dall'utente (02/10/2026): i due toggle "Andata con scalo" / "Ritorno con
+            scalo" uniti in uno solo — vedi commento su DEFAULT_FILTERS/runSearch sopra per
+            come viene tradotto di nuovo nei due flag separati che Results.jsx si aspetta. */}
         <ToggleRow
-          label="Andata con scalo"
-          hint="Se conviene, l'andata può avere uno scalo intermedio invece del volo diretto"
-          checked={flexOutboundStop}
-          onChange={setFlexOutboundStop}
-        />
-        <ToggleRow
-          label="Ritorno con scalo"
-          hint="Se conviene, il ritorno può avere uno scalo intermedio invece del volo diretto"
-          checked={flexReturnStop}
-          onChange={setFlexReturnStop}
+          label="Con scalo"
+          hint="Se conviene, andata e ritorno possono avere uno scalo intermedio invece del volo diretto"
+          checked={flexStop}
+          onChange={setFlexStop}
         />
 
         {/* Richiesto esplicitamente dall'utente (02/10/2026): "Escludi paesi" ha senso solo
