@@ -752,7 +752,14 @@ export function Search() {
       {/* Posizione dinamica legata ad "Altri filtri": chiuso, il bottone segue il flusso
           normale della pagina (subito sotto il divisore, niente più spazio vuoto inutile);
           aperto, torna fisso in fondo come oggi per non finire coperto dal contenuto della
-          tendina che si allunga sotto. */}
+          tendina che si allunga sotto.
+          z-index nel caso "chiuso" (richiesto dall'utente 02/10/2026): la sfumatura fissa di
+          TabBar.jsx (z-index 5, ultimi 220px di schermo) scurisce tutto ciò che le sta sotto
+          nello stacking order — un <div> in flusso normale (position:static, nessun
+          z-index) viene dipinto PRIMA degli elementi posizionati con z-index, quindi la
+          sfumatura ci passava sopra rendendo il bottone "sbiadito" quando si scorreva fino
+          in fondo alla pagina. position:relative + zIndex:6 lo porta sopra la sfumatura (5)
+          ma resta comunque sotto la tab bar vera e propria (25). */}
       <div
         style={
           filtersOpen
@@ -770,7 +777,7 @@ export function Search() {
                 // Sopra la sfumatura (z-index 5) ma sotto la tab bar (z-index 25).
                 zIndex: 10,
               }
-            : { marginTop: 4 }
+            : { marginTop: 4, position: "relative", zIndex: 6 }
         }
       >
         <PrimaryButton
