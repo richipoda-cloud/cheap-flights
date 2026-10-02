@@ -488,7 +488,12 @@ export function Search() {
       flexArrival,
       flexOutboundStop,
       flexReturnStop,
-      excludedCountries,
+      // "Escludi paesi" ha senso solo con "Ovunque" (vedi commento nell'Accordion sotto:
+      // il filtro vive solo in quella modalità) — con una destinazione fissa la mandiamo
+      // comunque? No: l'utente ha scelto DOVE andare, escludere paesi non c'entra più.
+      // excludedCountries resta comunque salvato lato server per quando si torna a
+      // "Ovunque" — qui semplicemente non lo si applica a una ricerca con destinazione fissa.
+      excludedCountries: destination === null ? excludedCountries : [],
     };
     navigate("/results", { state: { filters } });
   };
@@ -703,33 +708,45 @@ export function Search() {
           onChange={setFlexReturnStop}
         />
 
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.accent, marginTop: 12, marginBottom: 8 }}>
-          Escludi paesi
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Autocomplete
-            value={countryInput}
-            onChange={(v) => setCountryInput(v)}
-            onPick={(name) => setCountryInput(name)}
-            onKeyDown={(e) => e.key === "Enter" && addExcludedCountry()}
-            suggestions={COUNTRY_SUGGESTIONS}
-            placeholder={prefsLoading ? "Caricamento…" : "Nome paese (es. Francia)"}
-            style={inputStyle}
-            disabled={prefsLoading}
-          />
-          <PrimaryButton onClick={addExcludedCountry} disabled={prefsLoading}>
-            Escludi
-          </PrimaryButton>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-          {excludedCountries.map((code) => (
-            <Pill key={code} onClick={() => removeExcludedCountry(code)}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
-              </span>
-            </Pill>
-          ))}
-        </div>
+        {/* Richiesto esplicitamente dall'utente (02/10/2026): "Escludi paesi" ha senso solo
+            con "Ovunque" (serve a filtrare destinazioni suggerite su cui NON si vuole andare,
+            inutile quando la destinazione è già scelta a mano) — nascosto con "Destinazione
+            fissa". L'utente ha chiarito esplicitamente di NON voler perdere i paesi già
+            esclusi passando da una modalità all'altra: lo stato (excludedCountries) resta
+            quello salvato su Supabase via useUserPreferences, indipendente da questa sola
+            visibilità — nascondere il blocco non lo tocca minimamente, solo runSearch sopra
+            evita di applicarlo quando la destinazione è fissa. */}
+        {destination === null && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.accent, marginTop: 12, marginBottom: 8 }}>
+              Escludi paesi
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Autocomplete
+                value={countryInput}
+                onChange={(v) => setCountryInput(v)}
+                onPick={(name) => setCountryInput(name)}
+                onKeyDown={(e) => e.key === "Enter" && addExcludedCountry()}
+                suggestions={COUNTRY_SUGGESTIONS}
+                placeholder={prefsLoading ? "Caricamento…" : "Nome paese (es. Francia)"}
+                style={inputStyle}
+                disabled={prefsLoading}
+              />
+              <PrimaryButton onClick={addExcludedCountry} disabled={prefsLoading}>
+                Escludi
+              </PrimaryButton>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+              {excludedCountries.map((code) => (
+                <Pill key={code} onClick={() => removeExcludedCountry(code)}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <FlagIcon countryCode={code} size={12} /> {countryName(code)} ✕
+                  </span>
+                </Pill>
+              ))}
+            </div>
+          </>
+        )}
       </Accordion>
 
       {/* Posizione dinamica legata ad "Altri filtri": chiuso, il bottone segue il flusso
