@@ -57,6 +57,13 @@
 // destinazioni europee economiche senza nessuna coincidenza reale verso rotte intercontinentali.
 // Vedi CURATED_LONG_HAUL_HUBS sotto: stessa idea già usata in search-direct/index.ts
 // (COUNTRY_MAJOR_CITIES, hub verificati dal vivo il 27/09/2026) riapplicata qui per gli scali.
+//
+// LOG DIAGNOSTICI TEMPORANEI (02-03/10/2026): tre correzioni di fila (rate limit,
+// tolleranza data, hub curati) NON hanno risolto il "zero risultati" su Thailandia/USA,
+// tutte basate solo su ragionamento sul codice senza una verifica dal vivo — invece di
+// continuare a ipotizzare, console.log in findConnectionHubs/cheapestConnection sotto
+// mostrano cosa trova DAVVERO l'API (visibili in Supabase → Edge Functions → verify-price
+// → Logs dopo un tentativo). Da rimuovere una volta risolto.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -274,7 +281,12 @@ async function findConnectionHubs(origin: string, excludeDestination: string, co
   // parte da un aeroporto vicino a un grande scalo europeo diverso da quelli curati, o per
   // scali intra-Europei dove "il più economico da casa" resta un'ipotesi ragionevole.
   const combined = [...curated, ...cheapFromOrigin.filter((h) => !curated.includes(h))];
-  return combined.slice(0, count);
+  const picked = combined.slice(0, count);
+  // LOG DIAGNOSTICO TEMPORANEO (vedi nota in cima al file).
+  console.log(
+    `[scalo] findConnectionHubs origin=${origin} escludi=${excludeDestination} totaleOpzioniOneWay=${options.length} candidatiScelti=${JSON.stringify(picked)} (curatiDisponibili=${JSON.stringify(curated)} economiciDaOrigine=${JSON.stringify(cheapFromOrigin.slice(0, 8))})`
+  );
+  return picked;
 }
 
 // Pool one-way su una rotta per un mese e il successivo (stesso pattern di
@@ -298,6 +310,10 @@ async function cheapestConnection(origin: string, destination: string, date: str
       // troppo sparsa per pretendere l'esattezza che basta invece sulle rotte dirette.
       const leg1Pool = await fetchOneWayPool(origin, hub, date);
       const leg1 = pickCheapestNearDate(leg1Pool, date, CONNECTION_DATE_TOLERANCE_DAYS);
+      // LOG DIAGNOSTICO TEMPORANEO (vedi nota in cima al file).
+      console.log(
+        `[scalo] leg1 ${origin}->${hub} data=${date}: pool=${leg1Pool.length} trovato=${leg1 ? `${leg1.date}@${leg1.price}eur${leg1.approxDate ? " (approx)" : ""}` : "NESSUNO"}`
+      );
       if (!leg1) return null;
       // Seconda tratta: cercata attorno alla data EFFETTIVA della prima (non più quella
       // originale, che potrebbe già essere slittata) — e filtrata per partire dopo il suo
@@ -311,6 +327,10 @@ async function cheapestConnection(origin: string, destination: string, date: str
       const leg2 = leg2Candidates.sort(
         (a: any, b: any) => a.price - b.price || new Date(a.date).getTime() - new Date(b.date).getTime()
       )[0];
+      // LOG DIAGNOSTICO TEMPORANEO (vedi nota in cima al file).
+      console.log(
+        `[scalo] leg2 ${hub}->${destination} dopo leg1=${leg1.date}: pool=${leg2Pool.length} candidatiEntroFinestra=${leg2Candidates.length} trovato=${leg2 ? `${leg2.date}@${leg2.price}eur` : "NESSUNO"}`
+      );
       if (!leg2) return null;
       // Stesso avviso onesto già usato per i diretti senza match esatto (LegBox) — qui
       // segnala che l'intero scalo è slittato di qualche giorno dalla data richiesta.
@@ -322,7 +342,12 @@ async function cheapestConnection(origin: string, destination: string, date: str
     })
   );
   const valid = attempts.filter((a): a is { legs: any[]; total: number } => a !== null);
-  return valid.sort((a, b) => a.total - b.total)[0] ?? null;
+  const result = valid.sort((a, b) => a.total - b.total)[0] ?? null;
+  // LOG DIAGNOSTICO TEMPORANEO (vedi nota in cima al file).
+  console.log(
+    `[scalo] cheapestConnection ${origin}->${destination} (${date}): tentativiValidi=${valid.length}/${hubs.length} risultato=${result ? `${result.total}eur` : "NESSUNO"}`
+  );
+  return result;
 }
 
 // Schemi diretti compagnia, homepage e withAirlineDeepLink ora in _shared/airlineLinks.ts
@@ -449,6 +474,12 @@ Deno.serve(async (req) => {
       inboundLeg &&
         (cityOf(inboundLeg.originAirport) !== cityOf(flight.destination) ||
           inboundLeg.destinationAirport !== flight.origin)
+    );
+
+    // LOG DIAGNOSTICO TEMPORANEO (vedi nota in cima al file): quali flag di scalo sono
+    // attivi per QUESTA chiamata, e se verify-price trova già un diretto prima di provare.
+    console.log(
+      `[scalo] flight ${flight.origin}->${flight.destination} (${flight.departDate}/${flight.returnDate}) checkOutboundStop=${Boolean(flight.checkOutboundStop)} checkReturnStop=${Boolean(flight.checkReturnStop)} outboundLegDiretto=${outboundLeg ? "trovato" : "NESSUNO"} inboundLegDiretto=${inboundLeg ? "trovato" : "NESSUNO"}`
     );
 
     // "Con scalo", solo su richiesta esplicita (vedi sopra) — confrontato col diretto già
