@@ -50,6 +50,13 @@
 // esplicitamente una tolleranza di qualche giorno, ma SEGNALATA onestamente (leg.approxDate,
 // stesso trattamento già usato per i diretti senza match esatto), non un ritorno silenzioso
 // alla vecchia politica "va bene indovinare" del 27/09/2026.
+//
+// HUB CURATI PER LO SCALO (02/10/2026, dopo che la tolleranza di data sopra NON ha risolto
+// il "zero risultati" su Thailandia/USA): findConnectionHubs sceglieva come candidati SOLO
+// le destinazioni dirette più economiche dall'origine — su aeroporti low-cost, quasi sempre
+// destinazioni europee economiche senza nessuna coincidenza reale verso rotte intercontinentali.
+// Vedi CURATED_LONG_HAUL_HUBS sotto: stessa idea già usata in search-direct/index.ts
+// (COUNTRY_MAJOR_CITIES, hub verificati dal vivo il 27/09/2026) riapplicata qui per gli scali.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -230,12 +237,7 @@ function nearbyAirports(code: string, maxKm: number): string[] {
 // tutti i risultati insieme: il costo in chiamate sarebbe eccessivo per una verifica
 // automatica di massa — vedi il commento sul fallback automatico in Results.jsx, che
 // proprio per questo si limita a poche proposte e le lancia in sequenza, non tutte insieme).
-//
-// RIDOTTO da 5 a 3 (02/10/2026, poi confermato NON essere la causa del "zero risultati" —
-// vedi nota in cima al file): 3 hub resta comunque sufficiente a trovare uno scalo valido
-// nella grande maggioranza dei casi reali, e tenerlo basso resta prudente visto il numero
-// di chiamate per tentativo aumentato sotto dalla tolleranza di data.
-const CONNECTION_HUB_CANDIDATES = 3;
+const CONNECTION_HUB_CANDIDATES = 4;
 
 // Quanti giorni di distanza dalla data richiesta si accettano per la PRIMA tratta (hub di
 // andata) — vedi nota "TOLLERANZA DI DATA SOLO PER LO SCALO" in cima al file. 3 giorni:
@@ -248,6 +250,15 @@ const CONNECTION_DATE_TOLERANCE_DAYS = 3;
 // sosta turistica non richiesta).
 const CONNECTION_LAYOVER_MAX_DAYS = 2;
 
+// Vedi nota "HUB CURATI PER LO SCALO" in cima al file: grandi hub con voli di linea reali
+// verso praticamente ogni continente (Turkish/Emirates/Qatar sui rispettivi hub, principali
+// scali europei con network intercontinentale) — provati PRIMA delle destinazioni "più
+// economiche da casa" di findConnectionHubs, molto più probabili di avere davvero una
+// coincidenza utilizzabile verso rotte lunghe. Se uno di questi non ha dati one-way in
+// cache per l'origine specifica, il tentativo fallisce da sé (stesso comportamento di
+// sempre) — nessun danno a tenerli comunque come primi candidati.
+const CURATED_LONG_HAUL_HUBS = ["IST", "DXB", "DOH", "FRA", "AMS", "CDG", "LHR", "HEL"];
+
 async function findConnectionHubs(origin: string, excludeDestination: string, count: number) {
   const options = await fetchOneWayPrices({ origin, limit: 200 });
   const cheapestByHub = new Map<string, number>();
@@ -256,10 +267,14 @@ async function findConnectionHubs(origin: string, excludeDestination: string, co
     const current = cheapestByHub.get(o.destination);
     if (current == null || o.price < current) cheapestByHub.set(o.destination, o.price);
   }
-  return [...cheapestByHub.entries()]
-    .sort((a, b) => a[1] - b[1])
-    .slice(0, count)
-    .map(([hub]) => hub);
+  const cheapFromOrigin = [...cheapestByHub.entries()].sort((a, b) => a[1] - b[1]).map(([hub]) => hub);
+  const curated = CURATED_LONG_HAUL_HUBS.filter((h) => h !== excludeDestination);
+  // Hub curati prima (più probabili di avere una vera coincidenza intercontinentale),
+  // poi le destinazioni più economiche dall'origine non già incluse — utili quando l'utente
+  // parte da un aeroporto vicino a un grande scalo europeo diverso da quelli curati, o per
+  // scali intra-Europei dove "il più economico da casa" resta un'ipotesi ragionevole.
+  const combined = [...curated, ...cheapFromOrigin.filter((h) => !curated.includes(h))];
+  return combined.slice(0, count);
 }
 
 // Pool one-way su una rotta per un mese e il successivo (stesso pattern di
