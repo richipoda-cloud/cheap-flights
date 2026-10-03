@@ -353,7 +353,13 @@ export function Results() {
   // (1) qui ci si limita alle poche proposte dirette più economiche, non tutte e 10;
   // (2) le si verifica IN SEQUENZA (una alla volta, await) invece che tutte insieme in
   // parallelo, per restare ben sotto qualunque soglia plausibile anche nel caso peggiore.
-  const SCALO_FALLBACK_LIMIT = 3;
+  //
+  // Portato da 3 a 6 il 03/10/2026 (richiesto esplicitamente dall'utente dopo aver visto
+  // dal vivo un risultato reale — Miami — comparire grazie al fallback): più proposte
+  // controllate significa più possibilità di trovare qualcosa, a costo di una ricerca più
+  // lunga quando i diretti non sono confermati (resta IN SEQUENZA, non in parallelo, per
+  // lo stesso motivo di rate limit descritto sopra).
+  const SCALO_FALLBACK_LIMIT = 6;
   const [scaloVerifiedData, setScaloVerifiedData] = useState({});
   const [verifyingScalo, setVerifyingScalo] = useState(false);
   const pendingScaloRef = useRef(0);
