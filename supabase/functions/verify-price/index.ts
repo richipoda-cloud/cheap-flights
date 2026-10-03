@@ -71,6 +71,17 @@
 // porta con sé anche un campo `scaloDebug` nella risposta JSON stessa — Results.jsx lo
 // mostra direttamente in pagina quando la ricerca con scalo finisce vuota, cosi
 // un semplice screenshot basta a far vedere cosa ha davvero trovato l'API, senza dashboard.
+//
+// RICERCA DIRETTA CON SCALO (03/10/2026, idea dell'utente dopo aver visto dal vivo i dati
+// diagnostici sopra): il ritorno USA->hub non ha quasi mai dati in cache qualunque hub si
+// provi (pool quasi sempre 0, su 3 ricerche reali testate) — limite della cache one-way
+// asimmetrica di Travelpayouts (molte più ricerche reali "Italia->estero" che il contrario),
+// non un bug risolvibile con più tentativi di hub. fetchDirectConnectionOption sotto prova
+// anche una strada diversa: chiedere DIRETTAMENTE a Travelpayouts un itinerario con scalo
+// già pronto sulla rotta intera (v3/prices_for_dates con allowConnections=true, ma con la
+// stessa tolleranza di data del resto dello scalo, non illimitata) — una ricerca realistica
+// che le persone fanno davvero, quindi più probabile avere dati. cheapestConnection tiene
+// il più economico tra questa e la strada "via hub" di prima.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -311,6 +322,39 @@ async function fetchOneWayPool(origin: string, destination: string, monthAnchor:
   return [...thisMonthOpts, ...nextMonthOpts];
 }
 
+// IDEA DELL'UTENTE (03/10/2026, dopo aver visto dal vivo che il ritorno USA->hub non ha
+// quasi mai dati in cache, qualunque hub si provi — vedi la nota "RICERCA DIRETTA CON
+// SCALO" in cima al file): invece di assemblare NOI uno scalo con due biglietti separati
+// via un hub scelto da noi (self-transfer, origine->hub e hub->destinazione come due
+// ricerche one-way indipendenti), chiediamo DIRETTAMENTE a Travelpayouts un itinerario con
+// scalo già pronto sulla rotta intera richiesta (v3/prices_for_dates con
+// allowConnections=true, stessa chiamata di fetchUnverifiedConnectingLeg ma QUI con la
+// stessa tolleranza di data del resto dello scalo — non "qualunque data pur di trovare
+// qualcosa", quella resta un fallback separato e marcatamente non verificato). Molto più
+// probabile avere dati in cache: questa è una ricerca realistica che le persone fanno
+// davvero (es. "New York - Milano"), non una coppia origine-hub inventata da noi che magari
+// nessuno ha mai cercato. Il risultato è UN SOLO biglietto/itinerario (non due tratte
+// separate nostre), con compagnia/orario reali dalla stessa API delle altre tratte
+// confermate — stesso livello di fiducia, non "da verificare al link" come invece resta
+// fetchUnverifiedConnectingLeg (quella senza alcun limite di data).
+async function fetchDirectConnectionOption(origin: string, destination: string, date: string) {
+  const thisMonth = date.slice(0, 7);
+  const [thisMonthOpts, nextMonthOpts] = await Promise.all([
+    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: thisMonth, allowConnections: true }),
+    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: nextMonth(thisMonth), allowConnections: true }),
+  ]);
+  // Solo itinerari CON scalo (transfers>0, altrimenti è un diretto già coperto altrove) ed
+  // entro un numero di cambi ragionevole (oltre 2 non è più un'alternativa comoda).
+  const pool = [...thisMonthOpts, ...nextMonthOpts].filter(
+    (o: any) => (o.transfers ?? 0) > 0 && (o.transfers ?? 0) <= 2
+  );
+  const picked = pickCheapestNearDate(pool, date, CONNECTION_DATE_TOLERANCE_DAYS);
+  console.log(
+    `[scalo] fetchDirectConnectionOption ${origin}->${destination} data=${date}: pool=${pool.length} trovato=${picked ? `${picked.date}@${picked.price}eur transfers=${picked.transfers}${picked.approxDate ? " (approx)" : ""}` : "NESSUNO"}`
+  );
+  return { poolSize: pool.length, picked };
+}
+
 // Riporta, per ogni hub tentato, cosa ha trovato (o non trovato) — prima solo nei
 // console.log (visibili solo da Supabase), ora anche restituito come `debug` così la
 // risposta finale di Deno.serve può passarlo al client (vedi `scaloDebug` sotto e
@@ -382,24 +426,54 @@ async function cheapestConnection(origin: string, destination: string, date: str
     })
   );
   const valid = attempts.filter((a) => a.result !== null);
-  const best = valid.sort((a, b) => (a.result!.total - b.result!.total))[0] ?? null;
+  const bestViaHub = valid.sort((a, b) => (a.result!.total - b.result!.total))[0] ?? null;
   console.log(
-    `[scalo] cheapestConnection ${origin}->${destination} (${date}): tentativiValidi=${valid.length}/${hubs.length} risultato=${best ? `${best.result!.total}eur via ${best.hub}` : "NESSUNO"}`
+    `[scalo] cheapestConnection (via hub) ${origin}->${destination} (${date}): tentativiValidi=${valid.length}/${hubs.length} risultato=${bestViaHub ? `${bestViaHub.result!.total}eur via ${bestViaHub.hub}` : "NESSUNO"}`
   );
+
+  // Seconda strategia (vedi nota sopra fetchDirectConnectionOption): un itinerario con
+  // scalo già pronto, trovato direttamente da Travelpayouts sulla rotta intera, invece che
+  // assemblato da noi via un hub scelto a mano. Tenuto il più economico tra le due.
+  const direct = await fetchDirectConnectionOption(origin, destination, date);
+  const directResult = direct.picked ? { legs: [direct.picked], total: direct.picked.price } : null;
+
+  const best =
+    bestViaHub?.result && directResult
+      ? bestViaHub.result.total <= directResult.total
+        ? bestViaHub.result
+        : directResult
+      : bestViaHub?.result ?? directResult ?? null;
+  console.log(
+    `[scalo] cheapestConnection TOTALE ${origin}->${destination} (${date}): viaHub=${bestViaHub?.result ? `${bestViaHub.result.total}eur` : "NESSUNO"} ricercaDiretta=${directResult ? `${directResult.total}eur` : "NESSUNO"} scelto=${best ? `${best.total}eur` : "NESSUNO"}`
+  );
+
   // debug: un riepilogo per ogni hub tentato, senza i campi `result` interni (ridondanti
   // con leg1/leg2 già testuali) — pensato per essere leggibile su schermo, non solo in log.
-  const debug = attempts.map(({ hub, leg1PoolSize, leg1, leg2PoolSize, leg2CandidatesInWindow, leg2, outcome }) => ({
-    hub,
-    leg1PoolSize,
-    leg1,
-    leg2PoolSize,
-    leg2CandidatesInWindow,
-    leg2,
-    outcome,
-  }));
+  // In coda, anche il tentativo di ricerca diretta (non è un hub, ma stesso formato per
+  // restare leggibile nello stesso elenco in Results.jsx).
+  const debug = [
+    ...attempts.map(({ hub, leg1PoolSize, leg1, leg2PoolSize, leg2CandidatesInWindow, leg2, outcome }) => ({
+      hub,
+      leg1PoolSize,
+      leg1,
+      leg2PoolSize,
+      leg2CandidatesInWindow,
+      leg2,
+      outcome,
+    })),
+    {
+      hub: "ricerca diretta con scalo (Aviasales)",
+      leg1PoolSize: direct.poolSize,
+      leg1: direct.picked ? `${direct.picked.date}@${direct.picked.price} (${direct.picked.transfers} cambi)` : null,
+      leg2PoolSize: 0,
+      leg2CandidatesInWindow: 0,
+      leg2: null,
+      outcome: direct.picked ? "ok" : "nessun itinerario con scalo in cache entro la tolleranza di data",
+    },
+  ];
   return {
-    legs: best?.result?.legs ?? [],
-    total: best?.result?.total ?? null,
+    legs: best?.legs ?? [],
+    total: best?.total ?? null,
     debug,
   };
 }
@@ -558,7 +632,15 @@ Deno.serve(async (req) => {
         : inboundLeg
         ? [inboundLeg]
         : [];
-    const hasStop = outboundLegs.length > 1 || inboundLegs.length > 1;
+    // Oltre al caso "due biglietti separati" (più tratte), ora uno scalo può arrivare anche
+    // come UNA sola tratta con un cambio incluso (vedi fetchDirectConnectionOption: un
+    // itinerario con scalo trovato già pronto da Travelpayouts, un solo biglietto) — va
+    // comunque segnalato come "con scalo", non mostrato come se fosse un volo diretto.
+    const hasStop =
+      outboundLegs.length > 1 ||
+      inboundLegs.length > 1 ||
+      outboundLegs.some((l: any) => (l?.transfers ?? 0) > 0) ||
+      inboundLegs.some((l: any) => (l?.transfers ?? 0) > 0);
     // Biglietti separati (returnsElsewhere/hasStop): ogni tratta ha il proprio bottone
     // "Prenota andata/ritorno" legato al SUO leg.deepLink — va sostituito qui, non solo nel
     // link "biglietto unico" sopra, altrimenti resta sempre quello Aviasales per questi casi.
