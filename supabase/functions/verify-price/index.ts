@@ -95,6 +95,17 @@
 // scaloDebug.apiErrors); (2) il loop sugli hub qui sotto non è più un Promise.all su tutti
 // e 10 insieme, ma mapWithConcurrency con al massimo 3 richieste in volo — stesso principio
 // già usato in Results.jsx per il fallback automatico (sequenziale, non tutto insieme).
+//
+// STESSO RISCHIO SUI DIRETTI (04/10/2026, domanda esplicita dell'utente "sui diretti
+// invece nessuna novità?" — ha fatto notare che il fix sopra riguardava solo lo scalo):
+// la verifica diretta normale (flight.checkOutboundStop/checkReturnStop entrambi assenti)
+// NON passa da cheapestConnection, quindi non aveva lo stesso burst di 40 richieste — ma
+// Results.jsx lancia comunque fino a 10 verifyPrice IN PARALLELO (uno per risultato),
+// ognuna con 1-2+ chiamate oneway.ts qui sotto (outboundOptions + inboundOptionsPerPair),
+// quindi un burst comparabile (~20-30 richieste insieme) era comunque possibile dal lato
+// client. apiErrors (sotto) ora arriva SEMPRE nella risposta, non solo dentro scaloDebug,
+// cosi un 429 sui diretti diventa visibile anche senza aver richiesto lo scalo — il fix di
+// concorrenza lato client è in Results.jsx (mapWithConcurrency li', stesso principio).
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -799,6 +810,12 @@ Deno.serve(async (req) => {
         // _shared/travelpayouts.ts. Serve al client per non far sembrare un buco nei
         // dati quando in realtà quella rotta un volo diretto non lo ha proprio.
         numberOfChanges: match?.numberOfChanges ?? null,
+        // apiErrors ora SEMPRE in cima alla risposta (04/10/2026, non solo dentro
+        // scaloDebug) — lo stesso rischio di burst esiste anche sulla verifica DIRETTA
+        // (Results.jsx lancia più verifyPrice in parallelo, ognuna con 1-2+ chiamate
+        // oneway.ts): senza questo campo qui fuori, un eventuale 429 sui diretti restava
+        // invisibile perché scaloDebug è null quando lo scalo non è stato richiesto.
+        apiErrors: apiErrors.length > 0 ? apiErrors : null,
         // Diagnostica visibile in pagina (03/10/2026, vedi nota in cima al file) — presente
         // solo quando è stata davvero richiesta una verifica con scalo, null altrimenti.
         // Results.jsx la mostra solo quando il fallback con scalo finisce senza nessun

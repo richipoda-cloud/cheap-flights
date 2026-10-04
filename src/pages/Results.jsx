@@ -10,6 +10,28 @@ import { useAuth } from "../hooks/useAuth";
 import { useSearches } from "../hooks/useSearches";
 import { useFavorites } from "../hooks/useFavorites";
 
+// Vedi nota "STESSO RISCHIO SUI DIRETTI" in verify-price/index.ts (04/10/2026, domanda
+// esplicita dell'utente "sui diretti invece nessuna novità?" dopo il fix sullo scalo):
+// la verifica diretta qui sotto lanciava verifyPrice per TUTTI i risultati (fino a 10)
+// IN PARALLELO, ognuno con 1-2+ chiamate oneway.ts sul backend — un burst da ~20-30
+// richieste simultanee contro la stessa API gratuita, stesso tipo di rischio già corretto
+// per lo scalo (mapWithConcurrency in verify-price/index.ts). Stesso pattern "worker pool"
+// qui in versione JS semplice (nessun generics, non serve in un file .jsx).
+async function mapWithConcurrency(items, limit, fn) {
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+// Quante verifiche dirette in volo contemporaneamente (vedi commento sopra) — 3, lo stesso
+// valore già scelto per gli hub dello scalo in verify-price/index.ts (CONNECTION_HUB_CONCURRENCY).
+const DIRECT_VERIFY_CONCURRENCY = 3;
+
 // Lista piatta con separatori sottili tra le righe (non una card per riga) — un unico
 // box bianco arrotondato che contiene tutte le righe di un gruppo (diretti o creativi).
 function FlatList({ children }) {
@@ -351,6 +373,11 @@ export function Results() {
   const [verifyingAll, setVerifyingAll] = useState(false);
   const pendingVerifyRef = useRef(0);
   const [error, setError] = useState(null);
+  // Diagnostica (04/10/2026, vedi commento su mapWithConcurrency in cima al file): status
+  // HTTP veri delle chiamate oneway.ts fallite durante la verifica DIRETTA (non quella con
+  // scalo, che ha già il suo ScaloDebugPanel) — resta vuoto a meno che verify-price non
+  // incontri davvero un errore (es. 429), cosi non disturba quando tutto va bene.
+  const [directApiErrors, setDirectApiErrors] = useState([]);
   const recordedRef = useRef(false);
   const recordedSearchRef = useRef(null);
   const mountedRef = useRef(true);
@@ -424,7 +451,14 @@ export function Results() {
         // Lista tenuta volutamente corta (10 al massimo, vedi search-direct) proprio per
         // poterla verificare TUTTA dal vivo appena arriva, invece di lasciarla indicativa
         // finché non si apre il dettaglio — stessa somma tratte one-way del dettaglio.
-        list.forEach((r) => {
+        //
+        // Portato da "tutti insieme" (nessun limite, il forEach lanciava tutte le promesse
+        // in un colpo) a concorrenza limitata (04/10/2026, vedi mapWithConcurrency in cima
+        // al file) — stesso ragionamento già applicato al fallback con scalo sotto: fino a
+        // 10 risultati in parallelo, ognuno con 1-2+ chiamate oneway.ts sul backend, poteva
+        // benissimo sommarsi a un burst da 20-30 richieste contro la stessa API gratuita e
+        // far scattare un 429 scambiato poi per "nessun volo diretto in cache".
+        mapWithConcurrency(list, DIRECT_VERIFY_CONCURRENCY, async (r) => {
           // "Aeroporto di ritorno diverso dalla partenza": il ritorno atterra su un
           // aeroporto vicino a casa a scelta tra quelli di Partenza, non solo quello di
           // andata. "Ripartenza flessibile": il ritorno PARTE da un aeroporto vicino alla
@@ -440,16 +474,22 @@ export function Results() {
             // "Con scalo" è attivo.
             allowStops: Boolean(filters.flexOutboundStop || filters.flexReturnStop),
           };
-          verifyPrice(payload)
-            .then((v) => {
-              if (!mountedRef.current || v?.price == null) return;
+          try {
+            const v = await verifyPrice(payload);
+            if (mountedRef.current && v?.price != null) {
               setVerifiedData((prev) => ({ ...prev, [r.id]: v }));
-            })
-            .catch(() => {})
-            .finally(() => {
-              pendingVerifyRef.current -= 1;
-              if (mountedRef.current && pendingVerifyRef.current <= 0) setVerifyingAll(false);
-            });
+            }
+            // Diagnostica (04/10/2026): apiErrors ora arriva sempre da verify-price, non
+            // solo dentro scaloDebug — visibile anche qui, sul percorso diretto normale.
+            if (mountedRef.current && v?.apiErrors?.length) {
+              setDirectApiErrors((prev) => [...prev, ...v.apiErrors]);
+            }
+          } catch {
+            // ignorato, stesso comportamento di prima
+          } finally {
+            pendingVerifyRef.current -= 1;
+            if (mountedRef.current && pendingVerifyRef.current <= 0) setVerifyingAll(false);
+          }
         });
       })
       .catch((e) => setError(e.message))
@@ -615,6 +655,26 @@ export function Results() {
       </div>
 
       {error && <div style={{ color: COLORS.warn, marginBottom: 12 }}>{error}</div>}
+
+      {/* Diagnostica (04/10/2026, vedi commento sullo stato sopra): visibile solo se la
+          verifica diretta ha davvero incontrato un errore HTTP (es. 429) — distingue un
+          rate limit passeggero da una vera assenza di voli diretti in cache. */}
+      {directApiErrors.length > 0 && (
+        <div
+          style={{
+            fontSize: 10.5,
+            fontFamily: "monospace",
+            color: COLORS.warn,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            marginBottom: 12,
+          }}
+        >
+          ⚠️ {directApiErrors.length} chiamate API fallite durante la verifica diretta (
+          {directApiErrors.map((e) => `status ${e.status}`).join(", ")}) — possibile rate
+          limit temporaneo, non necessariamente assenza di voli.
+        </div>
+      )}
 
       {(loadingDirect || verifyingAll) && (
         <div style={{ color: COLORS.inkSoft }}>
