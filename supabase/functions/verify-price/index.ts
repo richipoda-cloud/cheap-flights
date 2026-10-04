@@ -51,6 +51,12 @@
 // stesso trattamento già usato per i diretti senza match esatto), non un ritorno silenzioso
 // alla vecchia politica "va bene indovinare" del 27/09/2026.
 //
+// SUPERATA IL 04/10/2026 (vedi nota "TOLLERANZA DI DATA ANCHE SUI DIRETTI" più sotto): la
+// regola "data esatta o niente" per i DIRETTI, menzionata qui sopra come intatta, non lo è
+// più — l'utente ha chiesto esplicitamente di estendere la stessa tolleranza anche ai
+// diretti, dopo aver visto "zero diretti" implausibili su New York. DIRECT_DATE_TOLERANCE_DAYS
+// (sotto) copre ora anche quel caso, con lo stesso avviso onesto leg.approxDate.
+//
 // HUB CURATI PER LO SCALO (02/10/2026, dopo che la tolleranza di data sopra NON ha risolto
 // il "zero risultati" su Thailandia/USA): findConnectionHubs sceglieva come candidati SOLO
 // le destinazioni dirette più economiche dall'origine — su aeroporti low-cost, quasi sempre
@@ -106,6 +112,18 @@
 // client. apiErrors (sotto) ora arriva SEMPRE nella risposta, non solo dentro scaloDebug,
 // cosi un 429 sui diretti diventa visibile anche senza aver richiesto lo scalo — il fix di
 // concorrenza lato client è in Results.jsx (mapWithConcurrency li', stesso principio).
+//
+// TOLLERANZA DI DATA ANCHE SUI DIRETTI (04/10/2026, richiesta esplicita dell'utente dopo
+// aver visto "zero diretti" su New York pur sapendo che un diretto Milano-NY esiste quasi
+// ogni giorno — confermato dal vivo che NON era rate-limit, vedi apiErrors sopra: la cache
+// one-way semplicemente non aveva un match sulla data ESATTA richiesta, la regola rigida
+// decisa il 02/10/2026). L'utente ha scelto esplicitamente di rilassare quella regola solo
+// ora, con la stessa tolleranza e lo stesso avviso onesto (leg.approxDate, già gestito da
+// LegBox/LegRow) già in uso per lo scalo — non un ritorno silenzioso a "va bene indovinare":
+// il client mostra sempre chiaramente quando la data trovata non è quella esatta richiesta.
+// outboundOptions/inboundOptionsPerPair sotto ora vengono dal pool di due mesi (fetchOneWayPool,
+// stesso helper già usato dallo scalo) invece che dalla sola data esatta, e pickCheapestOnDate
+// è diventato pickCheapestNearDate con DIRECT_DATE_TOLERANCE_DAYS.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -140,18 +158,13 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-function pickCheapestOnDate(options: any[], date: string) {
-  const matches = options.filter((o) => o.date === date);
-  return matches.sort((a, b) => a.price - b.price)[0] ?? null;
-}
-
 // Segnalato dall'utente: quando non c'è un match ESATTO per la data richiesta, il box
 // Andata/Ritorno mostrava solo "Orari e compagnia disponibili al passo di prenotazione" —
 // niente, anche se la stessa v3/prices_for_dates aveva risultati per un giorno vicino sulla
 // stessa rotta. Qui si sceglie il più vicino (a parità di scarto, il più economico) SOLO per
-// mostrarlo nel box informativo — mai per calcolare prezzo/conferma/link di prenotazione
-// (quelli restano legati alla data esatta richiesta, altrimenti si prenoterebbe un giorno
-// sbagliato senza saperlo). Il flag approxDate dice al client di segnalarlo onestamente.
+// mostrarlo nel box informativo — usata SOLO come ultimo fallback (fetchBroaderOneWayLeg)
+// quando pickCheapestNearDate sotto non trova nulla nemmeno entro la sua tolleranza; il
+// flag approxDate dice al client di segnalarlo onestamente in entrambi i casi.
 function pickClosestDate(options: any[], date: string) {
   if (!options.length) return null;
   const target = new Date(date).getTime();
@@ -319,6 +332,11 @@ const CONNECTION_HUB_CONCURRENCY = 3;
 // abbastanza per intercettare la cache one-way sparsa delle rotte intercontinentali, senza
 // scivolare su una data così lontana da non assomigliare più al viaggio richiesto.
 const CONNECTION_DATE_TOLERANCE_DAYS = 3;
+
+// Stessa idea, applicata ai voli DIRETTI (vedi nota "TOLLERANZA DI DATA ANCHE SUI DIRETTI"
+// in cima al file) — stesso valore dello scalo, nessuna ragione per essere diversi: la
+// cache one-way ha lo stesso buco "data esatta assente" su entrambi i percorsi.
+const DIRECT_DATE_TOLERANCE_DAYS = 3;
 // Quanti giorni dopo l'arrivo della prima tratta si accetta la seconda (il volo verso la
 // destinazione finale) — rappresenta la finestra di scalo realistica per un self-transfer
 // (stesso giorno o il successivo è la norma, oltre i 2 giorni non è più "uno scalo" ma una
@@ -605,22 +623,14 @@ Deno.serve(async (req) => {
       // pur essendo un risultato reale e recente — "confermato" falliva anche su risultati
       // corretti. Stesso limite ampio già usato in search-direct.
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate, limit: 1000 }),
-      fetchOneWayPrices({
-        origin: flight.origin,
-        destination: flight.destination,
-        limit: 100,
-        departureAt: flight.departDate,
-      }),
+      // Vedi nota "TOLLERANZA DI DATA ANCHE SUI DIRETTI" in cima al file (04/10/2026): non
+      // più la sola data esatta (fetchOneWayPrices con departureAt=giorno preciso), ma il
+      // pool di due mesi (fetchOneWayPool, stesso helper dello scalo) — pickCheapestNearDate
+      // sotto scegli poi il più vicino entro DIRECT_DATE_TOLERANCE_DAYS, mai più lontano.
+      fetchOneWayPool(flight.origin, flight.destination, flight.departDate),
       Promise.all(
         returnOrigins.flatMap((returnOrigin) =>
-          homeAirports.map((airport) =>
-            fetchOneWayPrices({
-              origin: returnOrigin,
-              destination: airport,
-              limit: 100,
-              departureAt: flight.returnDate,
-            })
-          )
+          homeAirports.map((airport) => fetchOneWayPool(returnOrigin, airport, flight.returnDate))
         )
       ),
     ]);
@@ -641,8 +651,8 @@ Deno.serve(async (req) => {
         r.returnDate === flight.returnDate &&
         (flight.allowStops || r.numberOfChanges === 0 || CHARTER_TRUSTED_CITIES.has(r.destination))
     );
-    const outboundLeg = pickCheapestOnDate(outboundOptions, flight.departDate);
-    const inboundLeg = pickCheapestOnDate(inboundOptionsPerPair.flat(), flight.returnDate);
+    const outboundLeg = pickCheapestNearDate(outboundOptions, flight.departDate, DIRECT_DATE_TOLERANCE_DAYS);
+    const inboundLeg = pickCheapestNearDate(inboundOptionsPerPair.flat(), flight.returnDate, DIRECT_DATE_TOLERANCE_DAYS);
     // true solo se la flessibilità ha davvero trovato conveniente un aeroporto diverso
     // (partenza del ritorno vicino alla destinazione, o arrivo vicino a casa) — round-trip
     // combinato non ha più senso in quel caso.
@@ -726,13 +736,12 @@ Deno.serve(async (req) => {
     const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg, inboundLeg) : null;
 
     // Solo per il box informativo (mai per prezzo/conferma/link, calcolati sopra e già
-    // finiti): se manca un match esatto, si mostra il volo reale più vicino trovato in cache
-    // invece del placeholder "disponibile al passo di prenotazione". outboundOptions/
-    // inboundOptionsPerPair sopra sono già filtrati dalla API sulla data ESATTA — se quel
-    // giorno preciso non ha nulla in cache l'array arriva vuoto, senza alternative "vicine"
-    // tra cui scegliere. fetchBroaderOneWayLeg riprova sul mese e, se ancora vuoto, sul mese
-    // successivo (scoperto dal vivo: alcune rotte hanno cache solo in una direzione/mese) —
-    // SOLO come fallback quando serve davvero, mai sui risultati che hanno già un match.
+    // finiti): se pickCheapestNearDate sopra non trova NULLA nemmeno entro
+    // DIRECT_DATE_TOLERANCE_DAYS, si mostra il volo reale più vicino trovato in cache
+    // invece del placeholder "disponibile al passo di prenotazione". fetchBroaderOneWayLeg
+    // riprova sul mese e, se ancora vuoto, sul mese successivo (scoperto dal vivo: alcune
+    // rotte hanno cache solo in una direzione/mese) — SOLO come ultimo fallback quando
+    // nemmeno la tolleranza basta, mai sui risultati che hanno già un match.
     // withAirlineDeepLink applicato anche qui (non solo alle tratte con match esatto sopra):
     // senza, una tratta mostrata solo per approssimazione (approxDate) restava con il
     // deepLink Aviasales originale di oneway.ts anche per compagnie che sappiamo gestire
