@@ -82,13 +82,26 @@
 // stessa tolleranza di data del resto dello scalo, non illimitata) — una ricerca realistica
 // che le persone fanno davvero, quindi più probabile avere dati. cheapestConnection tiene
 // il più economico tra questa e la strada "via hub" di prima.
+//
+// RATE LIMIT SCAMBIATO PER "ZERO CACHE" (04/10/2026, testato dal vivo aprendo il sito con
+// il browser invece di aspettare uno screenshot): su Thailandia, TUTTI gli 8 hub curati
+// risultavano pool=0 sull'ANDATA, su TUTTE le finestre di data provate — implausibile sia
+// davvero zero cache su rotte europee trafficate (Milano->Istanbul/Francoforte/Amsterdam
+// ecc.). _shared/oneway.ts trattava QUALSIASI errore HTTP (incluso un 429) come pool vuoto,
+// indistinguibile nel debug. Il motivo del burst: findConnectionHubs (10 hub) x 2 mesi x 2
+// direzioni (andata/ritorno in Promise.all) + fetchDirectConnectionOption = fino a ~40
+// richieste simultanee alla stessa API gratuita per UNA ricerca con scalo. Due fix: (1)
+// oneway.ts ora registra lo status HTTP reale (drainApiFetchErrors, mostrato qui sotto in
+// scaloDebug.apiErrors); (2) il loop sugli hub qui sotto non è più un Promise.all su tutti
+// e 10 insieme, ma mapWithConcurrency con al massimo 3 richieste in volo — stesso principio
+// già usato in Results.jsx per il fallback automatico (sequenziale, non tutto insieme).
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
   filterByFreshness,
   CHARTER_TRUSTED_CITIES,
 } from "../_shared/travelpayouts.ts";
-import { fetchOneWayPrices } from "../_shared/oneway.ts";
+import { fetchOneWayPrices, drainApiFetchErrors } from "../_shared/oneway.ts";
 import {
   cityOf,
   buildAirlineDeepLink,
@@ -97,6 +110,24 @@ import {
 } from "../_shared/airlineLinks.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import airportCoords from "../_shared/airportCoords.json" with { type: "json" };
+
+// Vedi nota "RATE LIMIT SCAMBIATO PER ZERO CACHE" in cima al file: esegue `fn` su tutti gli
+// `items`, ma al massimo `limit` chiamate in volo contemporaneamente invece di un
+// Promise.all su tutti insieme — riduce il burst di richieste verso Travelpayouts senza
+// tornare a un loop puramente sequenziale (che sarebbe troppo lento con 10 hub).
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 function pickCheapestOnDate(options: any[], date: string) {
   const matches = options.filter((o) => o.date === date);
@@ -267,6 +298,11 @@ function nearbyAirports(code: string, maxKm: number): string[] {
 // con 4 si tagliava via metà di CURATED_LONG_HAUL_HUBS (8 voci) e tutto il backfill.
 const CONNECTION_HUB_CANDIDATES = 10;
 
+// Quante richieste per gli hub in volo contemporaneamente (vedi nota "RATE LIMIT SCAMBIATO
+// PER ZERO CACHE" in cima al file) — 3 invece di tutti e 10 insieme, per non sommarsi al
+// resto del burst (ritorno in parallelo, ricerca diretta) e rischiare un 429 silenzioso.
+const CONNECTION_HUB_CONCURRENCY = 3;
+
 // Quanti giorni di distanza dalla data richiesta si accettano per la PRIMA tratta (hub di
 // andata) — vedi nota "TOLLERANZA DI DATA SOLO PER LO SCALO" in cima al file. 3 giorni:
 // abbastanza per intercettare la cache one-way sparsa delle rotte intercontinentali, senza
@@ -361,8 +397,10 @@ async function fetchDirectConnectionOption(origin: string, destination: string, 
 // Results.jsx) senza che l'utente debba aprire una dashboard.
 async function cheapestConnection(origin: string, destination: string, date: string) {
   const hubs = await findConnectionHubs(origin, destination, CONNECTION_HUB_CANDIDATES);
-  const attempts = await Promise.all(
-    hubs.map(async (hub) => {
+  // Vedi nota "RATE LIMIT SCAMBIATO PER ZERO CACHE" in cima al file: non più un Promise.all
+  // su tutti i 10 hub insieme (20 richieste in un colpo solo), ma al massimo
+  // CONNECTION_HUB_CONCURRENCY in volo — stesso risultato finale, meno rischio di 429.
+  const attempts = await mapWithConcurrency(hubs, CONNECTION_HUB_CONCURRENCY, async (hub) => {
       // Prima tratta: tolleranza di qualche giorno sulla data richiesta (vedi
       // CONNECTION_DATE_TOLERANCE_DAYS) — su rotte intercontinentali la cache one-way è
       // troppo sparsa per pretendere l'esattezza che basta invece sulle rotte dirette.
@@ -423,8 +461,7 @@ async function cheapestConnection(origin: string, destination: string, date: str
         outcome: "ok",
         result: { legs: [leg1, { ...leg2, approxDate: shifted }], total: leg1.price + leg2.price },
       };
-    })
-  );
+  });
   const valid = attempts.filter((a) => a.result !== null);
   const bestViaHub = valid.sort((a, b) => (a.result!.total - b.result!.total))[0] ?? null;
   console.log(
@@ -736,6 +773,13 @@ Deno.serve(async (req) => {
       ? deepLink ?? outboundLegsForDisplay[0]?.deepLink ?? inboundLegsForDisplay[0]?.deepLink ?? null
       : null;
 
+    // Vedi nota "RATE LIMIT SCAMBIATO PER ZERO CACHE" in cima al file: drenato qui, a fine
+    // richiesta, cosi raccoglie TUTTI gli errori HTTP accumulati durante questa singola
+    // chiamata (ricerca diretta + entrambe le direzioni dello scalo), senza bisogno dei log
+    // Supabase — se scaloDebug arriva vuoto ma apiErrors ha voci con status 429, è la prova
+    // che il problema è il rate limit del burst, non la cache.
+    const apiErrors = drainApiFetchErrors();
+
     return new Response(
       JSON.stringify({
         price,
@@ -759,9 +803,15 @@ Deno.serve(async (req) => {
         // solo quando è stata davvero richiesta una verifica con scalo, null altrimenti.
         // Results.jsx la mostra solo quando il fallback con scalo finisce senza nessun
         // risultato confermato, per capire cosa ha trovato l'API senza Supabase.
+        // apiErrors (04/10/2026): status HTTP veri delle chiamate fallite durante questa
+        // richiesta (es. 429 rate-limit) — distingue "errore di rete" da "zero cache".
         scaloDebug:
           flight.checkOutboundStop || flight.checkReturnStop
-            ? { outbound: outboundConnection?.debug ?? null, return: returnConnection?.debug ?? null }
+            ? {
+                outbound: outboundConnection?.debug ?? null,
+                return: returnConnection?.debug ?? null,
+                apiErrors: apiErrors.length > 0 ? apiErrors : null,
+              }
             : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

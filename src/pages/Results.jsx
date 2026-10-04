@@ -253,6 +253,14 @@ function ResultRow({ result, isLast, expanded, onToggle, verifiedPrice, verifyDa
 // declinata: "non ho voglia"): ogni tentativo è un hub provato da cheapestConnection sul
 // backend (verify-price), con cosa ha trovato (o non trovato) per ciascuna delle due
 // tratte. Pensata per essere leggibile con un semplice screenshot, non per essere bella.
+//
+// apiErrors (04/10/2026, dopo aver testato dal vivo col browser e trovato pool=0 su
+// TUTTI gli 8 hub curati su TUTTE le date per la Thailandia — implausibile sia davvero
+// "zero cache" su rotte europee trafficate): verify-price ora registra lo status HTTP
+// vero di ogni chiamata fallita (vedi drainApiFetchErrors in _shared/oneway.ts) — se
+// questo elenco mostra 429, è la prova che il problema è il rate limit del burst di
+// richieste, non la scarsità di dati. Mostrato una volta per candidato (non per
+// outbound/return separatamente, visto che arriva già unito nello stesso scaloDebug).
 function ScaloDebugPanel({ items }) {
   if (!items || items.length === 0) return null;
   return (
@@ -272,6 +280,23 @@ function ScaloDebugPanel({ items }) {
           }}
         >
           <div style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{label}</div>
+          {debug?.apiErrors?.length ? (
+            <div
+              style={{
+                fontSize: 10.5,
+                fontFamily: "monospace",
+                color: COLORS.warn,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                marginBottom: 4,
+              }}
+            >
+              ⚠️ {debug.apiErrors.length} chiamate API fallite durante questa verifica:{" "}
+              {debug.apiErrors
+                .map((e) => `status ${e.status} (${e.origin}→${e.destination ?? "?"})`)
+                .join(", ")}
+            </div>
+          ) : null}
           {["outbound", "return"].map((dir) =>
             debug?.[dir]?.length ? (
               <div key={dir} style={{ marginBottom: 4 }}>

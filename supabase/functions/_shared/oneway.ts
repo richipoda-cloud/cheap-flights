@@ -50,6 +50,26 @@ export function mapOneWayResult(r: any, unverified = false) {
   };
 }
 
+// DIAGNOSTICA ERRORI API (03/10/2026, dopo aver notato dal vivo che la ricerca con scalo
+// per Thailandia aveva pool=0 su TUTTI gli 8 hub curati, su TUTTE le finestre di data
+// provate — implausibile sia davvero "zero cache" su rotte europee trafficate come
+// Milano/Bergamo->Istanbul/Francoforte/Amsterdam ecc.). `if (!res.ok) return []` sotto
+// trattava QUALSIASI errore HTTP (incluso un 429 di rate-limit) esattamente come "nessuna
+// tratta in cache" — indistinguibile nel debug mostrato in pagina. cheapestConnection in
+// verify-price/index.ts lancia fino a ~40 richieste in parallelo per una singola ricerca
+// con scalo (10 hub x 2 mesi x 2 direzioni + la ricerca diretta) — un burst del genere
+// contro un'API gratuita è un candidato molto più plausibile di "zero dati reali".
+// Questo array (letto e svuotato da verify-price a fine richiesta, vedi drainApiFetchErrors)
+// rende visibile lo status HTTP vero in scaloDebug, senza bisogno di aprire i log Supabase
+// (che l'utente ha scelto di non controllare — "non ho voglia").
+const apiFetchErrors: Array<{ status: number; origin: string; destination?: string | null; departureAt?: string | null }> = [];
+
+export function drainApiFetchErrors() {
+  const copy = [...apiFetchErrors];
+  apiFetchErrors.length = 0;
+  return copy;
+}
+
 // origin/destination accettano anche codice paese; destination omesso = "ovunque".
 export async function fetchOneWayPrices({
   origin,
@@ -91,7 +111,13 @@ export async function fetchOneWayPrices({
   });
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
-  if (!res.ok) return [];
+  if (!res.ok) {
+    // Vedi nota "DIAGNOSTICA ERRORI API" sopra: prima qui si perdeva lo status (429, 500...)
+    // e il chiamante vedeva solo un pool vuoto, indistinguibile da "nessun dato in cache".
+    console.error(`[oneway] fetch fallita status=${res.status} origin=${origin} destination=${destination ?? "-"} departureAt=${departureAt ?? "-"}`);
+    apiFetchErrors.push({ status: res.status, origin, destination, departureAt });
+    return [];
+  }
   const json = await res.json();
   // v3/prices_for_dates può restituire anche voli con scalo (campo "transfers") — mostrarli
   // come "Diretto" con l'orario di arrivo finale dava durate assurde e un prezzo che poi in
