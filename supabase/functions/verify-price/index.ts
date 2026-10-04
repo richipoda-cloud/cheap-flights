@@ -124,6 +124,25 @@
 // outboundOptions/inboundOptionsPerPair sotto ora vengono dal pool di due mesi (fetchOneWayPool,
 // stesso helper già usato dallo scalo) invece che dalla sola data esatta, e pickCheapestOnDate
 // è diventato pickCheapestNearDate con DIRECT_DATE_TOLERANCE_DAYS.
+//
+// TOLLERANZA ANCORA INSUFFICIENTE SU NEW YORK (04/10/2026, testato dal vivo subito dopo il
+// deploy del fix sopra): confermato via chiamata diretta a questa funzione che per MXP-JFK
+// il pool di due mesi (fetchOneWayPool) non ha PROPRIO NESSUN prezzo diretto in cache, non
+// solo sulla data esatta — i 3 giorni di DIRECT_DATE_TOLERANCE_DAYS non potevano bastare,
+// perché non c'è nulla da cui scegliere nemmeno allargando i giorni. Più mesi scaricati
+// (fetchOneWayPool con monthsCount sotto, 3 mesi invece di 2 per i diretti, scalo invariato).
+//
+// NESSUN LIMITE DI GIORNI PER I DIRETTI (04/10/2026, osservazione decisiva dell'utente dopo
+// un primo tentativo con DIRECT_DATE_TOLERANCE_DAYS=90): "io sto sempre ragionando in termini
+// di date con 'sempre'" — con flight.dateMode === "anytime" (come l'utente cerca sempre),
+// la data mostrata in un risultato non è mai stata una sua scelta, è solo la combinazione
+// più economica trovata dalla cache aggregata v2 in quel momento. Imporre un tetto di
+// giorni (90 o altro) tra quella data e il diretto confermato presumeva ancora che la data
+// originale fosse "quella giusta da rispettare", il che non è vero per una ricerca già
+// flessibile su qualunque data. DIRECT_DATE_TOLERANCE_DAYS sotto è quindi Infinity: si
+// prende il diretto confermato più economico in tutto il pool scaricato, qualunque sia la
+// data, segnalato con leg.approxDate ogni volta che differisce da quella mostrata
+// all'inizio (onestà sulla provenienza del dato, non più un limite su quanto può scostarsi).
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -333,10 +352,21 @@ const CONNECTION_HUB_CONCURRENCY = 3;
 // scivolare su una data così lontana da non assomigliare più al viaggio richiesto.
 const CONNECTION_DATE_TOLERANCE_DAYS = 3;
 
-// Stessa idea, applicata ai voli DIRETTI (vedi nota "TOLLERANZA DI DATA ANCHE SUI DIRETTI"
-// in cima al file) — stesso valore dello scalo, nessuna ragione per essere diversi: la
-// cache one-way ha lo stesso buco "data esatta assente" su entrambi i percorsi.
-const DIRECT_DATE_TOLERANCE_DAYS = 3;
+// Per i voli DIRETTI, invece, NESSUN limite di giorni (04/10/2026, osservazione decisiva
+// dell'utente: "io sto sempre ragionando in termini di date con 'sempre'"). Il ragionamento
+// "3 giorni non bastano, allora 90" (tentato prima) restava comunque ancorato all'idea che
+// la data mostrata (flight.departDate/returnDate) sia una scelta dell'utente da rispettare
+// — ma con flight.dateMode === "anytime" (il modo in cui l'utente cerca sempre) quella data
+// non è mai stata una sua scelta: è solo la combinazione più economica trovata dalla cache
+// aggregata v2 in QUEL momento. Un volo diretto confermato su una data diversa non è quindi
+// un compromesso rispetto a "quello che l'utente voleva" — è altrettanto valido quanto la
+// data mostrata all'inizio, perché in un viaggio "sempre" ogni data è già sullo stesso piano.
+// pickCheapestNearDate con maxDiffDays=Infinity equivale a "il più economico confermato in
+// tutto il pool scaricato" (ordina per prezzo, la vicinanza alla data richiesta conta solo
+// come spareggio) — leg.approxDate resta true ogni volta che la data trovata differisce da
+// quella richiesta, quindi il client continua a segnalarlo onestamente, senza però più
+// scartare un match valido solo perché è lontano nel tempo.
+const DIRECT_DATE_TOLERANCE_DAYS = Infinity;
 // Quanti giorni dopo l'arrivo della prima tratta si accetta la seconda (il volo verso la
 // destinazione finale) — rappresenta la finestra di scalo realistica per un self-transfer
 // (stesso giorno o il successivo è la norma, oltre i 2 giorni non è più "uno scalo" ma una
@@ -375,16 +405,26 @@ async function findConnectionHubs(origin: string, excludeDestination: string, co
   return picked;
 }
 
-// Pool one-way su una rotta per un mese e il successivo (stesso pattern di
-// fetchBroaderOneWayLeg) — serve qui per dare a pickCheapestNearDate margine entro cui
-// scegliere, invece della sola (spesso vuota) data esatta richiesta.
-async function fetchOneWayPool(origin: string, destination: string, monthAnchor: string) {
-  const thisMonth = monthAnchor.slice(0, 7);
-  const [thisMonthOpts, nextMonthOpts] = await Promise.all([
-    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: thisMonth }),
-    fetchOneWayPrices({ origin, destination, limit: 50, departureAt: nextMonth(thisMonth) }),
-  ]);
-  return [...thisMonthOpts, ...nextMonthOpts];
+// Pool one-way su una rotta per `monthsCount` mesi consecutivi a partire da monthAnchor
+// (stesso pattern di fetchBroaderOneWayLeg) — serve qui per dare a pickCheapestNearDate
+// margine entro cui scegliere, invece della sola (spesso vuota) data esatta richiesta.
+//
+// monthsCount default 2 (comportamento originale, usato dallo scalo, non toccato il
+// 04/10/2026) — i diretti invece chiamano questa funzione con monthsCount=3 (vedi nota
+// "TOLLERANZA ANCORA INSUFFICIENTE SU NEW YORK" in cima al file): più mesi scaricati ha
+// senso solo insieme a DIRECT_DATE_TOLERANCE_DAYS più ampio, altrimenti i mesi aggiuntivi
+// verrebbero scartati comunque dal filtro sui giorni di distanza in pickCheapestNearDate.
+async function fetchOneWayPool(origin: string, destination: string, monthAnchor: string, monthsCount = 2) {
+  const months: string[] = [];
+  let cursor = monthAnchor.slice(0, 7);
+  for (let i = 0; i < monthsCount; i++) {
+    months.push(cursor);
+    cursor = nextMonth(cursor);
+  }
+  const perMonth = await Promise.all(
+    months.map((m) => fetchOneWayPrices({ origin, destination, limit: 50, departureAt: m }))
+  );
+  return perMonth.flat();
 }
 
 // IDEA DELL'UTENTE (03/10/2026, dopo aver visto dal vivo che il ritorno USA->hub non ha
@@ -623,14 +663,17 @@ Deno.serve(async (req) => {
       // pur essendo un risultato reale e recente — "confermato" falliva anche su risultati
       // corretti. Stesso limite ampio già usato in search-direct.
       fetchLatestPrices({ origin: flight.origin, destination: flight.destination, dateFrom: flight.departDate, limit: 1000 }),
-      // Vedi nota "TOLLERANZA DI DATA ANCHE SUI DIRETTI" in cima al file (04/10/2026): non
-      // più la sola data esatta (fetchOneWayPrices con departureAt=giorno preciso), ma il
-      // pool di due mesi (fetchOneWayPool, stesso helper dello scalo) — pickCheapestNearDate
-      // sotto scegli poi il più vicino entro DIRECT_DATE_TOLERANCE_DAYS, mai più lontano.
-      fetchOneWayPool(flight.origin, flight.destination, flight.departDate),
+      // Vedi nota "NESSUN LIMITE DI GIORNI PER I DIRETTI" in cima al file (04/10/2026): non
+      // più la sola data esatta (fetchOneWayPrices con departureAt=giorno preciso), ma un
+      // pool di 3 mesi (fetchOneWayPool con monthsCount=3 — 3 invece dei 2 di default usati
+      // dallo scalo, perché qui non c'è un tetto di giorni a limitare comunque la scelta,
+      // quindi vale la pena scaricare più mesi da cui pickCheapestNearDate può scegliere il
+      // diretto confermato più economico, qualunque sia la data (DIRECT_DATE_TOLERANCE_DAYS
+      // = Infinity, coerente con le ricerche a date flessibili "Sempre").
+      fetchOneWayPool(flight.origin, flight.destination, flight.departDate, 3),
       Promise.all(
         returnOrigins.flatMap((returnOrigin) =>
-          homeAirports.map((airport) => fetchOneWayPool(returnOrigin, airport, flight.returnDate))
+          homeAirports.map((airport) => fetchOneWayPool(returnOrigin, airport, flight.returnDate, 3))
         )
       ),
     ]);
