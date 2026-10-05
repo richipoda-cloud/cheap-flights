@@ -143,6 +143,16 @@
 // prende il diretto confermato più economico in tutto il pool scaricato, qualunque sia la
 // data, segnalato con leg.approxDate ogni volta che differisce da quella mostrata
 // all'inizio (onestà sulla provenienza del dato, non più un limite su quanto può scostarsi).
+//
+// ANDATA E RITORNO SCELTI INSIEME (05/10/2026, bug segnalato dall'utente: "un ritorno con
+// una data antecedente all'andata, è impossibile viaggiare nel tempo"): la nota qui sopra
+// toglieva il limite di giorni ma le due tratte restavano scelte INDIPENDENTEMENTE (la più
+// economica in 3 mesi per l'andata, la più economica in 3 mesi per il ritorno), quindi
+// potevano non formare un viaggio — verificato dal vivo: Milano-Stoccolma andata 24/11 e
+// ritorno 4/11, Milano-Podgorica andata 16/10 e ritorno 19/12. Ora pickCheapestPair prende
+// la coppia più economica tra quelle con lo STESSO NUMERO DI NOTTI del risultato mostrato
+// (ritorno sempre dopo l'andata, filtro durata dell'utente rispettato). Le date restano
+// libere come richiesto per le ricerche "Sempre", segnalate con leg.approxDate.
 import {
   TRAVELPAYOUTS_TOKEN,
   fetchLatestPrices,
@@ -212,6 +222,36 @@ function pickCheapestNearDate(options: any[], date: string, maxDiffDays: number)
     return a.price - b.price || diffA - diffB;
   });
   return { ...best, approxDate: best.date !== date };
+}
+
+// Coppia andata/ritorno scelta INSIEME (05/10/2026, vedi nota "ANDATA E RITORNO SCELTI
+// INSIEME" in cima al file): tra tutte le combinazioni dei due pool tiene solo quelle con lo
+// stesso numero di notti del risultato mostrato in lista (flight.departDate -> returnDate),
+// quindi il ritorno è sempre dopo l'andata e il filtro durata dell'utente resta rispettato;
+// tra queste prende la più economica (a parità, quella con l'andata più vicina alla data
+// mostrata). Le date restano libere (ricerca "Sempre"): approxDate segnala per ogni tratta
+// se la data trovata differisce da quella mostrata. Null se nessuna coppia ha quella durata.
+function pickCheapestPair(outs: any[], backs: any[], departDate: string, returnDate: string) {
+  const DAY_MS = 86400000;
+  const nights = Math.round((new Date(returnDate).getTime() - new Date(departDate).getTime()) / DAY_MS);
+  const departT = new Date(departDate).getTime();
+  let best: { o: any; b: any; total: number; dist: number } | null = null;
+  for (const o of outs) {
+    for (const b of backs) {
+      const n = Math.round((new Date(b.date).getTime() - new Date(o.date).getTime()) / DAY_MS);
+      if (n !== nights) continue;
+      const total = o.price + b.price;
+      const dist = Math.abs(new Date(o.date).getTime() - departT);
+      if (!best || total < best.total || (total === best.total && dist < best.dist)) {
+        best = { o, b, total, dist };
+      }
+    }
+  }
+  if (!best) return null;
+  return {
+    outbound: { ...best.o, approxDate: best.o.date !== departDate },
+    inbound: { ...best.b, approxDate: best.b.date !== returnDate },
+  };
 }
 
 function nextMonth(yyyyMm: string): string {
@@ -352,21 +392,8 @@ const CONNECTION_HUB_CONCURRENCY = 3;
 // scivolare su una data così lontana da non assomigliare più al viaggio richiesto.
 const CONNECTION_DATE_TOLERANCE_DAYS = 3;
 
-// Per i voli DIRETTI, invece, NESSUN limite di giorni (04/10/2026, osservazione decisiva
-// dell'utente: "io sto sempre ragionando in termini di date con 'sempre'"). Il ragionamento
-// "3 giorni non bastano, allora 90" (tentato prima) restava comunque ancorato all'idea che
-// la data mostrata (flight.departDate/returnDate) sia una scelta dell'utente da rispettare
-// — ma con flight.dateMode === "anytime" (il modo in cui l'utente cerca sempre) quella data
-// non è mai stata una sua scelta: è solo la combinazione più economica trovata dalla cache
-// aggregata v2 in QUEL momento. Un volo diretto confermato su una data diversa non è quindi
-// un compromesso rispetto a "quello che l'utente voleva" — è altrettanto valido quanto la
-// data mostrata all'inizio, perché in un viaggio "sempre" ogni data è già sullo stesso piano.
-// pickCheapestNearDate con maxDiffDays=Infinity equivale a "il più economico confermato in
-// tutto il pool scaricato" (ordina per prezzo, la vicinanza alla data richiesta conta solo
-// come spareggio) — leg.approxDate resta true ogni volta che la data trovata differisce da
-// quella richiesta, quindi il client continua a segnalarlo onestamente, senza però più
-// scartare un match valido solo perché è lontano nel tempo.
-const DIRECT_DATE_TOLERANCE_DAYS = Infinity;
+// Per i voli DIRETTI non c'è un limite di giorni: andata e ritorno si scelgono insieme con
+// pickCheapestPair (vedi nota "ANDATA E RITORNO SCELTI INSIEME" in cima al file).
 // Quanti giorni dopo l'arrivo della prima tratta si accetta la seconda (il volo verso la
 // destinazione finale) — rappresenta la finestra di scalo realistica per un self-transfer
 // (stesso giorno o il successivo è la norma, oltre i 2 giorni non è più "uno scalo" ma una
@@ -412,8 +439,8 @@ async function findConnectionHubs(origin: string, excludeDestination: string, co
 // monthsCount default 2 (comportamento originale, usato dallo scalo, non toccato il
 // 04/10/2026) — i diretti invece chiamano questa funzione con monthsCount=3 (vedi nota
 // "TOLLERANZA ANCORA INSUFFICIENTE SU NEW YORK" in cima al file): più mesi scaricati ha
-// senso solo insieme a DIRECT_DATE_TOLERANCE_DAYS più ampio, altrimenti i mesi aggiuntivi
-// verrebbero scartati comunque dal filtro sui giorni di distanza in pickCheapestNearDate.
+// senso perché pickCheapestPair non ha un limite di giorni: più mesi = più coppie tra cui
+// scegliere (a parità di notti).
 async function fetchOneWayPool(origin: string, destination: string, monthAnchor: string, monthsCount = 2) {
   const months: string[] = [];
   let cursor = monthAnchor.slice(0, 7);
@@ -667,9 +694,9 @@ Deno.serve(async (req) => {
       // più la sola data esatta (fetchOneWayPrices con departureAt=giorno preciso), ma un
       // pool di 3 mesi (fetchOneWayPool con monthsCount=3 — 3 invece dei 2 di default usati
       // dallo scalo, perché qui non c'è un tetto di giorni a limitare comunque la scelta,
-      // quindi vale la pena scaricare più mesi da cui pickCheapestNearDate può scegliere il
-      // diretto confermato più economico, qualunque sia la data (DIRECT_DATE_TOLERANCE_DAYS
-      // = Infinity, coerente con le ricerche a date flessibili "Sempre").
+      // quindi vale la pena scaricare più mesi da cui pickCheapestPair può scegliere la coppia
+      // andata/ritorno più economica con le stesse notti, qualunque sia la data (coerente
+      // con le ricerche a date flessibili "Sempre").
       fetchOneWayPool(flight.origin, flight.destination, flight.departDate, 3),
       Promise.all(
         returnOrigins.flatMap((returnOrigin) =>
@@ -694,8 +721,16 @@ Deno.serve(async (req) => {
         r.returnDate === flight.returnDate &&
         (flight.allowStops || r.numberOfChanges === 0 || CHARTER_TRUSTED_CITIES.has(r.destination))
     );
-    const outboundLeg = pickCheapestNearDate(outboundOptions, flight.departDate, DIRECT_DATE_TOLERANCE_DAYS);
-    const inboundLeg = pickCheapestNearDate(inboundOptionsPerPair.flat(), flight.returnDate, DIRECT_DATE_TOLERANCE_DAYS);
+    // Andata e ritorno scelti INSIEME (pickCheapestPair, vedi nota in cima al file): mai più
+    // due scelte indipendenti, che davano ritorni prima dell'andata o viaggi di mesi.
+    const directPair = pickCheapestPair(
+      outboundOptions,
+      inboundOptionsPerPair.flat(),
+      flight.departDate,
+      flight.returnDate
+    );
+    const outboundLeg = directPair?.outbound ?? null;
+    const inboundLeg = directPair?.inbound ?? null;
     // true solo se la flessibilità ha davvero trovato conveniente un aeroporto diverso
     // (partenza del ritorno vicino alla destinazione, o arrivo vicino a casa) — round-trip
     // combinato non ha più senso in quel caso.
@@ -779,8 +814,8 @@ Deno.serve(async (req) => {
     const deepLink = singleTicket ? await buildSingleTicketDeepLink(flight, outboundLeg, inboundLeg) : null;
 
     // Solo per il box informativo (mai per prezzo/conferma/link, calcolati sopra e già
-    // finiti): se pickCheapestNearDate sopra non trova NULLA nemmeno entro
-    // DIRECT_DATE_TOLERANCE_DAYS, si mostra il volo reale più vicino trovato in cache
+    // finiti): se pickCheapestPair sopra non trova NESSUNA coppia con le stesse notti, si
+    // mostra il volo reale più vicino trovato in cache
     // invece del placeholder "disponibile al passo di prenotazione". fetchBroaderOneWayLeg
     // riprova sul mese e, se ancora vuoto, sul mese successivo (scoperto dal vivo: alcune
     // rotte hanno cache solo in una direzione/mese) — SOLO come ultimo fallback quando
