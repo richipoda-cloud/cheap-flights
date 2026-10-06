@@ -142,6 +142,134 @@ async function fetchDirectRoundTrips(origins: string[], destination: string): Pr
   return results;
 }
 
+// UNIONE DELLE DUE RICERCHE PER "OVUNQUE" (06/10/2026, scelta esplicita dell'utente dopo il
+// confronto con la funzione di prova search-direct-v2): costruire la lista da tratte one-way
+// REALI (andata + ritorno, abbinate con ritorno dopo l'andata e notti nel range) dava il 100%
+// di risultati confermati e col prezzo giusto, ma da sola meno varieta' di destinazioni e
+// viaggi più lunghi (le coppie più economiche si concentrano in poche città). Qui si usa
+// SOLO per le ricerche "Ovunque" (destinazione fissa invariata) e SOLO per riservare fino a
+// ONEWAY_RESERVED_SLOTS posti, gli altri restano alla ricerca di sempre (v2). Se questa parte
+// fallisce o non trova nulla, il comportamento è esattamente quello di prima.
+//
+// Passi: andata one-way dai tuoi aeroporti verso ovunque (le più economiche in assoluto);
+// K destinazioni con l'andata più economica; ritorno one-way per ciascuna verso ogni
+// aeroporto di partenza; abbinamento (ritorno dopo l'andata, stesse notti del filtro).
+const ONEWAY_RESERVED_SLOTS = 5;
+const ONEWAY_MAX_PER_DESTINATION = 2;
+const ONEWAY_MIN_GAP_DAYS = 3;
+const ONEWAY_DESTINATIONS_TO_CHECK = 20;
+const ONEWAY_OUTBOUND_LIMIT = 300;
+const ONEWAY_INBOUND_LIMIT = 100;
+const ONEWAY_CONCURRENCY = 6;
+// Senza nessun filtro sulle notti: niente viaggi di mesi. Con solo il minimo (es. "15 o più")
+// nessun tetto, la scelta resta dell'utente.
+const ONEWAY_DEFAULT_MAX_NIGHTS = 30;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function buildOneWayRoundTripsAnywhere(
+  origins: string[],
+  filters: any,
+  dateFrom: string | null,
+  dateTo: string | null
+): Promise<any[]> {
+  if (origins.length === 0) return [];
+  const nightsMin: number = filters.nightsMin ?? 1;
+  const nightsMax: number =
+    filters.nightsMax ?? (filters.nightsMin != null ? Number.POSITIVE_INFINITY : ONEWAY_DEFAULT_MAX_NIGHTS);
+
+  const outboundPerOrigin = await mapWithConcurrency(origins, ONEWAY_CONCURRENCY, (origin) =>
+    fetchOneWayPrices({ origin, limit: ONEWAY_OUTBOUND_LIMIT })
+  );
+  let outbound = outboundPerOrigin.flat();
+  if (dateFrom && dateTo) outbound = outbound.filter((o: any) => o.date >= dateFrom && o.date <= dateTo);
+  outbound = filterByExcludedCountries(outbound, filters.excludedCountries);
+
+  const cheapestByDestination = new Map<string, number>();
+  for (const o of outbound) {
+    const cur = cheapestByDestination.get(o.destination);
+    if (cur == null || o.price < cur) cheapestByDestination.set(o.destination, o.price);
+  }
+  const destinations = [...cheapestByDestination.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, ONEWAY_DESTINATIONS_TO_CHECK)
+    .map(([code]) => code);
+
+  const pairs = destinations.flatMap((dest) => origins.map((origin) => ({ dest, origin })));
+  const inboundPerPair = await mapWithConcurrency(pairs, ONEWAY_CONCURRENCY, ({ dest, origin }) =>
+    fetchOneWayPrices({ origin: dest, destination: origin, limit: ONEWAY_INBOUND_LIMIT })
+  );
+  const inboundByKey = new Map<string, any[]>();
+  pairs.forEach(({ dest, origin }, i) => inboundByKey.set(`${dest}|${origin}`, inboundPerPair[i]));
+
+  const DAY_MS = 86400000;
+  const bestByDeparture = new Map<string, any>();
+  for (const out of outbound) {
+    if (!destinations.includes(out.destination)) continue;
+    const backs =
+      inboundByKey.get(`${out.destination}|${out.originAirport ?? ""}`) ??
+      origins.flatMap((o) => inboundByKey.get(`${out.destination}|${o}`) ?? []);
+    const outT = new Date(out.date).getTime();
+    for (const back of backs) {
+      const nights = Math.round((new Date(back.date).getTime() - outT) / DAY_MS);
+      if (nights < nightsMin || nights > nightsMax) continue;
+      const total = out.price + back.price;
+      const originCode = origins.find((o) => o === out.originAirport) ?? out.originAirport;
+      const key = `${originCode}-${out.destination}-${out.date}`;
+      const existing = bestByDeparture.get(key);
+      if (!existing || total < existing.price) {
+        bestByDeparture.set(key, {
+          id: `${originCode}-${out.destination}-${out.date}-${back.date}`,
+          origin: originCode,
+          destination: out.destination,
+          destinationName: out.destinationName,
+          countryCode: out.countryCode,
+          departDate: out.date,
+          returnDate: back.date,
+          price: total,
+          currency: "EUR",
+          nights,
+          foundAt: new Date().toISOString(),
+          numberOfChanges: 0,
+          fromV3: true,
+        });
+      }
+    }
+  }
+
+  // Al massimo ONEWAY_MAX_PER_DESTINATION per destinazione, e solo viaggi davvero diversi
+  // (andata a 3+ giorni di distanza, durata che differisce di 3+ notti).
+  const sorted = [...bestByDeparture.values()].sort((a, b) => a.price - b.price);
+  const acceptedByDestination = new Map<string, any[]>();
+  const picked: any[] = [];
+  for (const r of sorted) {
+    if (picked.length >= ONEWAY_RESERVED_SLOTS) break;
+    const accepted = acceptedByDestination.get(r.destination) ?? [];
+    const distinct = accepted.every(
+      (a) =>
+        Math.abs(new Date(a.departDate).getTime() - new Date(r.departDate).getTime()) >=
+          ONEWAY_MIN_GAP_DAYS * DAY_MS && Math.abs(a.nights - r.nights) >= 3
+    );
+    if (accepted.length < ONEWAY_MAX_PER_DESTINATION && distinct) {
+      picked.push(r);
+      acceptedByDestination.set(r.destination, [...accepted, r]);
+    }
+  }
+  return picked;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -163,6 +291,16 @@ Deno.serve(async (req) => {
     // cache anche se il resto di novembre sì.
     const dateFrom = filters.dateMode === "fixed" ? filters.dateFrom : null;
     const dateTo = filters.dateMode === "fixed" ? filters.dateTo : null;
+
+    // Parte "voli reali one-way" (solo Ovunque, vedi nota UNIONE DELLE DUE RICERCHE sopra):
+    // avviata subito, in parallelo con la ricerca di sempre. Qualsiasi errore qui non deve mai
+    // rompere la ricerca — si ricade su una lista vuota (comportamento di prima).
+    const oneWayPromise: Promise<any[]> = destination
+      ? Promise.resolve([])
+      : buildOneWayRoundTripsAnywhere(origins, filters, dateFrom, dateTo).catch((e) => {
+          console.error(`[search-direct] one-way anywhere fallita: ${e}`);
+          return [];
+        });
 
     // "Destinazione fissa" a un PAESE (2 lettere, es. "US") invece che a una città/
     // aeroporto (3 lettere, es. "NYC") — vedi COUNTRY_MAJOR_CITIES sopra.
@@ -248,10 +386,20 @@ Deno.serve(async (req) => {
     // varietà; secondo giro: riempie gli slot avanzati (se non bastano destinazioni
     // diverse) con le prossime più economiche, quindi non si perde mai un posto libero.
     const MAX_PER_DESTINATION = 3;
+    // Solo "Ovunque": i primi posti vanno ai voli costruiti da tratte one-way reali (vedi nota
+    // UNIONE DELLE DUE RICERCHE sopra), contati nel limite per destinazione; il resto della
+    // lista parte dalla ricerca di sempre, senza duplicare le stesse date di andata.
+    const reserved = await oneWayPromise;
     const perDestinationCount = new Map<string, number>();
-    const diverse: typeof deduped = [];
+    const reservedKeys = new Set<string>();
+    for (const r of reserved) {
+      perDestinationCount.set(r.destination, (perDestinationCount.get(r.destination) ?? 0) + 1);
+      reservedKeys.add(`${r.origin}-${r.destination}-${r.departDate}`);
+    }
+    const candidates = deduped.filter((r) => !reservedKeys.has(`${r.origin}-${r.destination}-${r.departDate}`));
+    const diverse: typeof deduped = [...reserved];
     const leftover: typeof deduped = [];
-    for (const r of deduped) {
+    for (const r of candidates) {
       const count = perDestinationCount.get(r.destination) ?? 0;
       if (count < MAX_PER_DESTINATION && diverse.length < MAX_RESULTS) {
         diverse.push(r);
