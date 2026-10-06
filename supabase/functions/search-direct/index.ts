@@ -100,26 +100,100 @@ const COUNTRY_MAJOR_CITIES: Record<string, string[]> = {
 // economici di NYC/MIA, occupavano tutti i 10 posti finali e i risultati DAVVERO
 // confermabili (NYC/MIA) restavano fuori dalla lista — da qui "nemmeno uno" confermato,
 // pur esistendo dati reali sottostanti. Vedi priorità in fondo al file.
-async function fetchDirectRoundTrips(origins: string[], destination: string): Promise<any[]> {
-  const [outboundPerOrigin, inboundPerOrigin] = await Promise.all([
-    Promise.all(origins.map((o) => fetchOneWayPrices({ origin: o, destination, limit: 200 }))),
-    Promise.all(origins.map((o) => fetchOneWayPrices({ origin: destination, destination: o, limit: 200 }))),
+//
+// CORREZIONE (06/10/2026, "ancora niente con Stati Uniti"): nonostante quanto sopra, per
+// NYC/MIA questa funzione restituiva comunque ZERO risultati (nessun fromV3 in lista). Causa
+// trovata: la richiesta one-way senza `departure_at` prende le `limit` tratte più economiche
+// IN ASSOLUTO sull'intera rotta, in gran parte CON scalo — il filtro "solo diretti" di
+// fetchOneWayPrices le scarta tutte e non resta nulla (mentre verify-price, che interroga
+// mese per mese, i voli diretti li trova eccome). Ora si interroga mese per mese anche qui
+// (stessa strategia di verify-price), solo per i mesi rilevanti (date fisse se impostate,
+// altrimenti i prossimi mesi), e l'abbinamento rispetta le notti scelte dall'utente.
+const DIRECT_RT_DEFAULT_MONTHS = 6;
+const DIRECT_RT_MAX_MONTHS = 12;
+const DIRECT_RT_LIMIT = 100;
+const DIRECT_RT_CONCURRENCY = 6;
+const DIRECT_RT_DEFAULT_MAX_NIGHTS = 30;
+
+// Elenco "YYYY-MM" da un mese all'altro compresi.
+function monthRange(startYm: string, count: number): string[] {
+  const out: string[] = [];
+  let y = Number(startYm.slice(0, 4));
+  let m = Number(startYm.slice(5, 7));
+  for (let i = 0; i < count; i++) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return out;
+}
+
+function monthsBetween(fromYm: string, toYm: string): number {
+  return (Number(toYm.slice(0, 4)) - Number(fromYm.slice(0, 4))) * 12 + (Number(toYm.slice(5, 7)) - Number(fromYm.slice(5, 7))) + 1;
+}
+
+async function fetchDirectRoundTrips(
+  origins: string[],
+  destination: string,
+  filters: any,
+  dateFrom: string | null,
+  dateTo: string | null
+): Promise<any[]> {
+  const nightsMin: number = filters.nightsMin ?? 1;
+  const nightsMax: number =
+    filters.nightsMax ?? (filters.nightsMin != null ? Number.POSITIVE_INFINITY : DIRECT_RT_DEFAULT_MAX_NIGHTS);
+
+  // Mesi di partenza: l'intervallo "Date fisse" se c'è, altrimenti i prossimi mesi da oggi.
+  const todayYm = new Date().toISOString().slice(0, 7);
+  let outMonths: string[];
+  if (dateFrom && dateTo) {
+    const count = Math.min(Math.max(monthsBetween(dateFrom.slice(0, 7), dateTo.slice(0, 7)), 1), DIRECT_RT_MAX_MONTHS);
+    outMonths = monthRange(dateFrom.slice(0, 7), count);
+  } else {
+    outMonths = monthRange(todayYm, DIRECT_RT_DEFAULT_MONTHS);
+  }
+  // Ritorno: gli stessi mesi + il successivo (il ritorno viene dopo la partenza).
+  const inMonths = monthRange(outMonths[0], outMonths.length + 1);
+
+  const outboundTasks = origins.flatMap((origin) => outMonths.map((month) => ({ origin, month })));
+  const inboundTasks = origins.flatMap((origin) => inMonths.map((month) => ({ origin, month })));
+  const [outboundLists, inboundLists] = await Promise.all([
+    mapWithConcurrency(outboundTasks, DIRECT_RT_CONCURRENCY, ({ origin, month }) =>
+      fetchOneWayPrices({ origin, destination, limit: DIRECT_RT_LIMIT, departureAt: month })
+    ),
+    mapWithConcurrency(inboundTasks, DIRECT_RT_CONCURRENCY, ({ origin, month }) =>
+      fetchOneWayPrices({ origin: destination, destination: origin, limit: DIRECT_RT_LIMIT, departureAt: month })
+    ),
   ]);
-  const outboundOptions = outboundPerOrigin.flat();
-  const inboundOptions = inboundPerOrigin.flat();
+  let outboundOptions = outboundLists.flat();
+  const inboundOptions = inboundLists.flat();
+  if (dateFrom && dateTo) {
+    outboundOptions = outboundOptions.filter((o: any) => o.date >= dateFrom && o.date <= dateTo);
+  }
   if (!outboundOptions.length || !inboundOptions.length) return [];
 
+  const DAY_MS = 86400000;
   const results: any[] = [];
   for (const out of outboundOptions) {
     const outTime = new Date(out.date).getTime();
     let best: any = null;
+    let bestNights = 0;
     for (const back of inboundOptions) {
       const backTime = new Date(back.date).getTime();
       if (backTime <= outTime) continue;
-      if (!best || back.price < best.price) best = back;
+      const nights = Math.round((backTime - outTime) / DAY_MS);
+      // Rispetta le notti scelte: prima si prendeva il ritorno più economico a qualunque
+      // distanza e poi il filtro notti lo scartava, buttando via anche l'andata.
+      if (nights < nightsMin || nights > nightsMax) continue;
+      if (!best || back.price < best.price || (back.price === best.price && nights < bestNights)) {
+        best = back;
+        bestNights = nights;
+      }
     }
     if (!best) continue;
-    const nights = Math.round((new Date(best.date).getTime() - outTime) / 86400000);
     results.push({
       id: `${out.originAirport}-${destination}-${out.date}-${best.date}`,
       origin: out.originAirport,
@@ -130,7 +204,7 @@ async function fetchDirectRoundTrips(origins: string[], destination: string): Pr
       returnDate: best.date,
       price: out.price + best.price,
       currency: "EUR",
-      nights,
+      nights: bestNights,
       // v3/prices_for_dates espone found_at solo per prezzi delle ultime 48 ore (Travelpayouts
       // lo popola solo così) — questi voli sono per definizione già "freschi", niente da
       // scartare col filtro di freschezza (pensato per v2, che può restare in cache settimane).
@@ -326,7 +400,7 @@ Deno.serve(async (req) => {
       ...extraCityDestinations.filter((c) => !CHARTER_TRUSTED_CITIES.has(c)),
     ];
     const directRoundTripsPerCity = await Promise.all(
-      regularCityTargets.map((city) => fetchDirectRoundTrips(origins, city))
+      regularCityTargets.map((city) => fetchDirectRoundTrips(origins, city, filters, dateFrom, dateTo))
     );
     const merged = [...perOrigin.flat(), ...directRoundTripsPerCity.flat()];
     // Scarta prezzi in cache troppo vecchi PRIMA di scegliere i più economici: un prezzo
