@@ -13,7 +13,7 @@
 //  2. si tengono le K destinazioni con l'andata più economica;
 //  3. ritorno: per ciascuna, one-way destinazione -> aeroporto di partenza;
 //  4. si abbinano andata e ritorno (ritorno dopo l'andata, notti nel range), la coppia più
-//     economica per ogni data di andata; poi stessa selezione di search-direct (max 3 per
+//     economica per ogni data di andata; poi stessa selezione di search-direct (max 2 per
 //     destinazione, 10 in totale).
 // Risposta nello stesso formato di search-direct + `meta` con numeri e tempi per il confronto.
 import { TRAVELPAYOUTS_TOKEN, filterByExcludedCountries } from "../_shared/travelpayouts.ts";
@@ -21,15 +21,19 @@ import { fetchOneWayPrices, drainApiFetchErrors } from "../_shared/oneway.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const MAX_RESULTS = 10;
-const MAX_PER_DESTINATION = 3;
+// Dal confronto del 06/10/2026: con 3 per destinazione poche città occupavano la lista
+// (Bilbao x3, Sofia x2...). Ora max 2 per destinazione, e le due devono essere davvero
+// diverse (andata a 3+ giorni di distanza e durata che differisce di 3+ notti).
+const MAX_PER_DESTINATION = 2;
+const MIN_GAP_DAYS = 3;
 // Quante destinazioni (le più economiche in andata) si controllano sul ritorno: ogni
-// destinazione costa una richiesta per aeroporto di partenza, quindi tenuto basso.
-const DESTINATIONS_TO_CHECK = 12;
+// destinazione costa una richiesta per aeroporto di partenza. Da 12 a 20 per più varietà.
+const DESTINATIONS_TO_CHECK = 20;
 // Pool andata per aeroporto (più economiche in assoluto, qualunque data/destinazione).
 const OUTBOUND_LIMIT = 300;
 const INBOUND_LIMIT = 100;
 // Richieste contemporanee verso Travelpayouts (stesso principio di verify-price).
-const CONCURRENCY = 4;
+const CONCURRENCY = 6;
 // Se l'utente non ha messo un range di notti, niente viaggi di mesi.
 const DEFAULT_MAX_NIGHTS = 30;
 
@@ -131,14 +135,20 @@ Deno.serve(async (req) => {
     }
 
     const sorted = [...bestByDeparture.values()].sort((a, b) => a.price - b.price);
-    const perDestinationCount = new Map<string, number>();
+    const acceptedByDestination = new Map<string, any[]>();
     const diverse: any[] = [];
     const leftover: any[] = [];
     for (const r of sorted) {
-      const count = perDestinationCount.get(r.destination) ?? 0;
-      if (count < MAX_PER_DESTINATION && diverse.length < MAX_RESULTS) {
+      const accepted = acceptedByDestination.get(r.destination) ?? [];
+      // Una seconda voce della stessa destinazione solo se è un viaggio davvero diverso.
+      const distinct = accepted.every(
+        (a) =>
+          Math.abs(new Date(a.departDate).getTime() - new Date(r.departDate).getTime()) >= MIN_GAP_DAYS * 86400000 &&
+          Math.abs(a.nights - r.nights) >= 3
+      );
+      if (accepted.length < MAX_PER_DESTINATION && distinct && diverse.length < MAX_RESULTS) {
         diverse.push(r);
-        perDestinationCount.set(r.destination, count + 1);
+        acceptedByDestination.set(r.destination, [...accepted, r]);
       } else {
         leftover.push(r);
       }
